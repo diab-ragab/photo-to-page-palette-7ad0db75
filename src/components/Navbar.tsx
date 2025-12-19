@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, Download } from "lucide-react";
+import { Menu, X, Download, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -18,6 +18,8 @@ const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) =
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { t } = useLanguage();
+  const location = useLocation();
+  const isHomePage = location.pathname === "/";
 
   const navLinks = [
     { label: t('nav.home'), href: "#hero" },
@@ -40,7 +42,7 @@ export const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
+            {isHomePage && navLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
@@ -50,6 +52,13 @@ export const Navbar = () => {
                 {link.label}
               </a>
             ))}
+            <Link
+              to="/shop"
+              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              {t('nav.shop')}
+            </Link>
             <LanguageSwitcher />
             <Button variant="default" size="sm">
               <Download className="mr-2 h-4 w-4" />
@@ -79,7 +88,7 @@ export const Navbar = () => {
           className="md:hidden bg-card border-b border-border"
         >
           <div className="container px-4 py-4 flex flex-col gap-4">
-            {navLinks.map((link) => (
+            {isHomePage && navLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
@@ -92,6 +101,14 @@ export const Navbar = () => {
                 {link.label}
               </a>
             ))}
+            <Link
+              to="/shop"
+              className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
+              onClick={() => setIsOpen(false)}
+            >
+              <ShoppingBag className="w-4 h-4" />
+              {t('nav.shop')}
+            </Link>
             <Button variant="default" className="w-full">
               <Download className="mr-2 h-4 w-4" />
               {t('nav.download')}
