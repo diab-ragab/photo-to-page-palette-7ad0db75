@@ -8,12 +8,10 @@ import { CTA } from "@/components/CTA";
 import { UpdateRoad } from "@/components/UpdateRoad";
 import { Footer } from "@/components/Footer";
 import { ConsentPopup } from "@/components/ConsentPopup";
-import { VHSEffect } from "@/components/VHSEffect";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <VHSEffect />
       <Navbar />
       <HeroSection />
       <ClassSelection />
