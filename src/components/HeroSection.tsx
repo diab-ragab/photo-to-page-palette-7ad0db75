@@ -5,7 +5,7 @@ import { ServerStatusCard } from "@/components/ServerStatusCard";
 import { AnnouncementsCard } from "@/components/AnnouncementsCard";
 import { ChangelogCard } from "@/components/ChangelogCard";
 import { DiscordCard } from "@/components/DiscordCard";
-import { ParticleField } from "@/components/ParticleField";
+
 import { useLanguage } from "@/contexts/LanguageContext";
 import heroBg from "@/assets/hero-bg.jpg";
 import { useRef } from "react";
@@ -25,7 +25,7 @@ export const HeroSection = () => {
   const overlayOpacity = useTransform(scrollYProgress, [0, 0.5, 1], [1, 0.8, 0]);
   const contentY = useTransform(scrollYProgress, [0, 1], ["0%", "25%"]);
   const contentOpacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
-  const particleY = useTransform(scrollYProgress, [0, 1], ["0%", "40%"]);
+  
 
   return (
     <section id="hero" ref={sectionRef} className="relative min-h-screen flex flex-col justify-center overflow-hidden pb-20">
@@ -35,41 +35,21 @@ export const HeroSection = () => {
         style={{ y: videoY }}
       >
         <motion.div
-          className="absolute w-full h-full bg-cover bg-center bg-no-repeat saturate-[1.3] contrast-[1.1]"
+          className="absolute w-full h-full bg-cover bg-center bg-no-repeat"
           style={{ 
             scale: videoScale,
             backgroundImage: `url(${heroBg})`,
           }}
         />
-        {/* RGB Color Cycling Overlay */}
-        <div className="absolute inset-0 rgb-overlay pointer-events-none" />
       </motion.div>
       
-      {/* HDR Gradient Overlay with Vivid Colors */}
+      {/* Simple Gradient Overlay */}
       <motion.div 
         className="absolute inset-0 z-10"
         style={{ opacity: overlayOpacity }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/50 to-background" />
-        <div className="absolute inset-0 bg-gradient-to-r from-hdr-cyan/10 via-transparent to-hdr-magenta/10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/40 to-background" />
         <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-background via-background/80 to-transparent" />
-      </motion.div>
-      
-      {/* HDR Color Bloom Effects */}
-      <div className="absolute inset-0 z-[5] pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-hdr-cyan/20 rounded-full blur-[120px] animate-pulse-glow" />
-        <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-hdr-purple/20 rounded-full blur-[100px] animate-pulse-glow" style={{ animationDelay: '1s' }} />
-        <div className="absolute bottom-1/4 left-1/3 w-72 h-72 bg-hdr-magenta/15 rounded-full blur-[100px] animate-pulse-glow" style={{ animationDelay: '2s' }} />
-      </div>
-
-      {/* CRT Scanline Effect - Enhanced with multiple layers */}
-      <div className="absolute inset-0 z-[25] pointer-events-none crt-overlay" />
-      <div className="absolute inset-0 z-[26] pointer-events-none crt-color-fringe" />
-      <div className="absolute inset-0 z-[27] pointer-events-none crt-noise" />
-      
-      {/* Floating Particles with Parallax */}
-      <motion.div style={{ y: particleY }} className="absolute inset-0 z-15">
-        <ParticleField />
       </motion.div>
       
       <motion.div 
