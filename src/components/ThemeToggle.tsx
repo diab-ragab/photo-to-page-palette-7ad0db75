@@ -11,6 +11,17 @@ export const ThemeToggle = () => {
     setMounted(true);
   }, []);
 
+  const toggleTheme = () => {
+    // Add transitioning class for smooth animation
+    document.documentElement.classList.add('transitioning');
+    setTheme(theme === "dark" ? "light" : "dark");
+    
+    // Remove class after transition completes
+    setTimeout(() => {
+      document.documentElement.classList.remove('transitioning');
+    }, 300);
+  };
+
   if (!mounted) {
     return (
       <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -24,7 +35,7 @@ export const ThemeToggle = () => {
       variant="ghost"
       size="icon"
       className="h-9 w-9"
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      onClick={toggleTheme}
     >
       {theme === "dark" ? (
         <Sun className="h-4 w-4 transition-transform hover:rotate-45" />
