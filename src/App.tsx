@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { CartProvider } from "@/contexts/CartContext";
+import { ThemeProvider } from "next-themes";
 import { AnimatePresence } from "framer-motion";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { ScrollProgress } from "@/components/ScrollProgress";
@@ -44,20 +45,22 @@ const AnimatedRoutes = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <LanguageProvider>
-      <CartProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <ScrollProgress />
-          <BrowserRouter>
-            <AnimatedRoutes />
-            <ScrollToTop />
-            <RecentPurchases />
-          </BrowserRouter>
-        </TooltipProvider>
-      </CartProvider>
-    </LanguageProvider>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+      <LanguageProvider>
+        <CartProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <ScrollProgress />
+            <BrowserRouter>
+              <AnimatedRoutes />
+              <ScrollToTop />
+              <RecentPurchases />
+            </BrowserRouter>
+          </TooltipProvider>
+        </CartProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

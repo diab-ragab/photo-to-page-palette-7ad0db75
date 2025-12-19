@@ -6,6 +6,7 @@ import { Link, useLocation } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { CartButton } from "@/components/shop/CartButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
   e.preventDefault();
@@ -61,6 +62,7 @@ export const Navbar = () => {
               {t('nav.shop')}
             </Link>
             <CartButton />
+            <ThemeToggle />
             <LanguageSwitcher />
             <Button variant="default" size="sm">
               <Download className="mr-2 h-4 w-4" />
@@ -70,6 +72,7 @@ export const Navbar = () => {
 
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
+            <ThemeToggle />
             <LanguageSwitcher />
             <button
               onClick={() => setIsOpen(!isOpen)}
