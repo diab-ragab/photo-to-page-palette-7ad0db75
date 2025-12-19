@@ -78,6 +78,9 @@ export const HeroSection = () => {
         <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-hdr-purple/20 rounded-full blur-[100px] animate-pulse-glow" style={{ animationDelay: '1s' }} />
         <div className="absolute bottom-1/4 left-1/3 w-72 h-72 bg-hdr-magenta/15 rounded-full blur-[100px] animate-pulse-glow" style={{ animationDelay: '2s' }} />
       </div>
+
+      {/* CRT Scanline Effect */}
+      <div className="absolute inset-0 z-[25] pointer-events-none crt-overlay" />
       
       {/* Floating Particles with Parallax */}
       <motion.div style={{ y: particleY }} className="absolute inset-0 z-15">
