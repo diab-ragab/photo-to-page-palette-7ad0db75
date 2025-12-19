@@ -36,4 +36,34 @@
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
+  <url>
+    <loc>https://woiendgame.com/blog</loc>
+    <lastmod>2025-01-15</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://woiendgame.com/blog/season-5-update-new-dungeons</loc>
+    <lastmod>2025-01-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://woiendgame.com/blog/class-balancing-patch-notes</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://woiendgame.com/blog/pvp-tournament-announcement</loc>
+    <lastmod>2025-01-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://woiendgame.com/blog/new-player-guide-2025</loc>
+    <lastmod>2025-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
 </urlset>
