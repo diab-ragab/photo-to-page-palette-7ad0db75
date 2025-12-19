@@ -1,30 +1,33 @@
 import { motion } from "framer-motion";
 import { Download, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DiscordWidget } from "@/components/DiscordWidget";
+import { ServerStatusCard } from "@/components/ServerStatusCard";
+import { AnnouncementsCard } from "@/components/AnnouncementsCard";
+import { ChangelogCard } from "@/components/ChangelogCard";
+import { DiscordCard } from "@/components/DiscordCard";
 import heroBg from "@/assets/hero-bg.jpg";
 
 export const HeroSection = () => {
   return (
-    <section className="relative min-h-screen flex flex-col justify-center overflow-hidden pb-32">
+    <section className="relative min-h-screen flex flex-col justify-center overflow-hidden pb-20">
       {/* Background Image */}
       <div 
         className="absolute inset-0 z-0"
         style={{
           backgroundImage: `url(${heroBg})`,
           backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundPosition: 'center top',
         }}
       />
       {/* Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/60 to-background z-10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/50 to-background z-10" />
       
       <div className="container relative z-20 px-4 pt-24">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="text-center max-w-4xl mx-auto"
+          className="text-center max-w-4xl mx-auto mb-12"
         >
           <span className="inline-block px-4 py-1.5 rounded-full bg-primary/20 border border-primary/30 text-primary text-sm font-display uppercase tracking-widest mb-6">
             Private Server
@@ -53,8 +56,17 @@ export const HeroSection = () => {
           </div>
         </motion.div>
 
-        {/* Discord & Announcements Widgets */}
-        <DiscordWidget />
+        {/* Info Cards Grid */}
+        <div className="grid md:grid-cols-3 gap-4 max-w-5xl mx-auto mb-4">
+          <ServerStatusCard />
+          <AnnouncementsCard />
+          <ChangelogCard />
+        </div>
+
+        {/* Discord Card */}
+        <div className="max-w-5xl mx-auto">
+          <DiscordCard />
+        </div>
       </div>
     </section>
   );
