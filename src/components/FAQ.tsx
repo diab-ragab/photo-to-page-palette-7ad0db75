@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Helmet } from "react-helmet-async";
 import {
   Accordion,
   AccordionContent,
@@ -30,9 +31,28 @@ const faqs = [
 ];
 
 export const FAQ = () => {
+  const faqStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map((faq) => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer,
+      },
+    })),
+  };
+
   return (
-    <section id="faq" className="py-16 md:py-24 px-4 scroll-mt-20">
-      <div className="container max-w-3xl">
+    <>
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify(faqStructuredData)}
+        </script>
+      </Helmet>
+      <section id="faq" className="py-16 md:py-24 px-4 scroll-mt-20">
+        <div className="container max-w-3xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -72,5 +92,6 @@ export const FAQ = () => {
         </motion.div>
       </div>
     </section>
+    </>
   );
 };
