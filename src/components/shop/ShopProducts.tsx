@@ -191,11 +191,17 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: index * 0.05 }}
-              className="glass-card overflow-hidden group hover:border-primary/50 transition-all duration-300"
+              whileHover={{ 
+                y: -8, 
+                scale: 1.02,
+                transition: { duration: 0.2 }
+              }}
+              className="glass-card overflow-hidden group hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20 transition-all duration-300"
             >
               {/* Product Image/Icon */}
-              <div className="relative h-40 bg-gradient-to-br from-secondary/50 to-background flex items-center justify-center">
-                <span className="text-6xl group-hover:scale-110 transition-transform duration-300">
+              <div className="relative h-40 bg-gradient-to-br from-secondary/50 to-background flex items-center justify-center overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <span className="text-6xl group-hover:scale-110 group-hover:drop-shadow-[0_0_15px_rgba(var(--primary),0.5)] transition-all duration-300">
                   {product.image}
                 </span>
                 
