@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ShoppingCart, Sparkles, Star, Minus, Plus } from "lucide-react";
+import { ShoppingCart, Sparkles, Star, Minus, Plus, ZoomIn, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -227,14 +227,45 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
               className="glass-card overflow-hidden group hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20 transition-all duration-300"
             >
               {/* Product Image/Icon */}
-              <div className="relative h-40 bg-gradient-to-br from-secondary/50 to-background flex items-center justify-center overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <span className="text-6xl group-hover:scale-110 group-hover:drop-shadow-[0_0_15px_rgba(var(--primary),0.5)] transition-all duration-300">
+              <div className="relative h-40 bg-gradient-to-br from-secondary/50 to-background flex items-center justify-center overflow-hidden cursor-pointer">
+                {/* Background gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
+                {/* Zoom background effect */}
+                <div className="absolute inset-0 bg-primary/5 scale-0 group-hover:scale-100 rounded-full transition-transform duration-500 origin-center" />
+                
+                {/* Product emoji with zoom effect */}
+                <motion.span 
+                  className="text-6xl relative z-10 transition-all duration-300 group-hover:scale-125 group-hover:drop-shadow-[0_0_20px_hsl(var(--primary)/0.6)]"
+                  whileHover={{ rotate: [0, -5, 5, 0] }}
+                  transition={{ duration: 0.5 }}
+                >
                   {product.image}
-                </span>
+                </motion.span>
+                
+                {/* Quick view overlay */}
+                <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-background/60 backdrop-blur-sm">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    whileHover={{ scale: 1.1 }}
+                    animate={{ scale: 1 }}
+                    className="p-2 rounded-full bg-primary/90 text-primary-foreground shadow-lg"
+                  >
+                    <ZoomIn className="w-5 h-5" />
+                  </motion.div>
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    whileHover={{ scale: 1.1 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.05 }}
+                    className="p-2 rounded-full bg-secondary text-secondary-foreground shadow-lg"
+                  >
+                    <Eye className="w-5 h-5" />
+                  </motion.div>
+                </div>
                 
                 {/* Badges */}
-                <div className="absolute top-3 left-3 flex flex-col gap-2">
+                <div className="absolute top-3 left-3 flex flex-col gap-2 z-20">
                   {product.popular && (
                     <Badge className="bg-primary text-primary-foreground gap-1">
                       <Star className="w-3 h-3" />
@@ -249,7 +280,7 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                 </div>
                 
                 {product.bonus && (
-                  <Badge className="absolute top-3 right-3 bg-primary/90 text-primary-foreground gap-1">
+                  <Badge className="absolute top-3 right-3 bg-primary/90 text-primary-foreground gap-1 z-20">
                     <Sparkles className="w-3 h-3" />
                     {product.bonus}
                   </Badge>
