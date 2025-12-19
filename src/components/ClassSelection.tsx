@@ -1,7 +1,14 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import berserkerImg from "@/assets/class-berserker.jpg";
 import magusImg from "@/assets/class-magus.jpg";
 import hereticImg from "@/assets/class-heretic.jpg";
@@ -133,47 +140,18 @@ const classes: ClassData[] = [
   },
 ];
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.2 },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 50, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.6 },
-  },
-};
-
 export const ClassSelection = () => {
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleClassClick = (classData: ClassData) => {
     setSelectedClass(classData);
     setIsModalOpen(true);
   };
 
-  const scroll = (direction: "left" | "right") => {
-    if (scrollContainerRef.current) {
-      const scrollAmount = 320;
-      scrollContainerRef.current.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
-      });
-    }
-  };
-
   return (
     <>
-      <section id="classes" className="py-16 md:py-24 scroll-mt-20 overflow-hidden">
+      <section id="classes" className="py-16 md:py-24 scroll-mt-20">
         <div className="container px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -189,71 +167,60 @@ export const ClassSelection = () => {
               fierce warrior or a powerful mage, there's a class waiting for you.
             </p>
           </motion.div>
-
-          {/* Navigation Buttons */}
-          <div className="flex justify-center gap-4 mb-6">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => scroll("left")}
-              className="rounded-full"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => scroll("right")}
-              className="rounded-full"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </Button>
-          </div>
         </div>
 
-        {/* Scrollable Container - Full width outside container */}
-        <motion.div
-          ref={scrollContainerRef}
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          className="flex gap-4 md:gap-6 overflow-x-auto scrollbar-hide pb-4 snap-x snap-mandatory"
-          style={{ 
-            paddingLeft: "calc(50vw - 140px)", 
-            paddingRight: "calc(50vw - 140px)" 
-          }}
-        >
-          {classes.map((classItem) => (
-            <motion.div
-              key={classItem.name}
-              variants={itemVariants}
-              onClick={() => handleClassClick(classItem)}
-              className="group relative overflow-hidden rounded-xl cursor-pointer flex-shrink-0 
-                         w-[280px] sm:w-[300px] lg:w-[320px] snap-center"
-            >
-                  <div className="aspect-[3/4] overflow-hidden">
-                    <img
-                      src={classItem.image}
-                      alt={classItem.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <h3 className="text-2xl font-bold font-display mb-2 text-foreground">
-                      {classItem.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {classItem.description}
-                    </p>
-                    <span className="inline-flex items-center text-primary text-sm font-semibold group-hover:gap-2 transition-all">
-                      View Skills <ArrowRight className="w-4 h-4 ml-1" />
-                    </span>
-                  </div>
-            </motion.div>
-          ))}
-        </motion.div>
+        {/* Carousel */}
+        <div className="w-full px-4 md:px-12 lg:px-20">
+          <Carousel
+            opts={{
+              align: "center",
+              loop: true,
+            }}
+            className="w-full"
+          >
+            <CarouselContent className="-ml-2 md:-ml-4">
+              {classes.map((classItem, index) => (
+                <CarouselItem 
+                  key={classItem.name} 
+                  className="pl-2 md:pl-4 basis-[280px] md:basis-[300px] lg:basis-[320px]"
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 50 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    onClick={() => handleClassClick(classItem)}
+                    className="group relative overflow-hidden rounded-xl cursor-pointer"
+                  >
+                    <div className="aspect-[3/4] overflow-hidden">
+                      <img
+                        src={classItem.image}
+                        alt={classItem.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-6">
+                      <h3 className="text-2xl font-bold font-display mb-2 text-foreground">
+                        {classItem.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {classItem.description}
+                      </p>
+                      <span className="inline-flex items-center text-primary text-sm font-semibold group-hover:gap-2 transition-all">
+                        View Skills <ArrowRight className="w-4 h-4 ml-1" />
+                      </span>
+                    </div>
+                  </motion.div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <div className="flex justify-center gap-4 mt-8">
+              <CarouselPrevious className="static translate-y-0" />
+              <CarouselNext className="static translate-y-0" />
+            </div>
+          </Carousel>
+        </div>
       </section>
 
       <ClassDetailModal
