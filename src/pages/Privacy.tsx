@@ -5,12 +5,20 @@ import { ChevronRight, Home } from "lucide-react";
 import { SEO } from "@/components/SEO";
 
 const Privacy = () => {
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  
+  const breadcrumbs = [
+    { name: "Home", url: baseUrl },
+    { name: "Privacy Policy", url: `${baseUrl}/privacy` },
+  ];
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SEO 
         title="Privacy Policy"
         description="WOI Endgame Privacy Policy. Learn how we collect, use, and protect your personal information."
         keywords="WOI privacy, data protection, privacy policy, WOI Endgame"
+        breadcrumbs={breadcrumbs}
       />
       <Navbar />
       <main className="container py-20 px-4">

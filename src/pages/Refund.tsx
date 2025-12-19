@@ -5,12 +5,20 @@ import { ChevronRight, Home } from "lucide-react";
 import { SEO } from "@/components/SEO";
 
 const Refund = () => {
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  
+  const breadcrumbs = [
+    { name: "Home", url: baseUrl },
+    { name: "Refund Policy", url: `${baseUrl}/refund` },
+  ];
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SEO 
         title="Refund Policy"
         description="WOI Endgame Refund Policy. Learn about our refund eligibility for VIP memberships, in-game credits, and donations."
         keywords="WOI refund, refund policy, chargebacks, WOI Endgame"
+        breadcrumbs={breadcrumbs}
       />
       <Navbar />
       <main className="container py-20 px-4">

@@ -19,6 +19,13 @@ const Shop = () => {
     url: typeof window !== "undefined" ? `${window.location.origin}/shop` : "",
   };
 
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  
+  const breadcrumbs = [
+    { name: "Home", url: baseUrl },
+    { name: "Shop", url: `${baseUrl}/shop` },
+  ];
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SEO 
@@ -27,6 +34,7 @@ const Shop = () => {
         keywords="WOI shop, game items, in-game currency, pets, fashion, WOI Endgame store"
         ogType="website"
         structuredData={structuredData}
+        breadcrumbs={breadcrumbs}
       />
       <Navbar />
       <ShopHero />
