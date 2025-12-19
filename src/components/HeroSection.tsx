@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { Download, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ServerStatusCard } from "@/components/ServerStatusCard";
@@ -6,21 +6,35 @@ import { AnnouncementsCard } from "@/components/AnnouncementsCard";
 import { ChangelogCard } from "@/components/ChangelogCard";
 import { DiscordCard } from "@/components/DiscordCard";
 import heroBg from "@/assets/hero-bg.jpg";
+import { useRef } from "react";
 
 export const HeroSection = () => {
+  const sectionRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  });
+
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
+  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+
   return (
-    <section id="hero" className="relative min-h-screen flex flex-col justify-center overflow-hidden pb-20">
-      {/* Background Image */}
-      <div 
+    <section id="hero" ref={sectionRef} className="relative min-h-screen flex flex-col justify-center overflow-hidden pb-20">
+      {/* Parallax Background Image */}
+      <motion.div 
         className="absolute inset-0 z-0"
         style={{
           backgroundImage: `url(${heroBg})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center top',
+          y: backgroundY,
         }}
       />
       {/* Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/50 to-background z-10" />
+      <motion.div 
+        className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/50 to-background z-10"
+        style={{ opacity }}
+      />
       
       <div className="container relative z-20 px-4 pt-24">
         <motion.div
