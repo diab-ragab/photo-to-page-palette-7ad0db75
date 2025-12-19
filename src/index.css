@@ -369,6 +369,91 @@
     66% { transform: translate(1px, -1px); }
     100% { transform: translate(0, 0); }
   }
+
+  /* RGB Color Cycling Overlay for Video Background */
+  .rgb-overlay {
+    background: linear-gradient(
+      45deg,
+      hsl(var(--hdr-cyan) / 0.25) 0%,
+      hsl(var(--hdr-purple) / 0.25) 33%,
+      hsl(var(--hdr-magenta) / 0.25) 66%,
+      hsl(var(--hdr-cyan) / 0.25) 100%
+    );
+    background-size: 400% 400%;
+    mix-blend-mode: color;
+    animation: rgb-cycle 8s ease infinite;
+  }
+
+  .rgb-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      -45deg,
+      hsl(var(--hdr-magenta) / 0.15) 0%,
+      transparent 30%,
+      transparent 70%,
+      hsl(var(--hdr-cyan) / 0.15) 100%
+    );
+    background-size: 200% 200%;
+    mix-blend-mode: overlay;
+    animation: rgb-shift 6s ease-in-out infinite alternate;
+  }
+
+  .rgb-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 0%,
+      hsl(var(--hdr-purple) / 0.1) 50%,
+      hsl(var(--hdr-cyan) / 0.2) 100%
+    );
+    mix-blend-mode: screen;
+    animation: rgb-pulse 4s ease-in-out infinite;
+  }
+
+  @keyframes rgb-cycle {
+    0%, 100% {
+      background-position: 0% 50%;
+      filter: hue-rotate(0deg);
+    }
+    25% {
+      background-position: 50% 100%;
+      filter: hue-rotate(30deg);
+    }
+    50% {
+      background-position: 100% 50%;
+      filter: hue-rotate(60deg);
+    }
+    75% {
+      background-position: 50% 0%;
+      filter: hue-rotate(30deg);
+    }
+  }
+
+  @keyframes rgb-shift {
+    0% {
+      background-position: 0% 0%;
+      opacity: 0.6;
+    }
+    100% {
+      background-position: 100% 100%;
+      opacity: 1;
+    }
+  }
+
+  @keyframes rgb-pulse {
+    0%, 100% {
+      opacity: 0.3;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(1.05);
+    }
+  }
 }
 
 @layer utilities {
