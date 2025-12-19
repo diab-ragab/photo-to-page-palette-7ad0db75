@@ -250,6 +250,61 @@
     50% { transform: translateX(2px); opacity: 1; }
     100% { transform: translateX(0); opacity: 1; }
   }
+
+  /* CRT Scanline Effect */
+  .crt-overlay {
+    background: 
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        hsl(var(--hdr-cyan) / 0.03) 2px,
+        hsl(var(--hdr-cyan) / 0.03) 4px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 1px,
+        rgba(0, 0, 0, 0.15) 1px,
+        rgba(0, 0, 0, 0.15) 2px
+      );
+    animation: crt-flicker 0.15s infinite;
+  }
+
+  .crt-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 0%,
+      transparent 50%,
+      hsl(var(--background) / 0.3) 100%
+    );
+  }
+
+  .crt-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      hsl(var(--hdr-cyan) / 0.02) 50%,
+      transparent 100%
+    );
+    animation: crt-scan 8s linear infinite;
+  }
+
+  @keyframes crt-flicker {
+    0%, 100% { opacity: 0.97; }
+    50% { opacity: 1; }
+  }
+
+  @keyframes crt-scan {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+  }
 }
 
 @layer utilities {
