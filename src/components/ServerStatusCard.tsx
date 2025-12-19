@@ -43,10 +43,10 @@ export const ServerStatusCard = () => {
       </div>
 
       <div className="flex gap-2">
-        <Button variant="default" size="sm" className="flex-1 text-xs">
+        <Button variant="default" size="sm" className="flex-1 text-[10px] md:text-xs px-2">
           Refresh
         </Button>
-        <Button variant="outline" size="sm" className="flex-1 text-xs">
+        <Button variant="outline" size="sm" className="flex-1 text-[10px] md:text-xs px-2">
           View Details
         </Button>
       </div>
