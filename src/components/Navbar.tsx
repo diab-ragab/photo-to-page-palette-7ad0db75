@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CartButton } from "@/components/shop/CartButton";
 
 const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
   e.preventDefault();
@@ -59,6 +60,7 @@ export const Navbar = () => {
               <ShoppingBag className="w-4 h-4" />
               {t('nav.shop')}
             </Link>
+            <CartButton />
             <LanguageSwitcher />
             <Button variant="default" size="sm">
               <Download className="mr-2 h-4 w-4" />
