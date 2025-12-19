@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import {
@@ -7,8 +7,10 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi,
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
+import { cn } from "@/lib/utils";
 import berserkerImg from "@/assets/class-berserker.jpg";
 import magusImg from "@/assets/class-magus.jpg";
 import hereticImg from "@/assets/class-heretic.jpg";
@@ -143,11 +145,27 @@ const classes: ClassData[] = [
 export const ClassSelection = () => {
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [api, setApi] = useState<CarouselApi>();
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    if (!api) return;
+
+    setCurrent(api.selectedScrollSnap());
+
+    api.on("select", () => {
+      setCurrent(api.selectedScrollSnap());
+    });
+  }, [api]);
 
   const handleClassClick = (classData: ClassData) => {
     setSelectedClass(classData);
     setIsModalOpen(true);
   };
+
+  const scrollTo = useCallback((index: number) => {
+    api?.scrollTo(index);
+  }, [api]);
 
   return (
     <>
@@ -172,6 +190,7 @@ export const ClassSelection = () => {
         {/* Carousel */}
         <div className="w-full px-4 md:px-12 lg:px-20">
           <Carousel
+            setApi={setApi}
             opts={{
               align: "center",
               loop: true,
@@ -222,8 +241,26 @@ export const ClassSelection = () => {
                 </CarouselItem>
               ))}
             </CarouselContent>
-            <div className="flex justify-center gap-4 mt-8">
+            <div className="flex justify-center items-center gap-4 mt-8">
               <CarouselPrevious className="static translate-y-0" />
+              
+              {/* Dot Indicators */}
+              <div className="flex gap-2">
+                {classes.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => scrollTo(index)}
+                    className={cn(
+                      "w-2 h-2 rounded-full transition-all duration-300",
+                      current === index 
+                        ? "bg-primary w-6" 
+                        : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                    )}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
+                ))}
+              </div>
+              
               <CarouselNext className="static translate-y-0" />
             </div>
           </Carousel>
