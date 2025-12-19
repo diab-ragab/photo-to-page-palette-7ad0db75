@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
 import { Download, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DiscordWidget } from "@/components/DiscordWidget";
 import heroBg from "@/assets/hero-bg.jpg";
 
 export const HeroSection = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-screen flex flex-col justify-center overflow-hidden pb-32">
       {/* Background Image */}
       <div 
         className="absolute inset-0 z-0"
@@ -18,7 +19,7 @@ export const HeroSection = () => {
       {/* Overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/60 to-background z-10" />
       
-      <div className="container relative z-20 px-4 pt-20">
+      <div className="container relative z-20 px-4 pt-24">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -51,6 +52,9 @@ export const HeroSection = () => {
             </Button>
           </div>
         </motion.div>
+
+        {/* Discord & Announcements Widgets */}
+        <DiscordWidget />
       </div>
     </section>
   );
