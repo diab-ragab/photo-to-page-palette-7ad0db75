@@ -30,7 +30,7 @@ export const ChangelogCard = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.3 }}
-      className="glass-card p-4"
+      className="p-4"
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
