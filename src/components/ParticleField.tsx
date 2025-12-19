@@ -13,9 +13,16 @@ interface Particle {
   twinkleOffset: number;
 }
 
+interface TrailPoint {
+  x: number;
+  y: number;
+  age: number;
+}
+
 export const ParticleField = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: -1000, y: -1000 });
+  const trailRef = useRef<TrailPoint[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -73,11 +80,45 @@ export const ParticleField = () => {
 
     const connectionRadius = 120;
 
+    const maxTrailLength = 20;
+
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       time += 1;
 
       const mouse = mouseRef.current;
+
+      // Update trail
+      if (mouse.x > 0 && mouse.y > 0) {
+        trailRef.current.unshift({ x: mouse.x, y: mouse.y, age: 0 });
+      }
+      trailRef.current = trailRef.current
+        .map((point) => ({ ...point, age: point.age + 1 }))
+        .filter((point) => point.age < maxTrailLength);
+
+      // Draw trail with fading glow
+      trailRef.current.forEach((point, index) => {
+        const progress = point.age / maxTrailLength;
+        const opacity = (1 - progress) * 0.3;
+        const size = (1 - progress) * 20 + 5;
+
+        const gradient = ctx.createRadialGradient(
+          point.x,
+          point.y,
+          0,
+          point.x,
+          point.y,
+          size
+        );
+        gradient.addColorStop(0, `rgba(74, 222, 128, ${opacity})`);
+        gradient.addColorStop(0.5, `rgba(74, 222, 128, ${opacity * 0.3})`);
+        gradient.addColorStop(1, "rgba(74, 222, 128, 0)");
+
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      });
 
       particles.forEach((particle) => {
         // Update base position (drifting)
