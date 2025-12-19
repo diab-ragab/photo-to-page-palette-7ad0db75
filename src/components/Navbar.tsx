@@ -2,12 +2,23 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Menu, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link, useLocation } from "react-router-dom";
 
 const navLinks = [
-  { label: "Home", href: "#" },
-  { label: "Download", href: "#download" },
-  { label: "Ranking", href: "#ranking" },
+  { label: "Home", href: "#hero" },
+  { label: "Classes", href: "#classes" },
+  { label: "Features", href: "#features" },
+  { label: "FAQ", href: "#faq" },
 ];
+
+const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+  e.preventDefault();
+  const id = href.replace("#", "");
+  const element = document.getElementById(id);
+  if (element) {
+    element.scrollIntoView({ behavior: "smooth" });
+  }
+};
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -17,12 +28,12 @@ export const Navbar = () => {
       <div className="container px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <a href="/" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="font-display font-bold text-primary-foreground text-sm">W</span>
             </div>
             <span className="font-display font-bold text-lg">WOI Endgame</span>
-          </a>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
@@ -30,7 +41,8 @@ export const Navbar = () => {
               <a
                 key={link.label}
                 href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+                onClick={(e) => scrollToSection(e, link.href)}
+                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors cursor-pointer"
               >
                 {link.label}
               </a>
@@ -64,8 +76,11 @@ export const Navbar = () => {
               <a
                 key={link.label}
                 href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
-                onClick={() => setIsOpen(false)}
+                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2 cursor-pointer"
+                onClick={(e) => {
+                  scrollToSection(e, link.href);
+                  setIsOpen(false);
+                }}
               >
                 {link.label}
               </a>
