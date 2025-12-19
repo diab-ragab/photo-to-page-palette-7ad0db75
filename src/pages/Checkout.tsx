@@ -10,6 +10,7 @@ import { ShieldCheck, CreditCard, Lock, ChevronLeft } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
+import { SEO } from "@/components/SEO";
 
 const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();
@@ -37,6 +38,11 @@ const Checkout = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO 
+        title="Checkout"
+        description="Complete your WOI Endgame purchase securely."
+        noIndex={true}
+      />
       <Navbar />
       <div className="container mx-auto px-4 py-24">
         <Link 

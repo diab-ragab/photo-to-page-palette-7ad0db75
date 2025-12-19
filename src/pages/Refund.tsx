@@ -2,10 +2,16 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Link } from "react-router-dom";
 import { ChevronRight, Home } from "lucide-react";
+import { SEO } from "@/components/SEO";
 
 const Refund = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO 
+        title="Refund Policy"
+        description="WOI Endgame Refund Policy. Learn about our refund eligibility for VIP memberships, in-game credits, and donations."
+        keywords="WOI refund, refund policy, chargebacks, WOI Endgame"
+      />
       <Navbar />
       <main className="container py-20 px-4">
         <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">

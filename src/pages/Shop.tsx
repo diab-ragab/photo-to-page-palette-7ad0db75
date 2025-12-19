@@ -3,6 +3,7 @@ import { Footer } from "@/components/Footer";
 import { ShopHero } from "@/components/shop/ShopHero";
 import { ShopCategories } from "@/components/shop/ShopCategories";
 import { ShopProducts } from "@/components/shop/ShopProducts";
+import { SEO } from "@/components/SEO";
 import { useState } from "react";
 
 export type ShopCategory = "all" | "fashion" | "pets" | "currency";
@@ -10,8 +11,23 @@ export type ShopCategory = "all" | "fashion" | "pets" | "currency";
 const Shop = () => {
   const [selectedCategory, setSelectedCategory] = useState<ShopCategory>("all");
 
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "Store",
+    name: "WOI Endgame Shop",
+    description: "Browse exclusive in-game items, fashion, pets, and currency for WOI Endgame.",
+    url: typeof window !== "undefined" ? `${window.location.origin}/shop` : "",
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO 
+        title="Shop"
+        description="Browse and purchase exclusive in-game items, fashion, pets, and currency for WOI Endgame private server. Fast delivery and secure checkout."
+        keywords="WOI shop, game items, in-game currency, pets, fashion, WOI Endgame store"
+        ogType="website"
+        structuredData={structuredData}
+      />
       <Navbar />
       <ShopHero />
       <ShopCategories 

@@ -2,10 +2,16 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Link } from "react-router-dom";
 import { ChevronRight, Home } from "lucide-react";
+import { SEO } from "@/components/SEO";
 
 const Privacy = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO 
+        title="Privacy Policy"
+        description="WOI Endgame Privacy Policy. Learn how we collect, use, and protect your personal information."
+        keywords="WOI privacy, data protection, privacy policy, WOI Endgame"
+      />
       <Navbar />
       <main className="container py-20 px-4">
         <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">

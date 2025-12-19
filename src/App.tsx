@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { ThemeProvider } from "next-themes";
 import { AnimatePresence } from "framer-motion";
+import { HelmetProvider } from "react-helmet-async";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { RecentPurchases } from "@/components/RecentPurchases";
@@ -44,24 +45,26 @@ const AnimatedRoutes = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-      <LanguageProvider>
-        <CartProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <ScrollProgress />
-            <BrowserRouter>
-              <AnimatedRoutes />
-              <ScrollToTop />
-              <RecentPurchases />
-            </BrowserRouter>
-          </TooltipProvider>
-        </CartProvider>
-      </LanguageProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+  <HelmetProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <LanguageProvider>
+          <CartProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <ScrollProgress />
+              <BrowserRouter>
+                <AnimatedRoutes />
+                <ScrollToTop />
+                <RecentPurchases />
+              </BrowserRouter>
+            </TooltipProvider>
+          </CartProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </HelmetProvider>
 );
 
 export default App;
