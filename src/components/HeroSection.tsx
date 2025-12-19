@@ -41,7 +41,7 @@ export const HeroSection = () => {
           muted
           loop
           playsInline
-          className="absolute w-full h-full object-cover"
+          className="absolute w-full h-full object-cover saturate-[1.3] contrast-[1.1]"
           style={{ scale: videoScale }}
           poster={heroBg}
         >
@@ -62,17 +62,22 @@ export const HeroSection = () => {
         }}
       />
       
-      {/* Gradient Overlay with Fade */}
+      {/* HDR Gradient Overlay with Vivid Colors */}
       <motion.div 
-        className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/60 to-background z-10"
+        className="absolute inset-0 z-10"
         style={{ opacity: overlayOpacity }}
-      />
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/50 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-r from-hdr-cyan/10 via-transparent to-hdr-magenta/10" />
+        <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-background via-background/80 to-transparent" />
+      </motion.div>
       
-      {/* Secondary Overlay for Depth */}
-      <motion.div 
-        className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-background/50 z-10"
-        style={{ opacity: overlayOpacity }}
-      />
+      {/* HDR Color Bloom Effects */}
+      <div className="absolute inset-0 z-[5] pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-hdr-cyan/20 rounded-full blur-[120px] animate-pulse-glow" />
+        <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-hdr-purple/20 rounded-full blur-[100px] animate-pulse-glow" style={{ animationDelay: '1s' }} />
+        <div className="absolute bottom-1/4 left-1/3 w-72 h-72 bg-hdr-magenta/15 rounded-full blur-[100px] animate-pulse-glow" style={{ animationDelay: '2s' }} />
+      </div>
       
       {/* Floating Particles with Parallax */}
       <motion.div style={{ y: particleY }} className="absolute inset-0 z-15">
@@ -89,7 +94,7 @@ export const HeroSection = () => {
           transition={{ duration: 0.8 }}
           className="text-center max-w-4xl mx-auto mb-12"
         >
-          <span className="inline-block px-4 py-1.5 rounded-full bg-primary/20 border border-primary/30 text-primary text-sm font-display uppercase tracking-widest mb-6">
+          <span className="inline-block px-4 py-1.5 rounded-full bg-gradient-to-r from-hdr-cyan/20 to-hdr-purple/20 border border-hdr-cyan/40 text-primary text-sm font-display uppercase tracking-widest mb-6 glow-effect">
             {t('hero.badge')}
           </span>
           
