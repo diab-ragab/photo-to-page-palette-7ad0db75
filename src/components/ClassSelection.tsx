@@ -173,8 +173,8 @@ export const ClassSelection = () => {
 
   return (
     <>
-      <section id="classes" className="py-16 md:py-24 px-4 scroll-mt-20">
-        <div className="container">
+      <section id="classes" className="py-16 md:py-24 scroll-mt-20 overflow-hidden">
+        <div className="container px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -209,26 +209,29 @@ export const ClassSelection = () => {
               <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
+        </div>
 
-          {/* Scrollable Container */}
-          <div className="relative w-screen left-1/2 -translate-x-1/2">
+        {/* Scrollable Container - Full width outside container */}
+        <motion.div
+          ref={scrollContainerRef}
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          className="flex gap-4 md:gap-6 overflow-x-auto scrollbar-hide pb-4 snap-x snap-mandatory"
+          style={{ 
+            paddingLeft: "calc(50vw - 140px)", 
+            paddingRight: "calc(50vw - 140px)" 
+          }}
+        >
+          {classes.map((classItem) => (
             <motion.div
-              ref={scrollContainerRef}
-              variants={containerVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-100px" }}
-              className="flex gap-4 md:gap-6 overflow-x-auto scrollbar-hide pb-4 snap-x snap-mandatory
-                         px-[calc(50vw-140px)] sm:px-[calc(50vw-150px)] lg:px-[calc(50vw-160px)]"
+              key={classItem.name}
+              variants={itemVariants}
+              onClick={() => handleClassClick(classItem)}
+              className="group relative overflow-hidden rounded-xl cursor-pointer flex-shrink-0 
+                         w-[280px] sm:w-[300px] lg:w-[320px] snap-center"
             >
-              {classes.map((classItem) => (
-                <motion.div
-                  key={classItem.name}
-                  variants={itemVariants}
-                  onClick={() => handleClassClick(classItem)}
-                  className="group relative overflow-hidden rounded-xl cursor-pointer flex-shrink-0 
-                             w-[280px] sm:w-[300px] lg:w-[320px] snap-center"
-                >
                   <div className="aspect-[3/4] overflow-hidden">
                     <img
                       src={classItem.image}
@@ -248,11 +251,9 @@ export const ClassSelection = () => {
                       View Skills <ArrowRight className="w-4 h-4 ml-1" />
                     </span>
                   </div>
-                </motion.div>
-              ))}
             </motion.div>
-          </div>
-        </div>
+          ))}
+        </motion.div>
       </section>
 
       <ClassDetailModal
