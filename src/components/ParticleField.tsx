@@ -3,6 +3,8 @@ import { useEffect, useRef } from "react";
 interface Particle {
   x: number;
   y: number;
+  baseX: number;
+  baseY: number;
   size: number;
   speedX: number;
   speedY: number;
@@ -13,6 +15,7 @@ interface Particle {
 
 export const ParticleField = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouseRef = useRef({ x: -1000, y: -1000 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -28,14 +31,34 @@ export const ParticleField = () => {
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
 
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseRef.current = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+    };
+
+    const handleMouseLeave = () => {
+      mouseRef.current = { x: -1000, y: -1000 };
+    };
+
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseleave", handleMouseLeave);
+
     const particleCount = 80;
     const particles: Particle[] = [];
+    const mouseRadius = 150;
 
     // Initialize particles
     for (let i = 0; i < particleCount; i++) {
+      const x = Math.random() * canvas.width;
+      const y = Math.random() * canvas.height;
       particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
+        x,
+        y,
+        baseX: x,
+        baseY: y,
         size: Math.random() * 2 + 0.5,
         speedX: (Math.random() - 0.5) * 0.3,
         speedY: (Math.random() - 0.5) * 0.3 - 0.2,
@@ -52,16 +75,36 @@ export const ParticleField = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       time += 1;
 
+      const mouse = mouseRef.current;
+
       particles.forEach((particle) => {
-        // Update position
-        particle.x += particle.speedX;
-        particle.y += particle.speedY;
+        // Update base position (drifting)
+        particle.baseX += particle.speedX;
+        particle.baseY += particle.speedY;
 
         // Wrap around edges
-        if (particle.x < 0) particle.x = canvas.width;
-        if (particle.x > canvas.width) particle.x = 0;
-        if (particle.y < 0) particle.y = canvas.height;
-        if (particle.y > canvas.height) particle.y = 0;
+        if (particle.baseX < 0) particle.baseX = canvas.width;
+        if (particle.baseX > canvas.width) particle.baseX = 0;
+        if (particle.baseY < 0) particle.baseY = canvas.height;
+        if (particle.baseY > canvas.height) particle.baseY = 0;
+
+        // Calculate mouse interaction
+        const dx = mouse.x - particle.baseX;
+        const dy = mouse.y - particle.baseY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < mouseRadius && distance > 0) {
+          const force = (mouseRadius - distance) / mouseRadius;
+          const angle = Math.atan2(dy, dx);
+          const pushX = Math.cos(angle) * force * 30;
+          const pushY = Math.sin(angle) * force * 30;
+          particle.x = particle.baseX - pushX;
+          particle.y = particle.baseY - pushY;
+        } else {
+          // Smoothly return to base position
+          particle.x += (particle.baseX - particle.x) * 0.1;
+          particle.y += (particle.baseY - particle.y) * 0.1;
+        }
 
         // Twinkle effect
         const twinkle = Math.sin(time * particle.twinkleSpeed + particle.twinkleOffset);
@@ -99,6 +142,8 @@ export const ParticleField = () => {
 
     return () => {
       window.removeEventListener("resize", resizeCanvas);
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("mouseleave", handleMouseLeave);
       cancelAnimationFrame(animationId);
     };
   }, []);
@@ -106,7 +151,8 @@ export const ParticleField = () => {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 w-full h-full pointer-events-none z-[5]"
+      className="absolute inset-0 w-full h-full z-[5]"
+      style={{ pointerEvents: "auto" }}
     />
   );
 };
