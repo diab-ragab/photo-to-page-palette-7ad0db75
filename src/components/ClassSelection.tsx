@@ -211,15 +211,14 @@ export const ClassSelection = () => {
           </div>
 
           {/* Scrollable Container */}
-          <div className="relative">
+          <div className="relative -mx-4 md:-mx-8 lg:-mx-16">
             <motion.div
               ref={scrollContainerRef}
               variants={containerVariants}
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: "-100px" }}
-              className="flex gap-4 md:gap-6 overflow-x-auto scrollbar-hide pb-4 snap-x snap-mandatory"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              className="flex gap-4 md:gap-6 overflow-x-auto scrollbar-hide pb-4 snap-x snap-mandatory px-[calc(50vw-140px)] md:px-[calc(50vw-150px)]"
             >
               {classes.map((classItem) => (
                 <motion.div
