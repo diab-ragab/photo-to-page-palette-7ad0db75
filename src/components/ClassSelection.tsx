@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import berserkerImg from "@/assets/class-berserker.jpg";
 import magusImg from "@/assets/class-magus.jpg";
 import hereticImg from "@/assets/class-heretic.jpg";
@@ -153,10 +154,21 @@ const itemVariants = {
 export const ClassSelection = () => {
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleClassClick = (classData: ClassData) => {
     setSelectedClass(classData);
     setIsModalOpen(true);
+  };
+
+  const scroll = (direction: "left" | "right") => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 320;
+      scrollContainerRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
   };
 
   return (
@@ -178,42 +190,67 @@ export const ClassSelection = () => {
             </p>
           </motion.div>
 
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
-          >
-            {classes.map((classItem) => (
-              <motion.div
-                key={classItem.name}
-                variants={itemVariants}
-                onClick={() => handleClassClick(classItem)}
-                className="group relative overflow-hidden rounded-xl cursor-pointer"
-              >
-                <div className="aspect-[4/5] sm:aspect-[3/4] overflow-hidden">
-                  <img
-                    src={classItem.image}
-                    alt={classItem.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <h3 className="text-2xl font-bold font-display mb-2 text-foreground">
-                    {classItem.name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {classItem.description}
-                  </p>
-                  <span className="inline-flex items-center text-primary text-sm font-semibold group-hover:gap-2 transition-all">
-                    View Skills <ArrowRight className="w-4 h-4 ml-1" />
-                  </span>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
+          {/* Navigation Buttons */}
+          <div className="flex justify-center gap-4 mb-6">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => scroll("left")}
+              className="rounded-full"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => scroll("right")}
+              className="rounded-full"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Scrollable Container */}
+          <div className="relative">
+            <motion.div
+              ref={scrollContainerRef}
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              className="flex gap-4 md:gap-6 overflow-x-auto scrollbar-hide pb-4 snap-x snap-mandatory"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
+              {classes.map((classItem) => (
+                <motion.div
+                  key={classItem.name}
+                  variants={itemVariants}
+                  onClick={() => handleClassClick(classItem)}
+                  className="group relative overflow-hidden rounded-xl cursor-pointer flex-shrink-0 w-[280px] md:w-[300px] snap-center"
+                >
+                  <div className="aspect-[3/4] overflow-hidden">
+                    <img
+                      src={classItem.image}
+                      alt={classItem.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <h3 className="text-2xl font-bold font-display mb-2 text-foreground">
+                      {classItem.name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {classItem.description}
+                    </p>
+                    <span className="inline-flex items-center text-primary text-sm font-semibold group-hover:gap-2 transition-all">
+                      View Skills <ArrowRight className="w-4 h-4 ml-1" />
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          </div>
         </div>
       </section>
 
