@@ -10,8 +10,6 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import heroBg from "@/assets/hero-bg.jpg";
 import { useRef } from "react";
 
-// Replace this URL with your actual game video URL
-const VIDEO_URL = "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4";
 
 export const HeroSection = () => {
   const sectionRef = useRef<HTMLElement>(null);
@@ -31,38 +29,21 @@ export const HeroSection = () => {
 
   return (
     <section id="hero" ref={sectionRef} className="relative min-h-screen flex flex-col justify-center overflow-hidden pb-20">
-      {/* Video Background with Parallax + RGB Effect */}
+      {/* Static Image Background with Parallax */}
       <motion.div 
         className="absolute inset-0 z-0 overflow-hidden"
         style={{ y: videoY }}
       >
-        <motion.video
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="absolute w-full h-full object-cover saturate-[1.3] contrast-[1.1]"
-          style={{ scale: videoScale }}
-          poster={heroBg}
-        >
-          <source src={VIDEO_URL} type="video/mp4" />
-        </motion.video>
+        <motion.div
+          className="absolute w-full h-full bg-cover bg-center bg-no-repeat saturate-[1.3] contrast-[1.1]"
+          style={{ 
+            scale: videoScale,
+            backgroundImage: `url(${heroBg})`,
+          }}
+        />
         {/* RGB Color Cycling Overlay */}
         <div className="absolute inset-0 rgb-overlay pointer-events-none" />
       </motion.div>
-      
-      {/* Fallback Image Background with Parallax */}
-      <motion.div 
-        className="absolute inset-0 z-[1]"
-        style={{
-          backgroundImage: `url(${heroBg})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          y: videoY,
-          scale: videoScale,
-          opacity: 0, // Hidden when video plays, shown as fallback
-        }}
-      />
       
       {/* HDR Gradient Overlay with Vivid Colors */}
       <motion.div 
