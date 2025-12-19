@@ -2,11 +2,28 @@ import { motion } from "framer-motion";
 import { ShoppingCart, Sparkles, Star, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ShopCategory } from "@/pages/Shop";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+const ProductCardSkeleton = () => (
+  <div className="glass-card overflow-hidden">
+    <Skeleton className="h-40 w-full rounded-none" />
+    <div className="p-4 space-y-3">
+      <Skeleton className="h-5 w-3/4" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-2/3" />
+      <div className="flex items-center justify-between pt-2">
+        <Skeleton className="h-8 w-20" />
+        <Skeleton className="h-8 w-24" />
+      </div>
+      <Skeleton className="h-9 w-full" />
+    </div>
+  </div>
+);
 
 interface Product {
   id: string;
@@ -152,6 +169,13 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
   const { t } = useLanguage();
   const { addToCart } = useCart();
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setIsLoading(true);
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, [selectedCategory]);
 
   const filteredProducts = selectedCategory === "all" 
     ? products 
@@ -185,7 +209,11 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
     <section className="py-16">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product, index) => (
+          {isLoading ? (
+            Array.from({ length: 8 }).map((_, index) => (
+              <ProductCardSkeleton key={index} />
+            ))
+          ) : filteredProducts.map((product, index) => (
             <motion.div
               key={product.id}
               initial={{ opacity: 0, y: 20 }}
@@ -278,7 +306,7 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
           ))}
         </div>
 
-        {filteredProducts.length === 0 && (
+        {!isLoading && filteredProducts.length === 0 && (
           <div className="text-center py-16">
             <p className="text-muted-foreground">{t('shop.noProducts')}</p>
           </div>
