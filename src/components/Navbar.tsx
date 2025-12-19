@@ -2,14 +2,9 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Menu, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation } from "react-router-dom";
-
-const navLinks = [
-  { label: "Home", href: "#hero" },
-  { label: "Classes", href: "#classes" },
-  { label: "Features", href: "#features" },
-  { label: "FAQ", href: "#faq" },
-];
+import { Link } from "react-router-dom";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
   e.preventDefault();
@@ -22,6 +17,14 @@ const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) =
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { t } = useLanguage();
+
+  const navLinks = [
+    { label: t('nav.home'), href: "#hero" },
+    { label: t('nav.classes'), href: "#classes" },
+    { label: t('nav.features'), href: "#features" },
+    { label: t('nav.faq'), href: "#faq" },
+  ];
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
@@ -47,19 +50,23 @@ export const Navbar = () => {
                 {link.label}
               </a>
             ))}
+            <LanguageSwitcher />
             <Button variant="default" size="sm">
               <Download className="mr-2 h-4 w-4" />
-              Download
+              {t('nav.download')}
             </Button>
           </div>
 
           {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 text-foreground"
-          >
-            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <LanguageSwitcher />
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="p-2 text-foreground"
+            >
+              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -87,7 +94,7 @@ export const Navbar = () => {
             ))}
             <Button variant="default" className="w-full">
               <Download className="mr-2 h-4 w-4" />
-              Download
+              {t('nav.download')}
             </Button>
           </div>
         </motion.div>
