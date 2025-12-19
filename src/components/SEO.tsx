@@ -1,5 +1,10 @@
 import { Helmet } from "react-helmet-async";
 
+interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
+
 interface SEOProps {
   title?: string;
   description?: string;
@@ -10,6 +15,7 @@ interface SEOProps {
   twitterCard?: "summary" | "summary_large_image";
   noIndex?: boolean;
   structuredData?: object;
+  breadcrumbs?: BreadcrumbItem[];
 }
 
 const defaultMeta = {
@@ -32,6 +38,7 @@ export const SEO = ({
   twitterCard = defaultMeta.twitterCard,
   noIndex = false,
   structuredData,
+  breadcrumbs,
 }: SEOProps) => {
   const fullTitle = title 
     ? `${title} | ${defaultMeta.siteName}` 
@@ -48,6 +55,18 @@ export const SEO = ({
     description: defaultMeta.description,
     url: typeof window !== "undefined" ? window.location.origin : "",
   };
+
+  // Breadcrumb structured data
+  const breadcrumbStructuredData = breadcrumbs && breadcrumbs.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": breadcrumbs.map((item, index) => ({
+      "@type": "ListItem",
+      "position": index + 1,
+      "name": item.name,
+      "item": item.url,
+    })),
+  } : null;
 
   return (
     <Helmet>
@@ -84,6 +103,13 @@ export const SEO = ({
       <script type="application/ld+json">
         {JSON.stringify(structuredData || defaultStructuredData)}
       </script>
+      
+      {/* Breadcrumb Structured Data */}
+      {breadcrumbStructuredData && (
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbStructuredData)}
+        </script>
+      )}
     </Helmet>
   );
 };

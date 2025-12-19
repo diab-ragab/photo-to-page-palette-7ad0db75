@@ -5,12 +5,20 @@ import { ChevronRight, Home } from "lucide-react";
 import { SEO } from "@/components/SEO";
 
 const Terms = () => {
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  
+  const breadcrumbs = [
+    { name: "Home", url: baseUrl },
+    { name: "Terms of Service", url: `${baseUrl}/terms` },
+  ];
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SEO 
         title="Terms of Service"
         description="Read the WOI Endgame Terms of Service. Understand your rights and responsibilities when using our private server gaming services."
         keywords="WOI terms, terms of service, gaming rules, WOI Endgame policies"
+        breadcrumbs={breadcrumbs}
       />
       <Navbar />
       <main className="container py-20 px-4">

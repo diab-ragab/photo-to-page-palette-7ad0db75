@@ -6,12 +6,20 @@ import { Link } from "react-router-dom";
 import { SEO } from "@/components/SEO";
 
 const Support = () => {
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  
+  const breadcrumbs = [
+    { name: "Home", url: baseUrl },
+    { name: "Support", url: `${baseUrl}/support` },
+  ];
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SEO 
         title="Support"
         description="Get help with WOI Endgame. Contact our support team via Discord or email. Find answers to frequently asked questions."
         keywords="WOI support, help, contact, Discord, FAQ, WOI Endgame support"
+        breadcrumbs={breadcrumbs}
       />
       <Navbar />
       <main className="container py-20 px-4">
