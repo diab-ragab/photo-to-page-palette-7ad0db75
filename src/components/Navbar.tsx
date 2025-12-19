@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, Download, ShoppingBag } from "lucide-react";
+import { Menu, X, Download, ShoppingBag, Newspaper } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -55,6 +55,13 @@ export const Navbar = () => {
               </a>
             ))}
             <Link
+              to="/blog"
+              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Newspaper className="w-4 h-4" />
+              Blog
+            </Link>
+            <Link
               to="/shop"
               className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
             >
@@ -106,6 +113,14 @@ export const Navbar = () => {
                 {link.label}
               </a>
             ))}
+            <Link
+              to="/blog"
+              className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
+              onClick={() => setIsOpen(false)}
+            >
+              <Newspaper className="w-4 h-4" />
+              Blog
+            </Link>
             <Link
               to="/shop"
               className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
