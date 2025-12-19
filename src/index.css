@@ -198,6 +198,58 @@
   .hdr-bg {
     background: linear-gradient(135deg, hsl(var(--hdr-cyan) / 0.1) 0%, hsl(var(--hdr-purple) / 0.1) 50%, hsl(var(--hdr-magenta) / 0.1) 100%);
   }
+
+  /* Chromatic Aberration Effect */
+  .chromatic-hover {
+    position: relative;
+    overflow: visible;
+  }
+
+  .chromatic-hover::before,
+  .chromatic-hover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+  }
+
+  .chromatic-hover::before {
+    box-shadow: -3px 0 0 0 hsl(var(--hdr-cyan) / 0.6);
+  }
+
+  .chromatic-hover::after {
+    box-shadow: 3px 0 0 0 hsl(var(--hdr-magenta) / 0.6);
+  }
+
+  .chromatic-hover:hover::before,
+  .chromatic-hover:hover::after {
+    opacity: 1;
+  }
+
+  .chromatic-hover:hover::before {
+    box-shadow: -4px 0 8px 0 hsl(var(--hdr-cyan) / 0.5), -2px 0 0 0 hsl(var(--hdr-cyan) / 0.3);
+    animation: chromatic-shift-left 0.15s ease-out;
+  }
+
+  .chromatic-hover:hover::after {
+    box-shadow: 4px 0 8px 0 hsl(var(--hdr-magenta) / 0.5), 2px 0 0 0 hsl(var(--hdr-magenta) / 0.3);
+    animation: chromatic-shift-right 0.15s ease-out;
+  }
+
+  @keyframes chromatic-shift-left {
+    0% { transform: translateX(0); opacity: 0; }
+    50% { transform: translateX(-2px); opacity: 1; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes chromatic-shift-right {
+    0% { transform: translateX(0); opacity: 0; }
+    50% { transform: translateX(2px); opacity: 1; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
 }
 
 @layer utilities {

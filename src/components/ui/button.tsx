@@ -5,18 +5,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 font-display uppercase tracking-wider",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 font-display uppercase tracking-wider relative group",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-[0_0_30px_hsl(142_71%_45%_/_0.5)]",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-primary/50 bg-transparent text-primary hover:bg-primary/10 hover:border-primary",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-[0_0_30px_hsl(175_95%_50%_/_0.5)] chromatic-hover",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 chromatic-hover",
+        outline: "border border-primary/50 bg-transparent text-primary hover:bg-primary/10 hover:border-primary chromatic-hover",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 chromatic-hover",
         ghost: "hover:bg-accent/20 hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        hero: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-[0_0_40px_hsl(142_71%_45%_/_0.6)] animate-pulse-glow",
-        heroOutline: "border-2 border-border bg-card/50 backdrop-blur-sm text-foreground hover:bg-card hover:border-primary/50",
+        hero: "bg-gradient-to-r from-hdr-cyan to-hdr-blue text-primary-foreground hover:shadow-[0_0_40px_hsl(175_95%_50%_/_0.6),0_0_80px_hsl(280_90%_60%_/_0.3)] chromatic-hover",
+        heroOutline: "border-2 border-border bg-card/50 backdrop-blur-sm text-foreground hover:bg-card hover:border-primary/50 chromatic-hover",
       },
       size: {
         default: "h-10 px-4 py-2",
