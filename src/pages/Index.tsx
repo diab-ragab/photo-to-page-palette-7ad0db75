@@ -7,6 +7,7 @@ import { FAQ } from "@/components/FAQ";
 import { CTA } from "@/components/CTA";
 import { UpdateRoad } from "@/components/UpdateRoad";
 import { Footer } from "@/components/Footer";
+import { ConsentPopup } from "@/components/ConsentPopup";
 
 const Index = () => {
   return (
@@ -20,6 +21,7 @@ const Index = () => {
       <CTA />
       <UpdateRoad />
       <Footer />
+      <ConsentPopup />
     </div>
   );
 };
