@@ -1,11 +1,21 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { Link } from "react-router-dom";
+import { ChevronRight, Home } from "lucide-react";
 
 const Terms = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <main className="container py-20 px-4">
+        <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+          <Link to="/" className="flex items-center gap-1 hover:text-primary transition-colors">
+            <Home className="w-4 h-4" />
+            <span>Home</span>
+          </Link>
+          <ChevronRight className="w-4 h-4" />
+          <span className="text-foreground">Terms of Service</span>
+        </nav>
         <h1 className="text-3xl md:text-4xl font-display font-bold mb-8">Terms of Service</h1>
         
         <div className="prose prose-invert max-w-none space-y-6 text-muted-foreground">
