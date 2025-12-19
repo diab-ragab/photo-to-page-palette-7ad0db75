@@ -22,6 +22,24 @@ const classes = [
   },
 ];
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.2 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 50, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.6 },
+  },
+};
+
 export const ClassSelection = () => {
   return (
     <section id="classes" className="py-16 md:py-24 px-4 scroll-mt-20">
@@ -41,14 +59,17 @@ export const ClassSelection = () => {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
-          {classes.map((classItem, index) => (
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6"
+        >
+          {classes.map((classItem) => (
             <motion.div
               key={classItem.name}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.15 }}
+              variants={itemVariants}
               className="group relative overflow-hidden rounded-xl cursor-pointer"
             >
               <div className="aspect-[4/5] sm:aspect-[3/4] overflow-hidden">
@@ -72,7 +93,7 @@ export const ClassSelection = () => {
               </div>
             </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );

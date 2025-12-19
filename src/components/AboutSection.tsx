@@ -19,9 +19,10 @@ export const AboutSection = () => {
       <div className="container relative z-20">
         <div className="max-w-4xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
             className="text-center mb-8 md:mb-12"
           >
             <span className="text-primary text-xs md:text-sm font-display uppercase tracking-widest mb-4 block">
@@ -40,10 +41,10 @@ export const AboutSection = () => {
           </motion.div>
 
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: 0.2, duration: 0.6 }}
             className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-8 md:mb-12 leading-relaxed px-2"
           >
             Our mission is to create a stable, fair, and engaging environment where all players 
@@ -53,10 +54,10 @@ export const AboutSection = () => {
 
           {/* Stats */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: 0.3, duration: 0.6 }}
             className="grid grid-cols-2 gap-3 md:gap-6 max-w-xl mx-auto"
           >
             <div className="glass-card p-4 md:p-6 text-center">

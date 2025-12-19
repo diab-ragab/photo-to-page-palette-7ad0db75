@@ -7,9 +7,10 @@ export const CTA = () => {
     <section className="py-16 md:py-24 px-4 bg-card/30">
       <div className="container">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          initial={{ opacity: 0, y: 50, scale: 0.95 }}
+          whileInView={{ opacity: 1, y: 0, scale: 1 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
           className="glass-card p-8 md:p-12 lg:p-16 text-center max-w-4xl mx-auto relative overflow-hidden"
         >
           {/* Glow effect */}
