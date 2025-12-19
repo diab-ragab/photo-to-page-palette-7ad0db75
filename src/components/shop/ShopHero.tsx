@@ -1,15 +1,24 @@
 import { motion } from "framer-motion";
-import { ShoppingBag, Sparkles } from "lucide-react";
+import { ShoppingBag, Sparkles, ChevronLeft } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Link } from "react-router-dom";
 
 export const ShopHero = () => {
   const { t } = useLanguage();
 
   return (
-    <section className="relative pt-32 pb-16 overflow-hidden">
+    <section className="relative pt-24 pb-16 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
       
       <div className="container mx-auto px-4 relative z-10">
+        <Link 
+          to="/" 
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors mb-6"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          {t('nav.home')}
+        </Link>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
