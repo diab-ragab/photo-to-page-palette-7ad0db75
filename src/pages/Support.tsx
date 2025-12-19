@@ -3,10 +3,16 @@ import { Footer } from "@/components/Footer";
 import { MessageCircle, Mail, HelpCircle, Clock, ChevronRight, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { SEO } from "@/components/SEO";
 
 const Support = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO 
+        title="Support"
+        description="Get help with WOI Endgame. Contact our support team via Discord or email. Find answers to frequently asked questions."
+        keywords="WOI support, help, contact, Discord, FAQ, WOI Endgame support"
+      />
       <Navbar />
       <main className="container py-20 px-4">
         <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">

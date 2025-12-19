@@ -6,6 +6,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ChevronLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { SEO } from "@/components/SEO";
 
 const Cart = () => {
   const { items, updateQuantity, removeFromCart, totalPrice, totalItems } = useCart();
@@ -14,6 +15,11 @@ const Cart = () => {
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-background text-foreground">
+        <SEO 
+          title="Cart"
+          description="Your WOI Endgame shopping cart. Review your items before checkout."
+          noIndex={true}
+        />
         <Navbar />
         <div className="container mx-auto px-4 py-32 text-center">
           <ShoppingBag className="w-24 h-24 mx-auto text-muted-foreground mb-6" />
@@ -33,7 +39,11 @@ const Cart = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Navbar />
+      <SEO 
+        title="Cart"
+        description="Your WOI Endgame shopping cart. Review your items before checkout."
+        noIndex={true}
+      />
       <div className="container mx-auto px-4 py-24">
         <Link 
           to="/" 
