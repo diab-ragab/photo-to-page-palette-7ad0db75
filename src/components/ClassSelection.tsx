@@ -3,6 +3,12 @@ import { ArrowRight } from "lucide-react";
 import berserkerImg from "@/assets/class-berserker.jpg";
 import magusImg from "@/assets/class-magus.jpg";
 import hereticImg from "@/assets/class-heretic.jpg";
+import paladinImg from "@/assets/class-paladin.jpg";
+import assassinImg from "@/assets/class-assassin.jpg";
+import rangerImg from "@/assets/class-ranger.jpg";
+import necromancerImg from "@/assets/class-necromancer.jpg";
+import monkImg from "@/assets/class-monk.jpg";
+import warlockImg from "@/assets/class-warlock.jpg";
 
 const classes = [
   {
@@ -19,6 +25,36 @@ const classes = [
     name: "Heretic",
     image: hereticImg,
     description: "Dark priest wielding forbidden powers",
+  },
+  {
+    name: "Paladin",
+    image: paladinImg,
+    description: "Holy knight blessed with divine protection",
+  },
+  {
+    name: "Assassin",
+    image: assassinImg,
+    description: "Silent killer striking from the shadows",
+  },
+  {
+    name: "Ranger",
+    image: rangerImg,
+    description: "Expert marksman with nature's guidance",
+  },
+  {
+    name: "Necromancer",
+    image: necromancerImg,
+    description: "Commander of the undead legions",
+  },
+  {
+    name: "Monk",
+    image: monkImg,
+    description: "Martial artist channeling inner chi",
+  },
+  {
+    name: "Warlock",
+    image: warlockImg,
+    description: "Wielder of demonic pacts and hellfire",
   },
 ];
 
@@ -64,7 +100,7 @@ export const ClassSelection = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
         >
           {classes.map((classItem) => (
             <motion.div
