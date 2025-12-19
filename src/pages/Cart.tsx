@@ -3,7 +3,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ChevronLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
@@ -35,6 +35,13 @@ const Cart = () => {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <div className="container mx-auto px-4 py-24">
+        <Link 
+          to="/" 
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors mb-6"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          {t('nav.home')}
+        </Link>
         <h1 className="text-4xl font-display font-bold mb-8">{t('cart.title')}</h1>
         
         <div className="grid lg:grid-cols-3 gap-8">
