@@ -5,6 +5,7 @@ import { ServerStatusCard } from "@/components/ServerStatusCard";
 import { AnnouncementsCard } from "@/components/AnnouncementsCard";
 import { ChangelogCard } from "@/components/ChangelogCard";
 import { DiscordCard } from "@/components/DiscordCard";
+import { ParticleField } from "@/components/ParticleField";
 import heroBg from "@/assets/hero-bg.jpg";
 import { useRef } from "react";
 
@@ -35,6 +36,8 @@ export const HeroSection = () => {
         className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/50 to-background z-10"
         style={{ opacity }}
       />
+      {/* Floating Particles */}
+      <ParticleField />
       
       <div className="container relative z-20 px-4 pt-24">
         <motion.div
