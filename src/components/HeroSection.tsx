@@ -21,47 +21,68 @@ export const HeroSection = () => {
     offset: ["start start", "end start"],
   });
 
-  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
-  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  // Multi-layer parallax transforms - different speeds create depth
+  const videoY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+  const videoScale = useTransform(scrollYProgress, [0, 1], [1.1, 1.3]);
+  const overlayOpacity = useTransform(scrollYProgress, [0, 0.5, 1], [1, 0.8, 0]);
+  const contentY = useTransform(scrollYProgress, [0, 1], ["0%", "25%"]);
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
+  const particleY = useTransform(scrollYProgress, [0, 1], ["0%", "40%"]);
 
   return (
     <section id="hero" ref={sectionRef} className="relative min-h-screen flex flex-col justify-center overflow-hidden pb-20">
-      {/* Video Background */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
-        <video
+      {/* Video Background with Parallax */}
+      <motion.div 
+        className="absolute inset-0 z-0 overflow-hidden"
+        style={{ y: videoY }}
+      >
+        <motion.video
           autoPlay
           muted
           loop
           playsInline
-          className="absolute w-full h-full object-cover scale-110"
+          className="absolute w-full h-full object-cover"
+          style={{ scale: videoScale }}
           poster={heroBg}
         >
           <source src={VIDEO_URL} type="video/mp4" />
-        </video>
-      </div>
+        </motion.video>
+      </motion.div>
       
-      {/* Fallback Image Background */}
+      {/* Fallback Image Background with Parallax */}
       <motion.div 
         className="absolute inset-0 z-[1]"
         style={{
           backgroundImage: `url(${heroBg})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center top',
-          y: backgroundY,
+          y: videoY,
+          scale: videoScale,
           opacity: 0, // Hidden when video plays, shown as fallback
         }}
       />
       
-      {/* Overlay */}
+      {/* Gradient Overlay with Fade */}
       <motion.div 
         className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/60 to-background z-10"
-        style={{ opacity }}
+        style={{ opacity: overlayOpacity }}
       />
       
-      {/* Floating Particles */}
-      <ParticleField />
+      {/* Secondary Overlay for Depth */}
+      <motion.div 
+        className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-background/50 z-10"
+        style={{ opacity: overlayOpacity }}
+      />
       
-      <div className="container relative z-20 px-4 pt-24">
+      {/* Floating Particles with Parallax */}
+      <motion.div style={{ y: particleY }} className="absolute inset-0 z-15">
+        <ParticleField />
+      </motion.div>
+      
+      <motion.div 
+        className="container relative z-20 px-4 pt-24"
+        style={{ y: contentY, opacity: contentOpacity }}
+      >
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -105,7 +126,7 @@ export const HeroSection = () => {
         <div className="max-w-5xl mx-auto">
           <DiscordCard />
         </div>
-      </div>
+      </motion.div>
     </section>
   );
 };
