@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
-import { ShoppingCart, Sparkles, Star } from "lucide-react";
+import { ShoppingCart, Sparkles, Star, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ShopCategory } from "@/pages/Shop";
+import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
+import { useState } from "react";
 
 interface Product {
   id: string;
@@ -148,15 +150,35 @@ interface ShopProductsProps {
 
 export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
   const { t } = useLanguage();
+  const { addToCart } = useCart();
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const filteredProducts = selectedCategory === "all" 
     ? products 
     : products.filter(p => p.category === selectedCategory);
 
+  const getQuantity = (id: string) => quantities[id] || 1;
+  
+  const setQuantity = (id: string, qty: number) => {
+    if (qty >= 1 && qty <= 99) {
+      setQuantities(prev => ({ ...prev, [id]: qty }));
+    }
+  };
+
   const handleAddToCart = (product: Product) => {
+    const qty = getQuantity(product.id);
+    addToCart({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      image: product.image,
+      rarity: product.rarity,
+    }, qty);
     toast.success(`${product.name} added to cart!`, {
-      description: `€${product.price.toFixed(2)}`,
+      description: `${qty}x €${product.price.toFixed(2)}`,
     });
+    setQuantities(prev => ({ ...prev, [product.id]: 1 }));
   };
 
   return (
@@ -209,13 +231,36 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                   {product.description}
                 </p>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl font-bold font-display text-primary">
-                    €{product.price.toFixed(2)}
-                  </span>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold font-display text-primary">
+                      €{product.price.toFixed(2)}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setQuantity(product.id, getQuantity(product.id) - 1)}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </Button>
+                      <span className="w-8 text-center font-semibold text-sm">
+                        {getQuantity(product.id)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setQuantity(product.id, getQuantity(product.id) + 1)}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
                   <Button 
                     size="sm" 
-                    className="gap-2"
+                    className="w-full gap-2"
                     onClick={() => handleAddToCart(product)}
                   >
                     <ShoppingCart className="w-4 h-4" />
