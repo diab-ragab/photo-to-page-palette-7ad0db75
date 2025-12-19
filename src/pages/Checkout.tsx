@@ -6,10 +6,10 @@ import { Label } from "@/components/ui/label";
 import { useCart } from "@/contexts/CartContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { motion } from "framer-motion";
-import { ShieldCheck, CreditCard, Lock } from "lucide-react";
+import { ShieldCheck, CreditCard, Lock, ChevronLeft } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();
@@ -39,6 +39,13 @@ const Checkout = () => {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <div className="container mx-auto px-4 py-24">
+        <Link 
+          to="/" 
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors mb-6"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          {t('nav.home')}
+        </Link>
         <h1 className="text-4xl font-display font-bold mb-8">{t('checkout.title')}</h1>
         
         <div className="grid lg:grid-cols-2 gap-8">
