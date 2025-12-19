@@ -5,6 +5,7 @@ import { ServerStatusCard } from "@/components/ServerStatusCard";
 import { AnnouncementsCard } from "@/components/AnnouncementsCard";
 import { ChangelogCard } from "@/components/ChangelogCard";
 import { DiscordCard } from "@/components/DiscordCard";
+import { ParticleField } from "@/components/ParticleField";
 
 import { useLanguage } from "@/contexts/LanguageContext";
 import heroBg from "@/assets/hero-bg.jpg";
@@ -43,14 +44,22 @@ export const HeroSection = () => {
         />
       </motion.div>
       
-      {/* Simple Gradient Overlay */}
+      {/* Gradient Overlay with Glow Effects */}
       <motion.div 
         className="absolute inset-0 z-10"
         style={{ opacity: overlayOpacity }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/40 to-background" />
         <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-background via-background/80 to-transparent" />
+        {/* Subtle glow effects */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-accent/15 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
       </motion.div>
+      
+      {/* Floating Particles */}
+      <div className="absolute inset-0 z-15">
+        <ParticleField />
+      </div>
       
       <motion.div 
         className="container relative z-20 px-4 pt-24"
