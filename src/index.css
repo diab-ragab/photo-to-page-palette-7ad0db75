@@ -62,6 +62,51 @@
     --sidebar-border: 160 8% 18%;
     --sidebar-ring: 142 71% 45%;
   }
+
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 160 10% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 160 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 160 10% 10%;
+
+    --primary: 142 71% 40%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 160 10% 92%;
+    --secondary-foreground: 160 10% 10%;
+
+    --muted: 160 10% 90%;
+    --muted-foreground: 160 10% 40%;
+
+    --accent: 142 71% 40%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 160 10% 85%;
+    --input: 160 10% 85%;
+    --ring: 142 71% 40%;
+
+    --glow-primary: 0 0 30px hsl(142 71% 40% / 0.2);
+    --glow-primary-strong: 0 0 60px hsl(142 71% 40% / 0.3);
+    --gradient-hero: linear-gradient(180deg, hsl(0 0% 98%) 0%, hsl(160 10% 95%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100% / 0.8) 0%, hsl(160 10% 96% / 0.6) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(142 71% 40%) 0%, hsl(142 60% 30%) 100%);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 160 10% 10%;
+    --sidebar-primary: 142 71% 40%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 160 10% 92%;
+    --sidebar-accent-foreground: 160 10% 10%;
+    --sidebar-border: 160 10% 85%;
+    --sidebar-ring: 142 71% 40%;
+  }
 }
 
 @layer base {
@@ -76,6 +121,14 @@
   body {
     @apply bg-background text-foreground font-body antialiased;
     font-family: var(--font-body);
+  }
+
+  /* Theme transition */
+  html.transitioning,
+  html.transitioning *,
+  html.transitioning *::before,
+  html.transitioning *::after {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, fill 0.3s ease, box-shadow 0.3s ease !important;
   }
 
   h1, h2, h3, h4, h5, h6 {
