@@ -53,9 +53,9 @@ export const ParticleField = () => {
     canvas.addEventListener("mousemove", handleMouseMove);
     canvas.addEventListener("mouseleave", handleMouseLeave);
 
-    const particleCount = 80;
+    const particleCount = 120;
     const particles: Particle[] = [];
-    const mouseRadius = 150;
+    const mouseRadius = 180;
 
     // Initialize particles
     for (let i = 0; i < particleCount; i++) {
@@ -66,11 +66,11 @@ export const ParticleField = () => {
         y,
         baseX: x,
         baseY: y,
-        size: Math.random() * 2 + 0.5,
-        speedX: (Math.random() - 0.5) * 0.3,
-        speedY: (Math.random() - 0.5) * 0.3 - 0.2,
-        opacity: Math.random() * 0.5 + 0.2,
-        twinkleSpeed: Math.random() * 0.02 + 0.01,
+        size: Math.random() * 3 + 1,
+        speedX: (Math.random() - 0.5) * 0.6,
+        speedY: (Math.random() - 0.5) * 0.6 - 0.4,
+        opacity: Math.random() * 0.7 + 0.3,
+        twinkleSpeed: Math.random() * 0.04 + 0.02,
         twinkleOffset: Math.random() * Math.PI * 2,
       });
     }
@@ -78,7 +78,7 @@ export const ParticleField = () => {
     let animationId: number;
     let time = 0;
 
-    const connectionRadius = 120;
+    const connectionRadius = 150;
 
     const maxTrailLength = 20;
 
