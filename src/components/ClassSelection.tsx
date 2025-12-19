@@ -24,24 +24,24 @@ const classes = [
 
 export const ClassSelection = () => {
   return (
-    <section className="py-24 px-4">
+    <section className="py-16 md:py-24 px-4">
       <div className="container">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="text-center mb-10 md:mb-16"
         >
-          <h2 className="text-3xl md:text-5xl font-bold font-display mb-4">
+          <h2 className="text-2xl md:text-3xl lg:text-5xl font-bold font-display mb-4">
             Choose Your Path
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto px-2">
             Select from distinct classes, each with unique abilities & skills. Whether you prefer to be a 
             fierce warrior or a powerful mage, there's a class waiting for you.
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
           {classes.map((classItem, index) => (
             <motion.div
               key={classItem.name}
@@ -51,7 +51,7 @@ export const ClassSelection = () => {
               transition={{ duration: 0.5, delay: index * 0.15 }}
               className="group relative overflow-hidden rounded-xl cursor-pointer"
             >
-              <div className="aspect-[3/4] overflow-hidden">
+              <div className="aspect-[4/5] sm:aspect-[3/4] overflow-hidden">
                 <img
                   src={classItem.image}
                   alt={classItem.name}

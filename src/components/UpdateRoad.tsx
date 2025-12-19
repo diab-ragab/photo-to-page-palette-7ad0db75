@@ -30,21 +30,21 @@ const updates = [
 
 export const UpdateRoad = () => {
   return (
-    <section className="py-24 px-4">
+    <section className="py-16 md:py-24 px-4">
       <div className="container">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="text-center mb-10 md:mb-16"
         >
-          <span className="text-primary text-sm font-display uppercase tracking-widest mb-4 block">
+          <span className="text-primary text-xs md:text-sm font-display uppercase tracking-widest mb-4 block">
             Roadmap
           </span>
-          <h2 className="text-3xl md:text-5xl font-bold font-display mb-4">
+          <h2 className="text-2xl md:text-3xl lg:text-5xl font-bold font-display mb-4">
             Update Road
           </h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">
+          <p className="text-sm md:text-base text-muted-foreground max-w-xl mx-auto px-2">
             Follow our development journey. Here's what we have planned for the future of WOI Endgame.
           </p>
         </motion.div>
@@ -52,10 +52,10 @@ export const UpdateRoad = () => {
         <div className="max-w-2xl mx-auto">
           <div className="relative">
             {/* Timeline Line */}
-            <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary via-primary/50 to-border" />
+            <div className="absolute left-4 md:left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary via-primary/50 to-border" />
 
             {/* Timeline Items */}
-            <div className="space-y-8">
+            <div className="space-y-6 md:space-y-8">
               {updates.map((update, index) => (
                 <motion.div
                   key={index}
@@ -63,10 +63,10 @@ export const UpdateRoad = () => {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: index * 0.15 }}
-                  className="relative pl-16"
+                  className="relative pl-10 md:pl-16"
                 >
                   {/* Timeline Dot */}
-                  <div className={`absolute left-4 top-1 w-5 h-5 rounded-full border-2 ${
+                  <div className={`absolute left-2 md:left-4 top-1 w-4 h-4 md:w-5 md:h-5 rounded-full border-2 ${
                     update.status === 'completed' 
                       ? 'bg-primary border-primary' 
                       : update.status === 'current'
@@ -79,19 +79,19 @@ export const UpdateRoad = () => {
                   </div>
 
                   {/* Content */}
-                  <div className="glass-card p-5 group hover:border-primary/50 transition-all">
-                    <span className="text-[10px] text-primary font-display uppercase tracking-widest mb-2 block">
+                  <div className="glass-card p-4 md:p-5 group hover:border-primary/50 transition-all">
+                    <span className="text-[9px] md:text-[10px] text-primary font-display uppercase tracking-widest mb-1 md:mb-2 block">
                       {update.phase}
                     </span>
-                    <h3 className="font-display font-bold text-lg mb-2 flex items-center gap-2">
-                      <update.icon className="w-5 h-5 text-primary" />
+                    <h3 className="font-display font-bold text-sm md:text-lg mb-1 md:mb-2 flex items-center gap-2">
+                      <update.icon className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                       {update.title}
                     </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
+                    <p className="text-[10px] md:text-sm text-muted-foreground leading-relaxed">
                       {update.description}
                     </p>
                     {update.status !== 'upcoming' && (
-                      <a href="#" className="inline-flex items-center gap-1 text-xs text-primary mt-3 hover:gap-2 transition-all">
+                      <a href="#" className="inline-flex items-center gap-1 text-[10px] md:text-xs text-primary mt-2 md:mt-3 hover:gap-2 transition-all">
                         Learn More <ChevronRight className="w-3 h-3" />
                       </a>
                     )}
