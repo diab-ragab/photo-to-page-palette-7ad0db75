@@ -31,7 +31,7 @@ export const HeroSection = () => {
 
   return (
     <section id="hero" ref={sectionRef} className="relative min-h-screen flex flex-col justify-center overflow-hidden pb-20">
-      {/* Video Background with Parallax */}
+      {/* Video Background with Parallax + RGB Effect */}
       <motion.div 
         className="absolute inset-0 z-0 overflow-hidden"
         style={{ y: videoY }}
@@ -47,6 +47,8 @@ export const HeroSection = () => {
         >
           <source src={VIDEO_URL} type="video/mp4" />
         </motion.video>
+        {/* RGB Color Cycling Overlay */}
+        <div className="absolute inset-0 rgb-overlay pointer-events-none" />
       </motion.div>
       
       {/* Fallback Image Background with Parallax */}
