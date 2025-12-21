@@ -61,17 +61,18 @@ export const ClassDetailModal = ({ classData, isOpen, onClose }: ClassDetailModa
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100]"
           />
 
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl md:max-h-[90vh] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
-          >
+          {/* Modal Container */}
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="w-full max-w-4xl max-h-[90vh] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden pointer-events-auto"
+            >
             <div className="h-full overflow-y-auto">
               {/* Header with Image */}
               <div className="relative h-48 md:h-64 overflow-hidden">
@@ -176,6 +177,7 @@ export const ClassDetailModal = ({ classData, isOpen, onClose }: ClassDetailModa
               </div>
             </div>
           </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>

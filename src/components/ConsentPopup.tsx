@@ -47,9 +47,9 @@ export const ConsentPopup = () => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ type: 'spring', duration: 0.5 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-[90%] max-w-md"
+            className="fixed inset-0 z-[101] flex items-center justify-center p-4"
           >
-            <div className="bg-card border border-border rounded-2xl p-6 shadow-2xl">
+            <div className="w-[90%] max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl">
               {/* Icon */}
               <div className="flex justify-center mb-4">
                 <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
