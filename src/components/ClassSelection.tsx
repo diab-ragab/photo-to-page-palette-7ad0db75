@@ -26,13 +26,13 @@ const classes: ClassData[] = [
   {
     name: "Berzerker",
     image: berserkerImg,
-    description: "Brutal force and destruction specialist",
-    lore: "Excelling at the brutal force and destruction the Berzerker is always the one to charge in head first. With a strong emphasis on melee damage and mobility they make the perfect soldier. While they have an affinity for melee weapons and medium grade armor they are however lacking in magical defense. By utilizing their ability to snare and close distance the Berzerker is a natural born destroyer.",
+    description: "Born to fight with superb skills, advocates strength and craves blood",
+    lore: "Gladiators are born to fight, they have superb fighting skills, advocate strength, and crave blood. Suitable for close combat with monsters, they wield their greatswords in the midst of enemy siege and use their blood to clear a path to victory. Gladiators pursue strength, physical attacks and critical hits, making their attacks more stable. They are more suitable for group battles, but if they cannot repel the enemy effectively, they put themselves in danger. Gladiators have some defense against physical damage, but are somewhat powerless against magic damage.",
     skills: [
-      { name: "Bloodrage", description: "Enter a berserker fury, increasing damage", icon: "🔥" },
+      { name: "Greatsword Slash", description: "Powerful melee attack with greatsword", icon: "⚔️" },
       { name: "Whirlwind", description: "Spin attack hitting all nearby enemies", icon: "🌀" },
-      { name: "Charge", description: "Close distance to enemies rapidly", icon: "⚡" },
-      { name: "Execution", description: "Massive damage to weakened targets", icon: "⚔️" },
+      { name: "Critical Strike", description: "High damage physical attack with crit bonus", icon: "💥" },
+      { name: "Battle Fury", description: "Increase attack power and crit rate", icon: "🔥" },
     ],
     stats: { strength: 95, defense: 60, magic: 15, speed: 70, health: 85 },
   },
