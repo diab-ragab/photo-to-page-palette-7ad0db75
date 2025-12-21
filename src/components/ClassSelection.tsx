@@ -14,25 +14,25 @@ import { cn } from "@/lib/utils";
 import berserkerImg from "@/assets/class-berserker.jpg";
 import magusImg from "@/assets/class-magus.jpg";
 import hereticImg from "@/assets/class-heretic.jpg";
-import paladinImg from "@/assets/class-paladin.jpg";
-import assassinImg from "@/assets/class-assassin.jpg";
+import championImg from "@/assets/class-paladin.jpg";
+import slayerImg from "@/assets/class-assassin.jpg";
+import duelistImg from "@/assets/class-warlock.jpg";
 import rangerImg from "@/assets/class-ranger.jpg";
-import necromancerImg from "@/assets/class-necromancer.jpg";
-import monkImg from "@/assets/class-monk.jpg";
-import warlockImg from "@/assets/class-warlock.jpg";
+import enchantressImg from "@/assets/class-monk.jpg";
+import harbingerImg from "@/assets/class-necromancer.jpg";
 import { ClassDetailModal, ClassData } from "@/components/ClassDetailModal";
 
 const classes: ClassData[] = [
   {
-    name: "Berserker",
+    name: "Berzerker",
     image: berserkerImg,
     description: "Brutal force and destruction specialist",
-    lore: "Excelling at brutal force and destruction, the Berserker is always the one to charge in head first. With a strong emphasis on melee damage and mobility they make the perfect soldier. While they have an affinity for melee weapons and medium grade armor they are however lacking in magical defense. By utilizing their ability to snare and close distance the Berserker is a natural born destroyer.",
+    lore: "Excelling at the brutal force and destruction the Berzerker is always the one to charge in head first. With a strong emphasis on melee damage and mobility they make the perfect soldier. While they have an affinity for melee weapons and medium grade armor they are however lacking in magical defense. By utilizing their ability to snare and close distance the Berzerker is a natural born destroyer.",
     skills: [
-      { name: "Bloodrage", description: "Enter a berserker fury, increasing damage by 50%", icon: "🔥" },
+      { name: "Bloodrage", description: "Enter a berserker fury, increasing damage", icon: "🔥" },
       { name: "Whirlwind", description: "Spin attack hitting all nearby enemies", icon: "🌀" },
-      { name: "Battle Cry", description: "Intimidate enemies, reducing their defense", icon: "📢" },
-      { name: "Execution", description: "Massive damage to low health targets", icon: "⚔️" },
+      { name: "Charge", description: "Close distance to enemies rapidly", icon: "⚡" },
+      { name: "Execution", description: "Massive damage to weakened targets", icon: "⚔️" },
     ],
     stats: { strength: 95, defense: 60, magic: 15, speed: 70, health: 85 },
   },
@@ -50,95 +50,95 @@ const classes: ClassData[] = [
     stats: { strength: 20, defense: 35, magic: 100, speed: 55, health: 50 },
   },
   {
+    name: "Champion",
+    image: championImg,
+    description: "Heavy armor tank and battlefield controller",
+    lore: "With heavy armor and strong weapons the Champion is always the focal point in every fight. As the tank, they specialize in abilities to control the battlefield by taunting their foes and strengthening their defenses. Champions are invaluable in any party as they will always be the first to engage the enemy and the last one to leave.",
+    skills: [
+      { name: "Taunt", description: "Force enemies to attack you", icon: "📢" },
+      { name: "Shield Wall", description: "Massively increase defense temporarily", icon: "🛡️" },
+      { name: "Rallying Cry", description: "Boost party morale and defense", icon: "⚔️" },
+      { name: "Ground Slam", description: "Stun nearby enemies with impact", icon: "💥" },
+    ],
+    stats: { strength: 75, defense: 100, magic: 20, speed: 40, health: 95 },
+  },
+  {
     name: "Heretic",
     image: hereticImg,
     description: "Divine light and destructive darkness wielder",
     lore: "Heretics harness the divine powers of light and the destructive nature of darkness. With the combined forces, they deal a respectable amount of damage while still keeping themselves and their party members healed. With their assistance, no battle is too tough.",
     skills: [
+      { name: "Divine Light", description: "Heal allies with holy energy", icon: "✨" },
+      { name: "Shadow Bolt", description: "Dark magic projectile attack", icon: "🌑" },
+      { name: "Purify", description: "Remove debuffs from party members", icon: "💫" },
+      { name: "Resurrection", description: "Bring fallen allies back to life", icon: "☀️" },
+    ],
+    stats: { strength: 30, defense: 50, magic: 85, speed: 50, health: 70 },
+  },
+  {
+    name: "Slayer",
+    image: slayerImg,
+    description: "Precision striker with balanced offense",
+    lore: "Adept in the arts of precision and accuracy, the Slayer inflicts heavy damage in a short period of time. Through their knowledge and fighting style, they carry both a balanced physical and magical offense. Though their defenses can be somewhat lacking, their offensive capability is almost unparalleled.",
+    skills: [
+      { name: "Precision Strike", description: "High accuracy critical attack", icon: "🎯" },
+      { name: "Shadow Step", description: "Teleport behind your target", icon: "👤" },
+      { name: "Blade Dance", description: "Rapid consecutive attacks", icon: "🗡️" },
+      { name: "Execute", description: "Finish off weakened enemies", icon: "⚔️" },
+    ],
+    stats: { strength: 85, defense: 35, magic: 45, speed: 90, health: 55 },
+  },
+  {
+    name: "Duelist",
+    image: duelistImg,
+    description: "Sword and dark magic hybrid fighter",
+    lore: "Trained in both the sword and the inner workings of dark magic, the Duelist is capable of dealing a high amount of damage while debuffing the enemy. By making use of the Demonic forces, the Duelist is highly versatile and difficult to isolate and kill.",
+    skills: [
+      { name: "Demonic Blade", description: "Infuse weapon with dark energy", icon: "🔥" },
+      { name: "Curse", description: "Weaken enemy defenses", icon: "☠️" },
+      { name: "Shadow Strike", description: "Dark magic enhanced attack", icon: "🌑" },
       { name: "Soul Drain", description: "Steal life force from enemies", icon: "💀" },
-      { name: "Dark Blessing", description: "Heal allies with shadow energy", icon: "🌑" },
-      { name: "Curse of Agony", description: "Inflict spreading damage over time", icon: "☠️" },
-      { name: "Resurrection", description: "Bring fallen allies back to life", icon: "✨" },
     ],
-    stats: { strength: 30, defense: 45, magic: 85, speed: 50, health: 65 },
-  },
-  {
-    name: "Paladin",
-    image: paladinImg,
-    description: "Holy knight blessed with divine protection",
-    lore: "Champions of light and justice, Paladins are warriors blessed by the divine. Their unwavering faith grants them supernatural resilience and the power to smite evil. They serve as protectors of the innocent, their golden armor shining as a beacon of hope in the darkest battles.",
-    skills: [
-      { name: "Divine Shield", description: "Become immune to all damage briefly", icon: "✝️" },
-      { name: "Holy Strike", description: "Blessed attack dealing bonus damage to undead", icon: "⚔️" },
-      { name: "Lay on Hands", description: "Powerful healing touch for allies", icon: "🙌" },
-      { name: "Consecration", description: "Sanctify ground, damaging evil creatures", icon: "☀️" },
-    ],
-    stats: { strength: 75, defense: 90, magic: 50, speed: 45, health: 95 },
-  },
-  {
-    name: "Assassin",
-    image: assassinImg,
-    description: "Silent killer striking from the shadows",
-    lore: "Masters of stealth and precision, Assassins are the unseen hand of death. Trained in ancient shadow arts, they can vanish into darkness and strike with lethal precision. Their targets rarely see them coming, and fewer still survive to tell the tale.",
-    skills: [
-      { name: "Shadowstep", description: "Teleport behind your target instantly", icon: "👤" },
-      { name: "Backstab", description: "Critical damage when attacking from behind", icon: "🗡️" },
-      { name: "Poison Blade", description: "Coat weapons with deadly toxin", icon: "🧪" },
-      { name: "Vanish", description: "Become invisible to escape or reposition", icon: "💨" },
-    ],
-    stats: { strength: 70, defense: 30, magic: 25, speed: 100, health: 55 },
+    stats: { strength: 70, defense: 45, magic: 70, speed: 75, health: 60 },
   },
   {
     name: "Ranger",
     image: rangerImg,
-    description: "Expert marksman with nature's guidance",
-    lore: "Guardians of the wild, Rangers are one with nature and deadly at range. They form bonds with animal companions and can track prey across any terrain. Their arrows fly true, guided by the spirits of the forest, never missing their mark.",
+    description: "Long range tactician and strategist",
+    lore: "With guile and precision, the Ranger is extremely proficient at dealing massive amounts of damage from long range. With AOE traps and skills to aid them in combat, the Ranger plays a vital role as the tactician and strategist. With their ability, a team's overall combat effectiveness will increase dramatically.",
     skills: [
       { name: "Multi-Shot", description: "Fire multiple arrows at once", icon: "🏹" },
-      { name: "Beast Companion", description: "Summon a loyal animal to fight alongside you", icon: "🐺" },
-      { name: "Trap", description: "Set snares to immobilize enemies", icon: "🪤" },
-      { name: "Eagle Eye", description: "Mark targets for increased critical chance", icon: "🦅" },
+      { name: "Trap", description: "Set AOE snares to immobilize enemies", icon: "🪤" },
+      { name: "Eagle Eye", description: "Mark targets for increased damage", icon: "🦅" },
+      { name: "Volley", description: "Rain arrows on an area", icon: "🎯" },
     ],
-    stats: { strength: 55, defense: 40, magic: 35, speed: 85, health: 60 },
+    stats: { strength: 65, defense: 40, magic: 30, speed: 85, health: 55 },
   },
   {
-    name: "Necromancer",
-    image: necromancerImg,
-    description: "Commander of the undead legions",
-    lore: "Masters of death itself, Necromancers command armies of the fallen. They have conquered mortality through dark rituals, their bodies neither fully alive nor dead. Where they walk, the grave follows, and the dead rise to serve their will.",
+    name: "Enchantress",
+    image: enchantressImg,
+    description: "Lyre-wielding buffer and support specialist",
+    lore: "Specializing in the lyre as a weapon, the Enchantress can both weave songs of courage and destruction. Her main role is to keep allies buffed and monsters debuffed. While she does not output a great deal of damage she does however buff her allies offensive and defensive capabilities making her a sought after party member.",
     skills: [
-      { name: "Raise Dead", description: "Summon skeletal warriors to fight for you", icon: "💀" },
-      { name: "Death Coil", description: "Bolt of necrotic energy that damages or heals", icon: "🌀" },
-      { name: "Bone Armor", description: "Shield yourself with skeletal remains", icon: "🦴" },
-      { name: "Army of the Damned", description: "Summon a massive undead horde", icon: "⚰️" },
+      { name: "Song of Valor", description: "Boost party attack power", icon: "🎵" },
+      { name: "Lullaby", description: "Put enemies to sleep", icon: "😴" },
+      { name: "War Drums", description: "Increase party movement speed", icon: "🥁" },
+      { name: "Siren Call", description: "Confuse and debuff enemies", icon: "🎶" },
     ],
-    stats: { strength: 25, defense: 50, magic: 90, speed: 40, health: 70 },
+    stats: { strength: 25, defense: 45, magic: 80, speed: 60, health: 65 },
   },
   {
-    name: "Monk",
-    image: monkImg,
-    description: "Martial artist channeling inner chi",
-    lore: "Disciples of ancient monasteries, Monks have achieved perfect harmony between body and spirit. Their chi flows like water, allowing superhuman feats of combat and healing. They need no weapons - their bodies are temples of destruction and their fists strike like thunder.",
+    name: "Harbinger",
+    image: harbingerImg,
+    description: "Soul-capturing scythe wielder",
+    lore: "Capturing souls with its scythe, the Harbinger is a master of death itself. They command the forces of the afterlife, wielding their deadly scythe to harvest the souls of their enemies. Few can stand against the Harbinger's dark powers.",
     skills: [
-      { name: "Flying Kick", description: "Leap through the air with a devastating strike", icon: "🦶" },
-      { name: "Chi Burst", description: "Release inner energy in a healing wave", icon: "💫" },
-      { name: "Iron Fist", description: "Channel chi for massively increased damage", icon: "👊" },
-      { name: "Meditation", description: "Rapidly regenerate health and energy", icon: "🧘" },
+      { name: "Soul Reap", description: "Harvest enemy souls for power", icon: "💀" },
+      { name: "Death Coil", description: "Bolt of necrotic energy", icon: "🌀" },
+      { name: "Summon Souls", description: "Call forth captured spirits", icon: "👻" },
+      { name: "Grim Harvest", description: "Devastating scythe attack", icon: "⚰️" },
     ],
-    stats: { strength: 65, defense: 55, magic: 60, speed: 90, health: 70 },
-  },
-  {
-    name: "Warlock",
-    image: warlockImg,
-    description: "Wielder of demonic pacts and hellfire",
-    lore: "Those who seek power at any cost become Warlocks, forging pacts with demons and otherworldly entities. Their fel magic burns with infernal flames, and their demon servants obey without question. The price of their power is their soul, but most consider it worth paying.",
-    skills: [
-      { name: "Hellfire", description: "Unleash demonic flames that burn everything", icon: "🔥" },
-      { name: "Summon Demon", description: "Call forth a demon servant to fight", icon: "👹" },
-      { name: "Life Tap", description: "Sacrifice health to restore mana", icon: "💔" },
-      { name: "Soul Siphon", description: "Drain enemy souls for power", icon: "👁️" },
-    ],
-    stats: { strength: 35, defense: 40, magic: 95, speed: 50, health: 60 },
+    stats: { strength: 60, defense: 50, magic: 85, speed: 55, health: 65 },
   },
 ];
 
