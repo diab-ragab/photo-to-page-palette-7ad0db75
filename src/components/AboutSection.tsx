@@ -35,8 +35,9 @@ export const AboutSection = () => {
             </h2>
             <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed px-2">
               WOI Endgame is a community-driven project by passionate War of the Immortals players. 
-              We're not a generic private server; we're a group of longtime players who decided to 
-              take the best parts of experience and shape it to modern standards.
+              Experience 9 unique classes including the brutal Berserker, the arcane Magus, and the 
+              divine Heretic. We bring the best parts of WOI to modern standards with classes, 
+              monsters, quests, items, pets, and more.
             </p>
           </motion.div>
 

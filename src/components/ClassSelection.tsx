@@ -26,8 +26,8 @@ const classes: ClassData[] = [
   {
     name: "Berserker",
     image: berserkerImg,
-    description: "Melee powerhouse with devastating damage",
-    lore: "Born from the ancient tribes of the Frozen North, Berserkers channel primal fury into devastating combat prowess. Their rage is legendary, allowing them to shrug off wounds that would fell lesser warriors. In battle, they become unstoppable forces of destruction, their axes cleaving through enemy ranks like wheat before a scythe.",
+    description: "Brutal force and destruction specialist",
+    lore: "Excelling at brutal force and destruction, the Berserker is always the one to charge in head first. With a strong emphasis on melee damage and mobility they make the perfect soldier. While they have an affinity for melee weapons and medium grade armor they are however lacking in magical defense. By utilizing their ability to snare and close distance the Berserker is a natural born destroyer.",
     skills: [
       { name: "Bloodrage", description: "Enter a berserker fury, increasing damage by 50%", icon: "🔥" },
       { name: "Whirlwind", description: "Spin attack hitting all nearby enemies", icon: "🌀" },
@@ -39,8 +39,8 @@ const classes: ClassData[] = [
   {
     name: "Magus",
     image: magusImg,
-    description: "Master of arcane magic and elemental fury",
-    lore: "The Magi are scholars who have unlocked the secrets of the arcane arts through decades of study in ancient towers. They command the elements themselves - fire, ice, and lightning bend to their will. Though physically frail, their devastating magical attacks can reshape battlefields in an instant.",
+    description: "Master of arcane and elemental forces",
+    lore: "Magi have mastered the mystical arts of both arcane and elemental forces. By harnessing these talents they create waves of devastation. From a distance, their offensive abilities are simply unmatched. They are the masters of crowd control and snaring, controlling the battlefield as they see fit. Many of the Magus powers are focused on AoE (Area of Effect) skills, which allow them to battle many opponents at a time.",
     skills: [
       { name: "Meteor Storm", description: "Rain fire from the sky on enemies", icon: "☄️" },
       { name: "Frost Nova", description: "Freeze all enemies in place", icon: "❄️" },
@@ -52,8 +52,8 @@ const classes: ClassData[] = [
   {
     name: "Heretic",
     image: hereticImg,
-    description: "Dark priest wielding forbidden powers",
-    lore: "Once devoted clerics, Heretics have turned from the light to embrace forbidden knowledge. They wield both healing and corruption, walking the razor's edge between life and death. Their dark prayers can save allies or doom enemies, making them unpredictable and feared.",
+    description: "Divine light and destructive darkness wielder",
+    lore: "Heretics harness the divine powers of light and the destructive nature of darkness. With the combined forces, they deal a respectable amount of damage while still keeping themselves and their party members healed. With their assistance, no battle is too tough.",
     skills: [
       { name: "Soul Drain", description: "Steal life force from enemies", icon: "💀" },
       { name: "Dark Blessing", description: "Heal allies with shadow energy", icon: "🌑" },
