@@ -71,9 +71,9 @@ export const ClassDetailModal = ({ classData, isOpen, onClose }: ClassDetailModa
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="w-full max-w-4xl max-h-[90vh] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden pointer-events-auto"
+              className="w-full max-w-4xl max-h-[90vh] bg-card border border-border rounded-2xl shadow-2xl pointer-events-auto flex flex-col overflow-hidden"
             >
-            <div className="h-full overflow-y-auto">
+              <div className="flex-1 overflow-y-auto overscroll-contain">
               {/* Header with Image */}
               <div className="relative h-48 md:h-64 overflow-hidden">
                 <img
