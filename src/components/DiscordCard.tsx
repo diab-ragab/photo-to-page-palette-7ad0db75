@@ -18,7 +18,12 @@ export const DiscordCard = () => {
           <h3 className="font-display font-semibold text-xs md:text-sm">Discord</h3>
           <p className="text-[10px] md:text-xs text-muted-foreground">15,403 Members</p>
         </div>
-        <Button variant="outline" size="sm" className="text-[10px] md:text-xs px-2 md:px-3">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="text-[10px] md:text-xs px-2 md:px-3"
+          onClick={() => window.open('https://discord.gg/vubqbv3U3y', '_blank')}
+        >
           <span className="hidden sm:inline">Join Server</span>
           <span className="sm:hidden">Join</span>
           <ExternalLink className="w-3 h-3 ml-1" />
