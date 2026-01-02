@@ -69,15 +69,13 @@ export const AuthModals = ({
     setLoginLoading(true);
     
     try {
+      const formData = new FormData();
+      formData.append("login", loginData.login);
+      formData.append("passwd", loginData.passwd);
+
       const response = await fetch("http://51.254.44.137/api/login.php", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          username: loginData.login,
-          password: loginData.passwd
-        })
+        body: formData
       });
 
       const result = await response.text();
@@ -150,16 +148,15 @@ export const AuthModals = ({
     setRegisterLoading(true);
     
     try {
+      const formData = new FormData();
+      formData.append("login", registerData.login);
+      formData.append("passwd", registerData.passwd);
+      formData.append("repasswd", registerData.repasswd);
+      formData.append("email", registerData.email);
+
       const response = await fetch("http://51.254.44.137/api/register.php", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          username: registerData.login,
-          password: registerData.passwd,
-          email: registerData.email
-        })
+        body: formData
       });
 
       const result = await response.text();
