@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, Download, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown } from "lucide-react";
+import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -8,6 +8,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { CartButton } from "@/components/shop/CartButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AuthModals } from "@/components/AuthModals";
+import { DownloadModal } from "@/components/DownloadModal";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
@@ -32,6 +33,7 @@ export const Navbar = () => {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const { t } = useLanguage();
   const location = useLocation();
   const isHomePage = location.pathname === "/";
@@ -135,16 +137,6 @@ export const Navbar = () => {
                 </Button>
               </>
             )}
-            <Button 
-              variant="default" 
-              size="sm"
-              asChild
-            >
-              <a href="/download">
-                <Download className="mr-2 h-4 w-4" />
-                {t('nav.download')}
-              </a>
-            </Button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -257,16 +249,6 @@ export const Navbar = () => {
                 </Button>
               </div>
             )}
-            <Button 
-              variant="default" 
-              className="w-full"
-              asChild
-            >
-              <a href="/download">
-                <Download className="mr-2 h-4 w-4" />
-                {t('nav.download')}
-              </a>
-            </Button>
           </div>
         </motion.div>
       )}
@@ -280,6 +262,11 @@ export const Navbar = () => {
         setForgotPasswordOpen={setForgotPasswordOpen}
         changePasswordOpen={changePasswordOpen}
         setChangePasswordOpen={setChangePasswordOpen}
+      />
+
+      <DownloadModal 
+        open={downloadOpen}
+        setOpen={setDownloadOpen}
       />
     </nav>
   );
