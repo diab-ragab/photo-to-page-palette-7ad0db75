@@ -6,15 +6,17 @@ import { AnnouncementsCard } from "@/components/AnnouncementsCard";
 import { ChangelogCard } from "@/components/ChangelogCard";
 import { DiscordCard } from "@/components/DiscordCard";
 import { ParticleField } from "@/components/ParticleField";
+import { DownloadModal } from "@/components/DownloadModal";
 
 import { useLanguage } from "@/contexts/LanguageContext";
 import heroBg from "@/assets/hero-bg.jpg";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 
 export const HeroSection = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const { t } = useLanguage();
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end start"],
@@ -90,7 +92,7 @@ export const HeroSection = () => {
               variant="hero" 
               size="lg" 
               className="w-full sm:w-auto"
-              onClick={() => window.open('https://example.com/download/game-client.exe', '_blank')}
+              onClick={() => setDownloadOpen(true)}
             >
               <Download className="mr-2 h-5 w-5" />
               {t('hero.downloadBtn')}
@@ -114,6 +116,8 @@ export const HeroSection = () => {
           <DiscordCard />
         </div>
       </motion.div>
+
+      <DownloadModal open={downloadOpen} setOpen={setDownloadOpen} />
     </section>
   );
 };

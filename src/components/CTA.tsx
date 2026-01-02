@@ -1,8 +1,12 @@
 import { motion } from "framer-motion";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { DownloadModal } from "@/components/DownloadModal";
 
 export const CTA = () => {
+  const [downloadOpen, setDownloadOpen] = useState(false);
+
   return (
     <section className="py-16 md:py-24 px-4 bg-card/30">
       <div className="container">
@@ -28,7 +32,7 @@ export const CTA = () => {
             variant="hero" 
             size="lg" 
             className="w-full sm:w-auto"
-            onClick={() => window.open('https://example.com/download/game-client.exe', '_blank')}
+            onClick={() => setDownloadOpen(true)}
           >
             <Download className="mr-2 h-5 w-5" />
             Download Game Client
@@ -39,6 +43,8 @@ export const CTA = () => {
           </p>
         </motion.div>
       </div>
+
+      <DownloadModal open={downloadOpen} setOpen={setDownloadOpen} />
     </section>
   );
 };
