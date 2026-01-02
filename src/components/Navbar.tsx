@@ -74,10 +74,12 @@ export const Navbar = () => {
             <Button 
               variant="default" 
               size="sm"
-              onClick={() => window.open('https://example.com/download/game-client.exe', '_blank')}
+              asChild
             >
-              <Download className="mr-2 h-4 w-4" />
-              {t('nav.download')}
+              <a href="/download">
+                <Download className="mr-2 h-4 w-4" />
+                {t('nav.download')}
+              </a>
             </Button>
           </div>
 
@@ -136,10 +138,12 @@ export const Navbar = () => {
             <Button 
               variant="default" 
               className="w-full"
-              onClick={() => window.open('https://example.com/download/game-client.exe', '_blank')}
+              asChild
             >
-              <Download className="mr-2 h-4 w-4" />
-              {t('nav.download')}
+              <a href="/download">
+                <Download className="mr-2 h-4 w-4" />
+                {t('nav.download')}
+              </a>
             </Button>
           </div>
         </motion.div>
