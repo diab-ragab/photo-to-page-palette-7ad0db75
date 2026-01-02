@@ -11,21 +11,21 @@ const downloadLinks = [
   {
     name: "MEGA",
     icon: Cloud,
-    url: "https://mega.nz/placeholder-link",
+    url: "https://mega.nz/file/x3BCVb6B#2_nAOHbfXNzzAyEEpMg-Yn1wiPJRprs27jOm31_a9gA",
     color: "bg-red-600 hover:bg-red-700",
     description: "Fast & Secure Cloud Storage"
   },
   {
     name: "Google Drive",
     icon: HardDrive,
-    url: "https://drive.google.com/placeholder-link",
+    url: "https://drive.google.com/file/d/1wYtPOZ5pWw4yVO4_R_wVlKxMvvkgJfJ3/view?usp=sharing",
     color: "bg-blue-600 hover:bg-blue-700",
     description: "Google Cloud Storage"
   },
   {
     name: "File.fm",
     icon: FileArchive,
-    url: "https://file.fm/placeholder-link",
+    url: "https://files.fm/u/czrengvywk",
     color: "bg-emerald-600 hover:bg-emerald-700",
     description: "Alternative Download Mirror"
   }
