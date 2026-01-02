@@ -24,9 +24,14 @@ export const CTA = () => {
             14 days of Premium, and a head start on your adventure!
           </p>
           
-          <Button variant="hero" size="lg" className="w-full sm:w-auto">
+          <Button 
+            variant="hero" 
+            size="lg" 
+            className="w-full sm:w-auto"
+            onClick={() => window.open('https://example.com/download/game-client.exe', '_blank')}
+          >
             <Download className="mr-2 h-5 w-5" />
-            Download the Game
+            Download Game Client
           </Button>
           
           <p className="text-[10px] md:text-xs text-muted-foreground mt-4 md:mt-6">
