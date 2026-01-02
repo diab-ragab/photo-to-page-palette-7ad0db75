@@ -73,7 +73,7 @@ export const AuthModals = ({
       formData.append("login", loginData.login);
       formData.append("passwd", loginData.passwd);
 
-      const response = await fetch("/api/login.php", {
+      const response = await fetch("http://51.254.44.137/api/login.php", {
         method: "POST",
         body: formData
       });
@@ -154,7 +154,7 @@ export const AuthModals = ({
       formData.append("repasswd", registerData.repasswd);
       formData.append("email", registerData.email);
 
-      const response = await fetch("/api/register.php", {
+      const response = await fetch("http://51.254.44.137/api/register.php", {
         method: "POST",
         body: formData
       });
@@ -231,7 +231,7 @@ export const AuthModals = ({
       formData.append("email", forgotData.email);
       formData.append("newpasswd", forgotData.newPasswd);
 
-      const response = await fetch("/api/reset_password.php", {
+      const response = await fetch("http://51.254.44.137/api/reset_password.php", {
         method: "POST",
         body: formData
       });
@@ -302,7 +302,7 @@ export const AuthModals = ({
       formData.append("oldpasswd", changeData.oldPasswd);
       formData.append("newpasswd", changeData.newPasswd);
 
-      const response = await fetch("/api/change_password.php", {
+      const response = await fetch("http://51.254.44.137/api/change_password.php", {
         method: "POST",
         body: formData
       });
