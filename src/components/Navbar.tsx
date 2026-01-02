@@ -71,7 +71,11 @@ export const Navbar = () => {
             <CartButton />
             <ThemeToggle />
             <LanguageSwitcher />
-            <Button variant="default" size="sm">
+            <Button 
+              variant="default" 
+              size="sm"
+              onClick={() => window.open('https://example.com/download/game-client.exe', '_blank')}
+            >
               <Download className="mr-2 h-4 w-4" />
               {t('nav.download')}
             </Button>
@@ -129,7 +133,11 @@ export const Navbar = () => {
               <ShoppingBag className="w-4 h-4" />
               {t('nav.shop')}
             </Link>
-            <Button variant="default" className="w-full">
+            <Button 
+              variant="default" 
+              className="w-full"
+              onClick={() => window.open('https://example.com/download/game-client.exe', '_blank')}
+            >
               <Download className="mr-2 h-4 w-4" />
               {t('nav.download')}
             </Button>

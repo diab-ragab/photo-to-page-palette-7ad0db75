@@ -86,7 +86,12 @@ export const HeroSection = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-3 justify-center px-4">
-            <Button variant="hero" size="lg" className="w-full sm:w-auto">
+            <Button 
+              variant="hero" 
+              size="lg" 
+              className="w-full sm:w-auto"
+              onClick={() => window.open('https://example.com/download/game-client.exe', '_blank')}
+            >
               <Download className="mr-2 h-5 w-5" />
               {t('hero.downloadBtn')}
             </Button>
