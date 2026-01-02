@@ -70,10 +70,11 @@ export const AuthModals = ({
     
     try {
       const formData = new FormData();
+      formData.append("action", "login");
       formData.append("login", loginData.login);
       formData.append("passwd", loginData.passwd);
 
-      const response = await fetch("http://51.254.44.137/api/login.php", {
+      const response = await fetch("http://51.254.44.137/api/auth.php", {
         method: "POST",
         body: formData
       });
@@ -149,12 +150,12 @@ export const AuthModals = ({
     
     try {
       const formData = new FormData();
-      formData.append("login", registerData.login);
-      formData.append("passwd", registerData.passwd);
-      formData.append("repasswd", registerData.repasswd);
+      formData.append("action", "register");
+      formData.append("username", registerData.login);
+      formData.append("password", registerData.passwd);
       formData.append("email", registerData.email);
 
-      const response = await fetch("http://51.254.44.137/api/register.php", {
+      const response = await fetch("http://51.254.44.137/api/auth.php", {
         method: "POST",
         body: formData
       });
@@ -221,21 +222,22 @@ export const AuthModals = ({
     
     try {
       const formData = new FormData();
+      formData.append("action", "reset");
       formData.append("login", forgotData.login);
       formData.append("email", forgotData.email);
       formData.append("newpasswd", forgotData.newPasswd);
 
-      const response = await fetch("http://51.254.44.137/api/reset_password.php", {
+      const response = await fetch("http://51.254.44.137/api/auth.php", {
         method: "POST",
         body: formData
       });
 
-      const result = await response.text();
+      const result = await response.json();
       
-      if (result.includes("success") || response.ok) {
+      if (result.success) {
         toast({
           title: "Success",
-          description: "Password reset successfully!"
+          description: result.message || "Password reset successfully!"
         });
         setForgotPasswordOpen(false);
         setForgotData({ login: "", email: "", newPasswd: "", confirmPasswd: "" });
@@ -243,7 +245,7 @@ export const AuthModals = ({
       } else {
         toast({
           title: "Error",
-          description: result || "Password reset failed! Check your username and email.",
+          description: result.message || "Password reset failed! Check your username and email.",
           variant: "destructive"
         });
       }
