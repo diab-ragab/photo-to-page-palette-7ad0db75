@@ -297,40 +297,11 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                 </p>
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-center">
                     <span className="text-2xl font-bold font-display text-primary">
-                      €{product.price.toFixed(2)}
+                      Coming Soon
                     </span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setQuantity(product.id, getQuantity(product.id) - 1)}
-                      >
-                        <Minus className="w-3 h-3" />
-                      </Button>
-                      <span className="w-8 text-center font-semibold text-sm">
-                        {getQuantity(product.id)}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setQuantity(product.id, getQuantity(product.id) + 1)}
-                      >
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
                   </div>
-                  <Button 
-                    size="sm" 
-                    className="w-full gap-2"
-                    onClick={() => handleAddToCart(product)}
-                  >
-                    <ShoppingCart className="w-4 h-4" />
-                    {t('shop.addToCart')}
-                  </Button>
                 </div>
               </div>
             </motion.div>
