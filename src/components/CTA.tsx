@@ -26,7 +26,7 @@ export const CTA = () => {
           
           <Button variant="hero" size="lg" className="w-full sm:w-auto">
             <Download className="mr-2 h-5 w-5" />
-            Download Launcher
+            Download the Game
           </Button>
           
           <p className="text-[10px] md:text-xs text-muted-foreground mt-4 md:mt-6">
