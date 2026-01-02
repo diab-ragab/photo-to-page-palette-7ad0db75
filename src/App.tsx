@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { CartProvider } from "@/contexts/CartContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "next-themes";
 import { AnimatePresence } from "framer-motion";
 import { HelmetProvider } from "react-helmet-async";
@@ -12,6 +13,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { RecentPurchases } from "@/components/RecentPurchases";
 import { PageTransition } from "@/components/PageTransition";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
@@ -38,9 +40,9 @@ const AnimatedRoutes = () => {
         <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
         <Route path="/refund" element={<PageTransition><Refund /></PageTransition>} />
         <Route path="/support" element={<PageTransition><Support /></PageTransition>} />
-        <Route path="/shop" element={<PageTransition><Shop /></PageTransition>} />
-        <Route path="/cart" element={<PageTransition><Cart /></PageTransition>} />
-        <Route path="/checkout" element={<PageTransition><Checkout /></PageTransition>} />
+        <Route path="/shop" element={<PageTransition><ProtectedRoute><Shop /></ProtectedRoute></PageTransition>} />
+        <Route path="/cart" element={<PageTransition><ProtectedRoute><Cart /></ProtectedRoute></PageTransition>} />
+        <Route path="/checkout" element={<PageTransition><ProtectedRoute><Checkout /></ProtectedRoute></PageTransition>} />
         <Route path="/blog" element={<PageTransition><Blog /></PageTransition>} />
         <Route path="/blog/:slug" element={<PageTransition><BlogPost /></PageTransition>} />
         <Route path="/download" element={<PageTransition><DownloadPage /></PageTransition>} />
@@ -55,18 +57,20 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
         <LanguageProvider>
-          <CartProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <ScrollProgress />
-              <BrowserRouter>
-                <AnimatedRoutes />
-                <ScrollToTop />
-                <RecentPurchases />
-              </BrowserRouter>
-            </TooltipProvider>
-          </CartProvider>
+          <AuthProvider>
+            <CartProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <ScrollProgress />
+                <BrowserRouter>
+                  <AnimatedRoutes />
+                  <ScrollToTop />
+                  <RecentPurchases />
+                </BrowserRouter>
+              </TooltipProvider>
+            </CartProvider>
+          </AuthProvider>
         </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>

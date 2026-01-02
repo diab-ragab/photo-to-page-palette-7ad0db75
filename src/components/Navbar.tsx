@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, Download, ShoppingBag, Newspaper, LogIn, UserPlus } from "lucide-react";
+import { Menu, X, Download, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -8,6 +8,14 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { CartButton } from "@/components/shop/CartButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AuthModals } from "@/components/AuthModals";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
   e.preventDefault();
@@ -22,9 +30,12 @@ export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const { t } = useLanguage();
   const location = useLocation();
   const isHomePage = location.pathname === "/";
+  const { user, isLoggedIn, logout } = useAuth();
 
   const navLinks = [
     { label: t('nav.home'), href: "#hero" },
@@ -64,32 +75,66 @@ export const Navbar = () => {
               <Newspaper className="w-4 h-4" />
               Blog
             </Link>
-            <Link
-              to="/shop"
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              {t('nav.shop')}
-            </Link>
-            <CartButton />
+            {isLoggedIn && (
+              <Link
+                to="/shop"
+                className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                {t('nav.shop')}
+              </Link>
+            )}
+            {isLoggedIn && <CartButton />}
             <ThemeToggle />
             <LanguageSwitcher />
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setLoginOpen(true)}
-            >
-              <LogIn className="mr-2 h-4 w-4" />
-              Login
-            </Button>
-            <Button 
-              variant="secondary" 
-              size="sm"
-              onClick={() => setRegisterOpen(true)}
-            >
-              <UserPlus className="mr-2 h-4 w-4" />
-              Register
-            </Button>
+            
+            {isLoggedIn ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <User className="h-4 w-4" />
+                    {user?.username}
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 bg-card border-border">
+                  <DropdownMenuItem 
+                    onClick={() => setChangePasswordOpen(true)}
+                    className="cursor-pointer"
+                  >
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    Change Password
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={logout}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setLoginOpen(true)}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Login
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => setRegisterOpen(true)}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Register
+                </Button>
+              </>
+            )}
             <Button 
               variant="default" 
               size="sm"
@@ -146,38 +191,72 @@ export const Navbar = () => {
               <Newspaper className="w-4 h-4" />
               Blog
             </Link>
-            <Link
-              to="/shop"
-              className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
-              onClick={() => setIsOpen(false)}
-            >
-              <ShoppingBag className="w-4 h-4" />
-              {t('nav.shop')}
-            </Link>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                className="flex-1"
-                onClick={() => {
-                  setLoginOpen(true);
-                  setIsOpen(false);
-                }}
+            {isLoggedIn && (
+              <Link
+                to="/shop"
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
+                onClick={() => setIsOpen(false)}
               >
-                <LogIn className="mr-2 h-4 w-4" />
-                Login
-              </Button>
-              <Button 
-                variant="secondary" 
-                className="flex-1"
-                onClick={() => {
-                  setRegisterOpen(true);
-                  setIsOpen(false);
-                }}
-              >
-                <UserPlus className="mr-2 h-4 w-4" />
-                Register
-              </Button>
-            </div>
+                <ShoppingBag className="w-4 h-4" />
+                {t('nav.shop')}
+              </Link>
+            )}
+            
+            {isLoggedIn ? (
+              <>
+                <div className="flex items-center gap-2 py-2 text-sm font-medium text-foreground">
+                  <User className="w-4 h-4" />
+                  {user?.username}
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    setChangePasswordOpen(true);
+                    setIsOpen(false);
+                  }}
+                >
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  Change Password
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  className="w-full"
+                  onClick={() => {
+                    logout();
+                    setIsOpen(false);
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => {
+                    setLoginOpen(true);
+                    setIsOpen(false);
+                  }}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Login
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  className="flex-1"
+                  onClick={() => {
+                    setRegisterOpen(true);
+                    setIsOpen(false);
+                  }}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Register
+                </Button>
+              </div>
+            )}
             <Button 
               variant="default" 
               className="w-full"
@@ -197,6 +276,10 @@ export const Navbar = () => {
         setLoginOpen={setLoginOpen}
         registerOpen={registerOpen}
         setRegisterOpen={setRegisterOpen}
+        forgotPasswordOpen={forgotPasswordOpen}
+        setForgotPasswordOpen={setForgotPasswordOpen}
+        changePasswordOpen={changePasswordOpen}
+        setChangePasswordOpen={setChangePasswordOpen}
       />
     </nav>
   );
