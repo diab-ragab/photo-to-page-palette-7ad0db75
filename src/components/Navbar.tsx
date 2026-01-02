@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, Download, ShoppingBag, Newspaper } from "lucide-react";
+import { Menu, X, Download, ShoppingBag, Newspaper, LogIn, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { CartButton } from "@/components/shop/CartButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AuthModals } from "@/components/AuthModals";
 
 const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
   e.preventDefault();
@@ -19,6 +20,8 @@ const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) =
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
   const { t } = useLanguage();
   const location = useLocation();
   const isHomePage = location.pathname === "/";
@@ -71,6 +74,22 @@ export const Navbar = () => {
             <CartButton />
             <ThemeToggle />
             <LanguageSwitcher />
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setLoginOpen(true)}
+            >
+              <LogIn className="mr-2 h-4 w-4" />
+              Login
+            </Button>
+            <Button 
+              variant="secondary" 
+              size="sm"
+              onClick={() => setRegisterOpen(true)}
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Register
+            </Button>
             <Button 
               variant="default" 
               size="sm"
@@ -135,6 +154,30 @@ export const Navbar = () => {
               <ShoppingBag className="w-4 h-4" />
               {t('nav.shop')}
             </Link>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => {
+                  setLoginOpen(true);
+                  setIsOpen(false);
+                }}
+              >
+                <LogIn className="mr-2 h-4 w-4" />
+                Login
+              </Button>
+              <Button 
+                variant="secondary" 
+                className="flex-1"
+                onClick={() => {
+                  setRegisterOpen(true);
+                  setIsOpen(false);
+                }}
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                Register
+              </Button>
+            </div>
             <Button 
               variant="default" 
               className="w-full"
@@ -148,6 +191,13 @@ export const Navbar = () => {
           </div>
         </motion.div>
       )}
+
+      <AuthModals 
+        loginOpen={loginOpen}
+        setLoginOpen={setLoginOpen}
+        registerOpen={registerOpen}
+        setRegisterOpen={setRegisterOpen}
+      />
     </nav>
   );
 };
