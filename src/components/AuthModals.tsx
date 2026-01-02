@@ -78,20 +78,20 @@ export const AuthModals = ({
         body: formData
       });
 
-      const result = await response.text();
+      const result = await response.json();
       
-      if (result.includes("success") || response.ok) {
-        login(loginData.login, "");
+      if (result.success) {
+        login(loginData.login, result.user?.email || "");
         toast({
           title: "Success",
-          description: "Login successful!"
+          description: result.message || "Login successful!"
         });
         setLoginOpen(false);
         setLoginData({ login: "", passwd: "" });
       } else {
         toast({
           title: "Error",
-          description: result || "Login failed!",
+          description: result.message || "Login failed!",
           variant: "destructive"
         });
       }
@@ -159,26 +159,20 @@ export const AuthModals = ({
         body: formData
       });
 
-      const result = await response.text();
+      const result = await response.json();
       
-      if (result.includes("successfully") || response.ok) {
+      if (result.success) {
         toast({
           title: "Success",
-          description: "New user added successfully!"
+          description: result.message || "Account created successfully!"
         });
         setRegisterOpen(false);
         setRegisterData({ login: "", passwd: "", repasswd: "", email: "" });
         setLoginOpen(true);
-      } else if (result.includes("already exists")) {
-        toast({
-          title: "Error",
-          description: "User already exists!",
-          variant: "destructive"
-        });
       } else {
         toast({
           title: "Error",
-          description: result || "Registration failed!",
+          description: result.message || "Registration failed!",
           variant: "destructive"
         });
       }
