@@ -74,7 +74,7 @@ export const AuthModals = ({
       formData.append("login", loginData.login);
       formData.append("passwd", loginData.passwd);
 
-      const response = await fetch("https://51.254.44.137/api/auth.php", {
+      const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         body: formData
       });
@@ -155,7 +155,7 @@ export const AuthModals = ({
       formData.append("password", registerData.passwd);
       formData.append("email", registerData.email);
 
-      const response = await fetch("https://51.254.44.137/api/auth.php", {
+      const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         body: formData
       });
@@ -227,7 +227,7 @@ export const AuthModals = ({
       formData.append("email", forgotData.email);
       formData.append("newpasswd", forgotData.newPasswd);
 
-      const response = await fetch("https://51.254.44.137/api/auth.php", {
+      const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         body: formData
       });
@@ -298,7 +298,7 @@ export const AuthModals = ({
       formData.append("oldpasswd", changeData.oldPasswd);
       formData.append("newpasswd", changeData.newPasswd);
 
-      const response = await fetch("https://51.254.44.137/api/change_password.php", {
+      const response = await fetch("https://woiendgame.online/api/change_password.php", {
         method: "POST",
         body: formData
       });
