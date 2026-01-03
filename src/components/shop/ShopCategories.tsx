@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Shirt, Egg, Coins, LayoutGrid } from "lucide-react";
+import { Shirt, Egg, Coins, LayoutGrid, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ShopCategory } from "@/pages/Shop";
@@ -11,6 +11,7 @@ interface ShopCategoriesProps {
 
 const categories: { id: ShopCategory; icon: typeof Shirt; labelKey: string }[] = [
   { id: "all", icon: LayoutGrid, labelKey: "shop.category.all" },
+  { id: "passes", icon: Crown, labelKey: "shop.category.passes" },
   { id: "fashion", icon: Shirt, labelKey: "shop.category.fashion" },
   { id: "pets", icon: Egg, labelKey: "shop.category.pets" },
   { id: "currency", icon: Coins, labelKey: "shop.category.currency" },

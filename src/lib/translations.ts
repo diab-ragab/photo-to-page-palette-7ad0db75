@@ -20,7 +20,7 @@ export type TranslationKey =
   | 'classes.title' | 'classes.subtitle'
   | 'features.title' | 'features.subtitle'
   | 'shop.badge' | 'shop.title' | 'shop.subtitle' | 'shop.note' | 'shop.addToCart' | 'shop.noProducts'
-  | 'shop.category.all' | 'shop.category.fashion' | 'shop.category.pets' | 'shop.category.currency'
+  | 'shop.category.all' | 'shop.category.fashion' | 'shop.category.pets' | 'shop.category.currency' | 'shop.category.passes'
   | 'cart.title' | 'cart.empty' | 'cart.emptyDescription' | 'cart.continueShopping' | 'cart.summary' | 'cart.items' | 'cart.total' | 'cart.checkout'
   | 'checkout.title' | 'checkout.accountInfo' | 'checkout.username' | 'checkout.usernamePlaceholder' | 'checkout.email'
   | 'checkout.paymentInfo' | 'checkout.cardName' | 'checkout.cardNumber' | 'checkout.expiry' | 'checkout.cvv'
@@ -65,6 +65,7 @@ export const translations: Translations = {
     'shop.category.fashion': 'Fashion & Backgears',
     'shop.category.pets': 'Pet Eggs',
     'shop.category.currency': 'Currency',
+    'shop.category.passes': 'Game Passes',
     'cart.title': 'Shopping Cart',
     'cart.empty': 'Your cart is empty',
     'cart.emptyDescription': 'Looks like you haven\'t added any items yet.',
@@ -129,6 +130,7 @@ export const translations: Translations = {
     'shop.category.fashion': 'Moda y Accesorios',
     'shop.category.pets': 'Huevos de Mascota',
     'shop.category.currency': 'Moneda',
+    'shop.category.passes': 'Pases de Juego',
     'cart.title': 'Carrito de Compras',
     'cart.empty': 'Tu carrito está vacío',
     'cart.emptyDescription': 'Parece que no has añadido ningún artículo.',
@@ -194,6 +196,7 @@ export const translations: Translations = {
     'shop.category.fashion': 'Moda e Acessórios',
     'shop.category.pets': 'Ovos de Pet',
     'shop.category.currency': 'Moeda',
+    'shop.category.passes': 'Passes de Jogo',
     'cart.title': 'Carrinho de Compras',
     'cart.empty': 'Seu carrinho está vazio',
     'cart.emptyDescription': 'Parece que você não adicionou nenhum item.',
@@ -259,6 +262,7 @@ export const translations: Translations = {
     'shop.category.fashion': 'Mode et Accessoires',
     'shop.category.pets': 'Œufs de Familier',
     'shop.category.currency': 'Monnaie',
+    'shop.category.passes': 'Passes de Jeu',
     'cart.title': 'Panier',
     'cart.empty': 'Votre panier est vide',
     'cart.emptyDescription': 'Il semble que vous n\'ayez pas encore ajouté d\'articles.',
@@ -324,6 +328,7 @@ export const translations: Translations = {
     'shop.category.fashion': 'Mode & Zubehör',
     'shop.category.pets': 'Haustier-Eier',
     'shop.category.currency': 'Währung',
+    'shop.category.passes': 'Spielpässe',
     'cart.title': 'Warenkorb',
     'cart.empty': 'Ihr Warenkorb ist leer',
     'cart.emptyDescription': 'Sie haben noch keine Artikel hinzugefügt.',
@@ -389,6 +394,7 @@ export const translations: Translations = {
     'shop.category.fashion': 'الأزياء والإكسسوارات',
     'shop.category.pets': 'بيض الحيوانات',
     'shop.category.currency': 'العملة',
+    'shop.category.passes': 'تذاكر اللعبة',
     'cart.title': 'سلة التسوق',
     'cart.empty': 'سلتك فارغة',
     'cart.emptyDescription': 'يبدو أنك لم تضف أي عناصر بعد.',
@@ -454,6 +460,7 @@ export const translations: Translations = {
     'shop.category.fashion': '时装与背饰',
     'shop.category.pets': '宠物蛋',
     'shop.category.currency': '货币',
+    'shop.category.passes': '游戏通行证',
     'cart.title': '购物车',
     'cart.empty': '购物车是空的',
     'cart.emptyDescription': '您还没有添加任何商品。',
@@ -519,6 +526,7 @@ export const translations: Translations = {
     'shop.category.fashion': 'Одежда и Аксессуары',
     'shop.category.pets': 'Яйца Питомцев',
     'shop.category.currency': 'Валюта',
+    'shop.category.passes': 'Игровые Пропуски',
     'cart.title': 'Корзина',
     'cart.empty': 'Ваша корзина пуста',
     'cart.emptyDescription': 'Похоже, вы еще не добавили товары.',
@@ -584,6 +592,7 @@ export const translations: Translations = {
     'shop.category.fashion': 'ファッション＆装備',
     'shop.category.pets': 'ペットエッグ',
     'shop.category.currency': '通貨',
+    'shop.category.passes': 'ゲームパス',
     'cart.title': 'ショッピングカート',
     'cart.empty': 'カートは空です',
     'cart.emptyDescription': 'まだ商品が追加されていません。',
@@ -649,6 +658,7 @@ export const translations: Translations = {
     'shop.category.fashion': '패션 & 장비',
     'shop.category.pets': '펫 알',
     'shop.category.currency': '화폐',
+    'shop.category.passes': '게임 패스',
     'cart.title': '장바구니',
     'cart.empty': '장바구니가 비어 있습니다',
     'cart.emptyDescription': '아직 상품을 추가하지 않으셨습니다.',
@@ -714,6 +724,7 @@ export const translations: Translations = {
     'shop.category.fashion': 'Thời trang & Phụ kiện',
     'shop.category.pets': 'Trứng thú cưng',
     'shop.category.currency': 'Tiền tệ',
+    'shop.category.passes': 'Game Pass',
     'cart.title': 'Giỏ hàng',
     'cart.empty': 'Giỏ hàng trống',
     'cart.emptyDescription': 'Bạn chưa thêm sản phẩm nào.',
