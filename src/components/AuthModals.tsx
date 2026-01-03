@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ export const AuthModals = ({
   const { t } = useLanguage();
   const { toast } = useToast();
   const { login, user } = useAuth();
+  const navigate = useNavigate();
   
   // Login state
   const [loginData, setLoginData] = useState({ login: "", passwd: "" });
@@ -89,6 +91,7 @@ export const AuthModals = ({
         });
         setLoginOpen(false);
         setLoginData({ login: "", passwd: "" });
+        navigate("/dashboard");
       } else {
         toast({
           title: "Error",

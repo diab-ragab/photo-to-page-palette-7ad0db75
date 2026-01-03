@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown } from "lucide-react";
+import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { CartButton } from "@/components/shop/CartButton";
@@ -36,6 +36,7 @@ export const Navbar = () => {
   const [downloadOpen, setDownloadOpen] = useState(false);
   const { t } = useLanguage();
   const location = useLocation();
+  const navigate = useNavigate();
   const isHomePage = location.pathname === "/";
   const { user, isLoggedIn, logout } = useAuth();
 
@@ -79,6 +80,15 @@ export const Navbar = () => {
             </Link>
             {isLoggedIn && (
               <Link
+                to="/dashboard"
+                className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </Link>
+            )}
+            {isLoggedIn && (
+              <Link
                 to="/shop"
                 className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
               >
@@ -100,6 +110,13 @@ export const Navbar = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-card border-border">
+                  <DropdownMenuItem 
+                    onClick={() => navigate('/dashboard')}
+                    className="cursor-pointer"
+                  >
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    Dashboard
+                  </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={() => setChangePasswordOpen(true)}
                     className="cursor-pointer"
@@ -183,6 +200,16 @@ export const Navbar = () => {
               <Newspaper className="w-4 h-4" />
               Blog
             </Link>
+            {isLoggedIn && (
+              <Link
+                to="/dashboard"
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
+                onClick={() => setIsOpen(false)}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </Link>
+            )}
             {isLoggedIn && (
               <Link
                 to="/shop"
