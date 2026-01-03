@@ -106,7 +106,7 @@ export const HeroSection = () => {
 
         {/* Info Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 max-w-5xl mx-auto mb-3 md:mb-4">
-          <ServerStatusCard apiEndpoint="http://51.254.44.137/api/server-status.php" />
+          <ServerStatusCard apiEndpoint="https://51.254.44.137/api/server-status.php" />
           <AnnouncementsCard />
           <ChangelogCard />
         </div>
