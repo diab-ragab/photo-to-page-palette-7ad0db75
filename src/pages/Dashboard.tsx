@@ -6,6 +6,7 @@ import { SEO } from "@/components/SEO";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVoteSystem } from "@/hooks/useVoteSystem";
 import { Leaderboards } from "@/components/Leaderboards";
+import { GamePass } from "@/components/GamePass";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -315,6 +316,11 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Game Pass Section */}
+        <div className="mt-8">
+          <GamePass />
         </div>
 
         {/* Leaderboards Section */}

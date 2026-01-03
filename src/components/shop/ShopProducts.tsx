@@ -30,14 +30,27 @@ interface Product {
   name: string;
   description: string;
   price: number;
-  category: "fashion" | "pets" | "currency";
+  category: "fashion" | "pets" | "currency" | "passes";
   image: string;
   rarity?: "common" | "rare" | "epic" | "legendary";
   popular?: boolean;
   bonus?: string;
+  featured?: boolean;
 }
 
 const products: Product[] = [
+  // Game Passes
+  {
+    id: "elite-pass",
+    name: "Elite Game Pass",
+    description: "Unlock premium rewards for 30 days! Legendary items, bonus coins & exclusive gear",
+    price: 14.99,
+    category: "passes",
+    image: "👑",
+    rarity: "legendary",
+    popular: true,
+    featured: true,
+  },
   // Fashion & Backgears
   {
     id: "fashion-1",

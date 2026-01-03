@@ -6,7 +6,7 @@ import { ShopProducts } from "@/components/shop/ShopProducts";
 import { SEO } from "@/components/SEO";
 import { useState } from "react";
 
-export type ShopCategory = "all" | "fashion" | "pets" | "currency";
+export type ShopCategory = "all" | "fashion" | "pets" | "currency" | "passes";
 
 const Shop = () => {
   const [selectedCategory, setSelectedCategory] = useState<ShopCategory>("all");
