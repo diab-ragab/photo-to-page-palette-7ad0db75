@@ -21,7 +21,33 @@ import {
   Sword,
   Shield,
   Zap,
+  Clock,
+  Calendar,
 } from "lucide-react";
+
+// Calculate time until next month reset
+const getSeasonResetTime = () => {
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+  const diff = nextMonth.getTime() - now.getTime();
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  
+  return { days, hours, minutes, seconds, totalMs: diff };
+};
+
+const getSeasonName = () => {
+  const month = new Date().getMonth();
+  const monthNames = [
+    "Winter Storm", "Frost Bite", "Spring Awakening", "Blossom Fury",
+    "Sunfire", "Summer Blaze", "Harvest Moon", "Autumn Winds",
+    "Shadow Fall", "Dark Harvest", "Frost Legion", "Winter's End"
+  ];
+  return monthNames[month];
+};
 
 interface PassReward {
   day: number;
@@ -120,6 +146,16 @@ export const GamePass = () => {
   const [currentDay, setCurrentDay] = useState(1);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(getSeasonResetTime());
+
+  // Update countdown every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(getSeasonResetTime());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   // Fetch pass status from PHP backend
   useEffect(() => {
@@ -239,6 +275,41 @@ export const GamePass = () => {
               Upgrade to Elite
             </Button>
           )}
+        </div>
+
+        {/* Season Timer */}
+        <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border border-primary/20">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">
+                Season: <span className="text-primary">{getSeasonName()}</span>
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Resets in:</span>
+              <div className="flex gap-1">
+                <div className="bg-background/80 border border-border px-2 py-1 rounded text-center min-w-[40px]">
+                  <span className="text-sm font-bold text-primary">{timeLeft.days}</span>
+                  <span className="text-[10px] text-muted-foreground block">days</span>
+                </div>
+                <div className="bg-background/80 border border-border px-2 py-1 rounded text-center min-w-[40px]">
+                  <span className="text-sm font-bold text-primary">{timeLeft.hours.toString().padStart(2, '0')}</span>
+                  <span className="text-[10px] text-muted-foreground block">hrs</span>
+                </div>
+                <div className="bg-background/80 border border-border px-2 py-1 rounded text-center min-w-[40px]">
+                  <span className="text-sm font-bold text-primary">{timeLeft.minutes.toString().padStart(2, '0')}</span>
+                  <span className="text-[10px] text-muted-foreground block">min</span>
+                </div>
+                <div className="bg-background/80 border border-border px-2 py-1 rounded text-center min-w-[40px]">
+                  <span className="text-sm font-bold text-primary">{timeLeft.seconds.toString().padStart(2, '0')}</span>
+                  <span className="text-[10px] text-muted-foreground block">sec</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Progress Bar */}
