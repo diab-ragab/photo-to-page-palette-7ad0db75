@@ -27,6 +27,7 @@ import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import DownloadPage from "./pages/Download";
 import Dashboard from "./pages/Dashboard";
+import SeasonHistory from "./pages/SeasonHistory";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const AnimatedRoutes = () => {
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<PageTransition><Index /></PageTransition>} />
         <Route path="/dashboard" element={<PageTransition><ProtectedRoute><Dashboard /></ProtectedRoute></PageTransition>} />
+        <Route path="/seasons" element={<PageTransition><SeasonHistory /></PageTransition>} />
         <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
         <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
         <Route path="/refund" element={<PageTransition><Refund /></PageTransition>} />
