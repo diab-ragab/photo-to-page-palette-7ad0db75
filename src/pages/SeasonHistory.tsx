@@ -14,7 +14,7 @@ import {
   Star,
   Sparkles,
   ChevronRight,
-  Lock,
+  Clock,
   ArrowLeft,
 } from "lucide-react";
 
@@ -25,113 +25,101 @@ interface SeasonReward {
   type: "free" | "elite";
 }
 
-interface PastSeason {
+interface UpcomingSeason {
   id: number;
   name: string;
   month: string;
   year: number;
   theme: string;
   themeColor: string;
-  totalParticipants: number;
-  elitePassHolders: number;
-  exclusiveRewards: SeasonReward[];
+  plannedRewards: SeasonReward[];
+  startsIn?: string;
 }
 
-const pastSeasons: PastSeason[] = [
+const upcomingSeasons: UpcomingSeason[] = [
   {
-    id: 12,
-    name: "Winter's End",
-    month: "December",
-    year: 2025,
-    theme: "Frost and Ice",
-    themeColor: "from-cyan-500 to-blue-600",
-    totalParticipants: 2847,
-    elitePassHolders: 523,
-    exclusiveRewards: [
-      { name: "Frost Dragon Mount", icon: "🐉", rarity: "legendary", type: "elite" },
-      { name: "Ice Crown", icon: "👑", rarity: "legendary", type: "elite" },
-      { name: "Snowflake Pet", icon: "❄️", rarity: "epic", type: "free" },
-      { name: "Winter Cloak", icon: "🧥", rarity: "rare", type: "free" },
+    id: 2,
+    name: "Frost Bite",
+    month: "February",
+    year: 2026,
+    theme: "Arctic Expedition",
+    themeColor: "from-cyan-400 to-blue-600",
+    startsIn: "Next Month",
+    plannedRewards: [
+      { name: "Ice Titan Mount", icon: "🦣", rarity: "legendary", type: "elite" },
+      { name: "Frozen Crown", icon: "❄️", rarity: "legendary", type: "elite" },
+      { name: "Snowstorm Pet", icon: "⛄", rarity: "epic", type: "free" },
+      { name: "Frost Armor", icon: "🧊", rarity: "rare", type: "free" },
     ],
   },
   {
-    id: 11,
-    name: "Dark Harvest",
-    month: "November",
-    year: 2025,
-    theme: "Shadow and Darkness",
-    themeColor: "from-purple-600 to-gray-800",
-    totalParticipants: 2654,
-    elitePassHolders: 489,
-    exclusiveRewards: [
-      { name: "Shadow Reaper Scythe", icon: "🗡️", rarity: "legendary", type: "elite" },
-      { name: "Phantom Wings", icon: "👻", rarity: "legendary", type: "elite" },
-      { name: "Dark Orb Pet", icon: "🔮", rarity: "epic", type: "free" },
-      { name: "Midnight Armor", icon: "🛡️", rarity: "rare", type: "free" },
+    id: 3,
+    name: "Spring Awakening",
+    month: "March",
+    year: 2026,
+    theme: "Nature's Rebirth",
+    themeColor: "from-green-400 to-emerald-600",
+    plannedRewards: [
+      { name: "Forest Guardian Mount", icon: "🦌", rarity: "legendary", type: "elite" },
+      { name: "Bloom Crown", icon: "🌸", rarity: "legendary", type: "elite" },
+      { name: "Butterfly Swarm Pet", icon: "🦋", rarity: "epic", type: "free" },
+      { name: "Vine Armor", icon: "🌿", rarity: "rare", type: "free" },
     ],
   },
   {
-    id: 10,
-    name: "Shadow Fall",
-    month: "October",
-    year: 2025,
-    theme: "Halloween Special",
-    themeColor: "from-orange-500 to-purple-700",
-    totalParticipants: 3124,
-    elitePassHolders: 678,
-    exclusiveRewards: [
-      { name: "Pumpkin King Crown", icon: "🎃", rarity: "legendary", type: "elite" },
-      { name: "Spectral Horse", icon: "🐴", rarity: "legendary", type: "elite" },
-      { name: "Bat Swarm Pet", icon: "🦇", rarity: "epic", type: "free" },
-      { name: "Witch's Broom", icon: "🧹", rarity: "rare", type: "free" },
+    id: 4,
+    name: "Blossom Fury",
+    month: "April",
+    year: 2026,
+    theme: "Cherry Blossom Festival",
+    themeColor: "from-pink-400 to-rose-600",
+    plannedRewards: [
+      { name: "Sakura Dragon", icon: "🐲", rarity: "legendary", type: "elite" },
+      { name: "Petal Wings", icon: "🌺", rarity: "legendary", type: "elite" },
+      { name: "Koi Fish Pet", icon: "🐟", rarity: "epic", type: "free" },
+      { name: "Blossom Robe", icon: "👘", rarity: "rare", type: "free" },
     ],
   },
   {
-    id: 9,
-    name: "Autumn Winds",
-    month: "September",
-    year: 2025,
-    theme: "Harvest Festival",
-    themeColor: "from-amber-500 to-orange-600",
-    totalParticipants: 2456,
-    elitePassHolders: 412,
-    exclusiveRewards: [
-      { name: "Golden Harvest Blade", icon: "⚔️", rarity: "legendary", type: "elite" },
-      { name: "Autumn Phoenix", icon: "🔥", rarity: "legendary", type: "elite" },
-      { name: "Maple Leaf Crown", icon: "🍁", rarity: "epic", type: "free" },
-      { name: "Scarecrow Companion", icon: "🎭", rarity: "rare", type: "free" },
+    id: 5,
+    name: "Sunfire",
+    month: "May",
+    year: 2026,
+    theme: "Solar Eclipse",
+    themeColor: "from-orange-400 to-red-600",
+    plannedRewards: [
+      { name: "Solar Phoenix", icon: "🔥", rarity: "legendary", type: "elite" },
+      { name: "Sun God Helm", icon: "☀️", rarity: "legendary", type: "elite" },
+      { name: "Flame Spirit Pet", icon: "🌟", rarity: "epic", type: "free" },
+      { name: "Ember Cloak", icon: "🧥", rarity: "rare", type: "free" },
     ],
   },
   {
-    id: 8,
-    name: "Harvest Moon",
-    month: "August",
-    year: 2025,
-    theme: "Lunar Celebration",
-    themeColor: "from-yellow-400 to-amber-600",
-    totalParticipants: 2789,
-    elitePassHolders: 534,
-    exclusiveRewards: [
-      { name: "Moon Goddess Staff", icon: "🌙", rarity: "legendary", type: "elite" },
-      { name: "Celestial Armor", icon: "✨", rarity: "legendary", type: "elite" },
-      { name: "Star Rabbit Pet", icon: "🐰", rarity: "epic", type: "free" },
-      { name: "Lantern Back Piece", icon: "🏮", rarity: "rare", type: "free" },
+    id: 6,
+    name: "Summer Blaze",
+    month: "June",
+    year: 2026,
+    theme: "Tropical Paradise",
+    themeColor: "from-yellow-400 to-orange-500",
+    plannedRewards: [
+      { name: "Tidal Serpent Mount", icon: "🐍", rarity: "legendary", type: "elite" },
+      { name: "Ocean King Trident", icon: "🔱", rarity: "legendary", type: "elite" },
+      { name: "Crab Companion", icon: "🦀", rarity: "epic", type: "free" },
+      { name: "Beach Warrior Set", icon: "🏖️", rarity: "rare", type: "free" },
     ],
   },
   {
     id: 7,
-    name: "Summer Blaze",
+    name: "Thunder Storm",
     month: "July",
-    year: 2025,
-    theme: "Beach Party",
-    themeColor: "from-yellow-400 to-red-500",
-    totalParticipants: 3012,
-    elitePassHolders: 621,
-    exclusiveRewards: [
-      { name: "Inferno Dragon", icon: "🐲", rarity: "legendary", type: "elite" },
-      { name: "Blazing Armor Set", icon: "🔥", rarity: "legendary", type: "elite" },
-      { name: "Sun Spirit Pet", icon: "☀️", rarity: "epic", type: "free" },
-      { name: "Beach Surfboard", icon: "🏄", rarity: "rare", type: "free" },
+    year: 2026,
+    theme: "Lightning Gods",
+    themeColor: "from-indigo-500 to-purple-700",
+    plannedRewards: [
+      { name: "Storm Dragon", icon: "⚡", rarity: "legendary", type: "elite" },
+      { name: "Thunder God Armor", icon: "🌩️", rarity: "legendary", type: "elite" },
+      { name: "Electric Sprite Pet", icon: "💫", rarity: "epic", type: "free" },
+      { name: "Lightning Staff", icon: "🪄", rarity: "rare", type: "free" },
     ],
   },
 ];
@@ -147,8 +135,8 @@ const SeasonHistory = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEO
-        title="Season History | WOI Endgame"
-        description="View past Game Pass seasons and their exclusive rewards in WOI Endgame."
+        title="Upcoming Seasons | WOI Endgame"
+        description="Preview upcoming Game Pass seasons and their exclusive rewards in WOI Endgame."
       />
       <Navbar />
 
@@ -169,10 +157,10 @@ const SeasonHistory = () => {
               className="text-center"
             >
               <h1 className="text-3xl md:text-4xl font-display font-bold mb-4">
-                <span className="text-primary">Season</span> History
+                <span className="text-primary">Upcoming</span> Seasons
               </h1>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Explore past Game Pass seasons and their exclusive rewards. These items are no longer obtainable and are considered collector's treasures!
+                Preview upcoming Game Pass seasons and their planned exclusive rewards. Get ready to collect these amazing items!
               </p>
             </motion.div>
           </div>
@@ -187,15 +175,15 @@ const SeasonHistory = () => {
             <Card className="bg-card border-primary/20">
               <CardContent className="pt-6 text-center">
                 <Calendar className="h-8 w-8 text-primary mx-auto mb-2" />
-                <div className="text-2xl font-bold">{pastSeasons.length}</div>
-                <div className="text-sm text-muted-foreground">Past Seasons</div>
+                <div className="text-2xl font-bold">{upcomingSeasons.length}</div>
+                <div className="text-sm text-muted-foreground">Upcoming Seasons</div>
               </CardContent>
             </Card>
             <Card className="bg-card border-primary/20">
               <CardContent className="pt-6 text-center">
                 <Trophy className="h-8 w-8 text-amber-500 mx-auto mb-2" />
                 <div className="text-2xl font-bold">
-                  {pastSeasons.reduce((acc, s) => acc + s.exclusiveRewards.filter(r => r.rarity === "legendary").length, 0)}
+                  {upcomingSeasons.reduce((acc, s) => acc + s.plannedRewards.filter(r => r.rarity === "legendary").length, 0)}
                 </div>
                 <div className="text-sm text-muted-foreground">Legendary Items</div>
               </CardContent>
@@ -204,25 +192,23 @@ const SeasonHistory = () => {
               <CardContent className="pt-6 text-center">
                 <Star className="h-8 w-8 text-purple-500 mx-auto mb-2" />
                 <div className="text-2xl font-bold">
-                  {pastSeasons.reduce((acc, s) => acc + s.exclusiveRewards.length, 0)}
+                  {upcomingSeasons.reduce((acc, s) => acc + s.plannedRewards.length, 0)}
                 </div>
-                <div className="text-sm text-muted-foreground">Exclusive Rewards</div>
+                <div className="text-sm text-muted-foreground">Planned Rewards</div>
               </CardContent>
             </Card>
             <Card className="bg-card border-primary/20">
               <CardContent className="pt-6 text-center">
-                <Crown className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-                <div className="text-2xl font-bold">
-                  {pastSeasons.reduce((acc, s) => acc + s.elitePassHolders, 0).toLocaleString()}
-                </div>
-                <div className="text-sm text-muted-foreground">Elite Pass Holders</div>
+                <Clock className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                <div className="text-2xl font-bold">6</div>
+                <div className="text-sm text-muted-foreground">Months Ahead</div>
               </CardContent>
             </Card>
           </motion.div>
 
           {/* Season Cards */}
           <div className="space-y-6">
-            {pastSeasons.map((season, index) => (
+            {upcomingSeasons.map((season, index) => (
               <motion.div
                 key={season.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -241,6 +227,12 @@ const SeasonHistory = () => {
                           <Badge className={`bg-gradient-to-r ${season.themeColor} text-white border-0`}>
                             {season.theme}
                           </Badge>
+                          {season.startsIn && (
+                            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {season.startsIn}
+                            </Badge>
+                          )}
                         </div>
                         <CardTitle className="text-xl flex items-center gap-2">
                           <Sparkles className="h-5 w-5 text-primary" />
@@ -250,30 +242,18 @@ const SeasonHistory = () => {
                           {season.month} {season.year}
                         </p>
                       </div>
-
-                      <div className="flex gap-4 text-sm">
-                        <div className="text-center">
-                          <div className="font-bold text-foreground">{season.totalParticipants.toLocaleString()}</div>
-                          <div className="text-muted-foreground text-xs">Participants</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="font-bold text-amber-500">{season.elitePassHolders.toLocaleString()}</div>
-                          <div className="text-muted-foreground text-xs">Elite Holders</div>
-                        </div>
-                      </div>
                     </div>
                   </CardHeader>
 
                   <CardContent>
                     <div className="mb-3 flex items-center gap-2">
                       <Gift className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Exclusive Rewards</span>
-                      <Lock className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">(No longer obtainable)</span>
+                      <span className="text-sm font-medium">Planned Rewards</span>
+                      <Badge variant="outline" className="text-xs">Preview</Badge>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {season.exclusiveRewards.map((reward, idx) => (
+                      {season.plannedRewards.map((reward, idx) => (
                         <div
                           key={idx}
                           className={`
@@ -314,9 +294,9 @@ const SeasonHistory = () => {
             <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-primary/30">
               <CardContent className="py-8">
                 <Sparkles className="h-12 w-12 text-primary mx-auto mb-4" />
-                <h3 className="text-xl font-bold mb-2">Don't Miss This Season!</h3>
+                <h3 className="text-xl font-bold mb-2">Join the Current Season!</h3>
                 <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-                  Join the current season now to earn exclusive rewards before they're gone forever.
+                  Don't wait for the next season - start earning exclusive rewards today!
                 </p>
                 <Button asChild className="bg-primary hover:bg-primary/90">
                   <Link to="/dashboard">

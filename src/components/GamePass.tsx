@@ -292,7 +292,7 @@ export const GamePass = () => {
               <Button variant="ghost" size="sm" asChild className="text-xs h-7 px-2">
                 <Link to="/seasons">
                   <History className="h-3 w-3 mr-1" />
-                  Past Seasons
+                  Upcoming Seasons
                 </Link>
               </Button>
             </div>
