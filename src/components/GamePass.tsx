@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 import {
   Crown,
   Lock,
@@ -23,6 +24,7 @@ import {
   Zap,
   Clock,
   Calendar,
+  History,
 } from "lucide-react";
 
 // Calculate time until next month reset
@@ -280,11 +282,19 @@ export const GamePass = () => {
         {/* Season Timer */}
         <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border border-primary/20">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">
-                Season: <span className="text-primary">{getSeasonName()}</span>
-              </span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">
+                  Season: <span className="text-primary">{getSeasonName()}</span>
+                </span>
+              </div>
+              <Button variant="ghost" size="sm" asChild className="text-xs h-7 px-2">
+                <Link to="/seasons">
+                  <History className="h-3 w-3 mr-1" />
+                  Past Seasons
+                </Link>
+              </Button>
             </div>
             
             <div className="flex items-center gap-2">
