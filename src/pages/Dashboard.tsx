@@ -103,60 +103,80 @@ const Dashboard = () => {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {/* Coins Card */}
-          <Card className="bg-card border-primary/20 hover:border-primary/40 transition-colors">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Vote Coins
-              </CardTitle>
-              <Coins className="h-5 w-5 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{voteData.coins.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">Spend in the shop</p>
-            </CardContent>
-          </Card>
+          <div className="group relative p-[1px] rounded-xl bg-gradient-to-br from-yellow-500/50 via-transparent to-yellow-500/50 hover:from-yellow-500 hover:to-amber-500 transition-all duration-500">
+            <Card className="relative bg-card rounded-xl overflow-hidden transition-all duration-300 group-hover:translate-y-[-2px] group-hover:shadow-lg group-hover:shadow-yellow-500/20">
+              <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardHeader className="relative flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Vote Coins
+                </CardTitle>
+                <div className="p-2 rounded-lg bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors duration-300">
+                  <Coins className="h-5 w-5 text-yellow-500 group-hover:scale-110 transition-transform duration-300" />
+                </div>
+              </CardHeader>
+              <CardContent className="relative">
+                <div className="text-2xl font-bold text-foreground">{voteData.coins.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground mt-1">Spend in the shop</p>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* VIP Points Card */}
-          <Card className="bg-card border-primary/20 hover:border-primary/40 transition-colors">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                VIP Points
-              </CardTitle>
-              <Crown className={`h-5 w-5 ${vipInfo.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{voteData.vipPoints.toLocaleString()}</div>
-              <p className={`text-xs mt-1 ${vipInfo.color}`}>{vipInfo.name}</p>
-            </CardContent>
-          </Card>
+          <div className="group relative p-[1px] rounded-xl bg-gradient-to-br from-purple-500/50 via-transparent to-purple-500/50 hover:from-purple-500 hover:to-pink-500 transition-all duration-500">
+            <Card className="relative bg-card rounded-xl overflow-hidden transition-all duration-300 group-hover:translate-y-[-2px] group-hover:shadow-lg group-hover:shadow-purple-500/20">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardHeader className="relative flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  VIP Points
+                </CardTitle>
+                <div className="p-2 rounded-lg bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors duration-300">
+                  <Crown className={`h-5 w-5 ${vipInfo.color} group-hover:scale-110 transition-transform duration-300`} />
+                </div>
+              </CardHeader>
+              <CardContent className="relative">
+                <div className="text-2xl font-bold text-foreground">{voteData.vipPoints.toLocaleString()}</div>
+                <p className={`text-xs mt-1 ${vipInfo.color}`}>{vipInfo.name}</p>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Total Votes Card */}
-          <Card className="bg-card border-primary/20 hover:border-primary/40 transition-colors">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Votes
-              </CardTitle>
-              <Vote className="h-5 w-5 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{voteData.totalVotes}</div>
-              <p className="text-xs text-muted-foreground mt-1">All-time votes</p>
-            </CardContent>
-          </Card>
+          <div className="group relative p-[1px] rounded-xl bg-gradient-to-br from-green-500/50 via-transparent to-green-500/50 hover:from-green-500 hover:to-emerald-500 transition-all duration-500">
+            <Card className="relative bg-card rounded-xl overflow-hidden transition-all duration-300 group-hover:translate-y-[-2px] group-hover:shadow-lg group-hover:shadow-green-500/20">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardHeader className="relative flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Votes
+                </CardTitle>
+                <div className="p-2 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors duration-300">
+                  <Vote className="h-5 w-5 text-green-500 group-hover:scale-110 transition-transform duration-300" />
+                </div>
+              </CardHeader>
+              <CardContent className="relative">
+                <div className="text-2xl font-bold text-foreground">{voteData.totalVotes}</div>
+                <p className="text-xs text-muted-foreground mt-1">All-time votes</p>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Server Status Card */}
-          <Card className="bg-card border-primary/20 hover:border-primary/40 transition-colors">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Online Players
-              </CardTitle>
-              <TrendingUp className="h-5 w-5 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{serverStats.players}</div>
-              <p className="text-xs text-muted-foreground mt-1">Uptime: {serverStats.uptime}</p>
-            </CardContent>
-          </Card>
+          <div className="group relative p-[1px] rounded-xl bg-gradient-to-br from-primary/50 via-transparent to-primary/50 hover:from-primary hover:to-blue-500 transition-all duration-500">
+            <Card className="relative bg-card rounded-xl overflow-hidden transition-all duration-300 group-hover:translate-y-[-2px] group-hover:shadow-lg group-hover:shadow-primary/20">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardHeader className="relative flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Online Players
+                </CardTitle>
+                <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors duration-300">
+                  <TrendingUp className="h-5 w-5 text-primary group-hover:scale-110 transition-transform duration-300" />
+                </div>
+              </CardHeader>
+              <CardContent className="relative">
+                <div className="text-2xl font-bold text-foreground">{serverStats.players}</div>
+                <p className="text-xs text-muted-foreground mt-1">Uptime: {serverStats.uptime}</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Main Content Grid */}
