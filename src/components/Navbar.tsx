@@ -167,6 +167,8 @@ export const Navbar = () => {
 
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
+            {isLoggedIn && <CartButton />}
+            {isLoggedIn && <NotificationsPopover />}
             <ThemeToggle />
             <LanguageSwitcher />
             <button
@@ -236,6 +238,14 @@ export const Navbar = () => {
                   <User className="w-4 h-4" />
                   {user?.username}
                 </div>
+                <Link
+                  to="/gm-panel"
+                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <Shield className="w-4 h-4" />
+                  GM Panel
+                </Link>
                 <Button 
                   variant="outline" 
                   className="w-full"
