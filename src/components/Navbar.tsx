@@ -39,7 +39,7 @@ export const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/";
-  const { user, isLoggedIn, logout } = useAuth();
+  const { user, isLoggedIn, isGM, logout } = useAuth();
 
   const navLinks = [
     { label: t('nav.home'), href: "#hero" },
@@ -238,14 +238,16 @@ export const Navbar = () => {
                   <User className="w-4 h-4" />
                   {user?.username}
                 </div>
-                <Link
-                  to="/gm-panel"
-                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <Shield className="w-4 h-4" />
-                  GM Panel
-                </Link>
+                {isGM && (
+                  <Link
+                    to="/gm-panel"
+                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <Shield className="w-4 h-4" />
+                    GM Panel
+                  </Link>
+                )}
                 <Button 
                   variant="outline" 
                   className="w-full"
