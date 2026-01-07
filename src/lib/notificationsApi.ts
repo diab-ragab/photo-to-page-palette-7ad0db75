@@ -38,6 +38,21 @@ export const notificationsApi = {
     }
   },
 
+  async update(id: number, notification: { title: string; message: string; type: string }): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/notifications.php?action=update&id=${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notification),
+      });
+      const result = await response.json();
+      return result.success;
+    } catch (error) {
+      console.error('Error updating notification:', error);
+      return false;
+    }
+  },
+
   async delete(id: number): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/notifications.php?action=delete&id=${id}`, {
