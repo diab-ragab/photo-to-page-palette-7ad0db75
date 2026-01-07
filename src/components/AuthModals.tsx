@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Lock, Mail, ArrowLeft, KeyRound } from "lucide-react";
+import { Loader2, User, Lock, Mail, ArrowLeft, KeyRound, Shield } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -56,6 +56,8 @@ export const AuthModals = ({
   const [changeData, setChangeData] = useState({ oldPasswd: "", newPasswd: "", confirmPasswd: "" });
   const [changeLoading, setChangeLoading] = useState(false);
 
+  const [showGMChoice, setShowGMChoice] = useState(false);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -85,6 +87,23 @@ export const AuthModals = ({
       
       if (result.success) {
         login(loginData.login, result.user?.email || "");
+        
+        // Check if user is GM
+        try {
+          const gmResponse = await fetch(
+            `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(loginData.login)}`
+          );
+          const gmData = await gmResponse.json();
+          
+          if (gmData.is_gm) {
+            setShowGMChoice(true);
+            setLoginData({ login: "", passwd: "" });
+            return;
+          }
+        } catch (gmError) {
+          console.error("Error checking GM status:", gmError);
+        }
+        
         toast({
           title: "Success",
           description: result.message || "Login successful!"
@@ -108,6 +127,16 @@ export const AuthModals = ({
     } finally {
       setLoginLoading(false);
     }
+  };
+
+  const handleGMChoice = (goToGM: boolean) => {
+    setShowGMChoice(false);
+    setLoginOpen(false);
+    toast({
+      title: "Success",
+      description: "Login successful!"
+    });
+    navigate(goToGM ? "/gm-panel" : "/dashboard");
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -336,88 +365,124 @@ export const AuthModals = ({
   return (
     <>
       {/* Login Modal */}
-      <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
+      <Dialog open={loginOpen} onOpenChange={(open) => {
+        setLoginOpen(open);
+        if (!open) setShowGMChoice(false);
+      }}>
         <DialogContent className="sm:max-w-md bg-card border-primary/20">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-display text-primary text-center">
-              Login
-            </DialogTitle>
-            <DialogDescription className="text-center text-muted-foreground">
-              Enter your credentials to access your account
-            </DialogDescription>
-          </DialogHeader>
-          
-          <form onSubmit={handleLogin} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="login-username" className="text-foreground">Username</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="login-username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={loginData.login}
-                  onChange={(e) => setLoginData({ ...loginData, login: e.target.value })}
-                  className="pl-10 bg-background border-border focus:border-primary"
-                  disabled={loginLoading}
-                />
+          {showGMChoice ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-display text-primary text-center">
+                  Welcome, GM!
+                </DialogTitle>
+                <DialogDescription className="text-center text-muted-foreground">
+                  Where would you like to go?
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-3 mt-4">
+                <Button 
+                  className="w-full" 
+                  onClick={() => handleGMChoice(true)}
+                >
+                  <Shield className="mr-2 h-4 w-4" />
+                  Go to GM Panel
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => handleGMChoice(false)}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Go to Dashboard
+                </Button>
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="login-password" className="text-foreground">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="login-password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={loginData.passwd}
-                  onChange={(e) => setLoginData({ ...loginData, passwd: e.target.value })}
-                  className="pl-10 bg-background border-border focus:border-primary"
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-display text-primary text-center">
+                  Login
+                </DialogTitle>
+                <DialogDescription className="text-center text-muted-foreground">
+                  Enter your credentials to access your account
+                </DialogDescription>
+              </DialogHeader>
+              
+              <form onSubmit={handleLogin} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-username" className="text-foreground">Username</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="login-username"
+                      type="text"
+                      placeholder="Enter your username"
+                      value={loginData.login}
+                      onChange={(e) => setLoginData({ ...loginData, login: e.target.value })}
+                      className="pl-10 bg-background border-border focus:border-primary"
+                      disabled={loginLoading}
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="login-password" className="text-foreground">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="login-password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={loginData.passwd}
+                      onChange={(e) => setLoginData({ ...loginData, passwd: e.target.value })}
+                      className="pl-10 bg-background border-border focus:border-primary"
+                      disabled={loginLoading}
+                    />
+                  </div>
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  className="w-full" 
                   disabled={loginLoading}
-                />
-              </div>
-            </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={loginLoading}
-            >
-              {loginLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Logging in...
-                </>
-              ) : (
-                "Login"
-              )}
-            </Button>
+                >
+                  {loginLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Logging in...
+                    </>
+                  ) : (
+                    "Login"
+                  )}
+                </Button>
 
-            <div className="flex justify-between text-sm">
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginOpen(false);
-                  setForgotPasswordOpen(true);
-                }}
-                className="text-primary hover:underline"
-              >
-                Forgot Password?
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginOpen(false);
-                  setRegisterOpen(true);
-                }}
-                className="text-primary hover:underline"
-              >
-                Register here
-              </button>
-            </div>
-          </form>
+                <div className="flex justify-between text-sm">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginOpen(false);
+                      setForgotPasswordOpen(true);
+                    }}
+                    className="text-primary hover:underline"
+                  >
+                    Forgot Password?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginOpen(false);
+                      setRegisterOpen(true);
+                    }}
+                    className="text-primary hover:underline"
+                  >
+                    Register here
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
