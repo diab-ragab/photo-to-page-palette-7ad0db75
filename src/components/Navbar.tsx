@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown, LayoutDashboard } from "lucide-react";
+import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown, LayoutDashboard, Shield } from "lucide-react";
+import { NotificationsPopover } from "@/components/NotificationsPopover";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -97,6 +98,7 @@ export const Navbar = () => {
               </Link>
             )}
             {isLoggedIn && <CartButton />}
+            {isLoggedIn && <NotificationsPopover />}
             <ThemeToggle />
             <LanguageSwitcher />
             
@@ -116,6 +118,13 @@ export const Navbar = () => {
                   >
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     Dashboard
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => navigate('/gm-panel')}
+                    className="cursor-pointer"
+                  >
+                    <Shield className="mr-2 h-4 w-4" />
+                    GM Panel
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={() => setChangePasswordOpen(true)}
