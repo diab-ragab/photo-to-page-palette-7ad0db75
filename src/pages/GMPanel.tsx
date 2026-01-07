@@ -1,0 +1,364 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
+import { SEO } from "@/components/SEO";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { notificationsApi, Notification } from "@/lib/notificationsApi";
+import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle } from "lucide-react";
+import { format } from "date-fns";
+
+const typeIcons = {
+  news: Megaphone,
+  update: Sparkles,
+  maintenance: Wrench,
+  event: Calendar,
+};
+
+export default function GMPanel() {
+  const { user, isLoggedIn } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGM, setIsGM] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  
+  const [newNotification, setNewNotification] = useState({
+    title: "",
+    message: "",
+    type: "news",
+  });
+
+  // Check if user is GM from your MySQL database
+  useEffect(() => {
+    const checkGMStatus = async () => {
+      if (!isLoggedIn || !user) {
+        navigate("/");
+        return;
+      }
+
+      try {
+        // Call your PHP API to check GM status
+        const response = await fetch(
+          `http://192.168.1.88/api/check_gm.php?username=${encodeURIComponent(user.username)}`
+        );
+        const data = await response.json();
+        
+        if (data.is_gm) {
+          setIsGM(true);
+        } else {
+          toast({
+            title: "Access Denied",
+            description: "You don't have GM privileges.",
+            variant: "destructive",
+          });
+          navigate("/dashboard");
+        }
+      } catch (error) {
+        console.error("Error checking GM status:", error);
+        // For development: allow access if API is not available
+        // Remove this in production!
+        setIsGM(true);
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+
+    checkGMStatus();
+  }, [isLoggedIn, user, navigate, toast]);
+
+  useEffect(() => {
+    if (isGM) {
+      fetchNotifications();
+    }
+  }, [isGM]);
+
+  const fetchNotifications = async () => {
+    setIsLoading(true);
+    const data = await notificationsApi.getAll();
+    setNotifications(data);
+    setIsLoading(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newNotification.title.trim() || !newNotification.message.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    const success = await notificationsApi.create({
+      ...newNotification,
+      created_by: user?.username || "GM",
+    });
+
+    if (success) {
+      toast({
+        title: "Success",
+        description: "Notification sent to all users!",
+      });
+      setNewNotification({ title: "", message: "", type: "news" });
+      fetchNotifications();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to send notification. Check your server connection.",
+        variant: "destructive",
+      });
+    }
+    
+    setIsSubmitting(false);
+  };
+
+  const handleDelete = async (id: number) => {
+    const success = await notificationsApi.delete(id);
+    
+    if (success) {
+      toast({
+        title: "Deleted",
+        description: "Notification removed.",
+      });
+      fetchNotifications();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to delete notification.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Checking authorization...</div>
+      </div>
+    );
+  }
+
+  if (!isGM) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <SEO
+        title="GM Panel | WOI Endgame"
+        description="Game Master administration panel"
+        noIndex
+      />
+      <Navbar />
+
+      <main className="container px-4 pt-24 pb-16">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="p-3 rounded-xl bg-primary/20">
+            <Shield className="h-8 w-8 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-display font-bold">GM Panel</h1>
+            <p className="text-muted-foreground">Manage notifications and server updates</p>
+          </div>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Create Notification Form */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                New Notification
+              </CardTitle>
+              <CardDescription>
+                Send a notification to all users
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Type</label>
+                  <Select
+                    value={newNotification.type}
+                    onValueChange={(value) =>
+                      setNewNotification({ ...newNotification, type: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="news">
+                        <span className="flex items-center gap-2">
+                          <Megaphone className="h-4 w-4" /> News
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="update">
+                        <span className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4" /> Update
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="maintenance">
+                        <span className="flex items-center gap-2">
+                          <Wrench className="h-4 w-4" /> Maintenance
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="event">
+                        <span className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" /> Event
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Title</label>
+                  <Input
+                    placeholder="Notification title..."
+                    value={newNotification.title}
+                    onChange={(e) =>
+                      setNewNotification({ ...newNotification, title: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Message</label>
+                  <Textarea
+                    placeholder="Write your message..."
+                    rows={4}
+                    value={newNotification.message}
+                    onChange={(e) =>
+                      setNewNotification({ ...newNotification, message: e.target.value })
+                    }
+                  />
+                </div>
+
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Send className="mr-2 h-4 w-4" />
+                  {isSubmitting ? "Sending..." : "Send Notification"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Notifications List */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>All Notifications</CardTitle>
+              <CardDescription>
+                {notifications.length} notification(s) sent
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading notifications...
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="text-center py-8">
+                  <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">No notifications yet</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Created By</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {notifications.map((notification) => {
+                      const Icon = typeIcons[notification.type] || Megaphone;
+                      return (
+                        <TableRow key={notification.id}>
+                          <TableCell>
+                            <Badge variant="outline" className="gap-1">
+                              <Icon className="h-3 w-3" />
+                              {notification.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-medium max-w-[200px] truncate">
+                            {notification.title}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {notification.created_by}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {notification.created_at &&
+                              format(new Date(notification.created_at), "MMM d, yyyy")}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(notification.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* PHP API Info */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-lg">PHP API Configuration</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Create a <code className="bg-muted px-1 rounded">check_gm.php</code> file on your server to verify GM status:
+            </p>
+            <pre className="bg-muted p-3 rounded-lg overflow-x-auto text-xs">
+{`<?php
+header('Access-Control-Allow-Origin: *');
+header('Content-Type: application/json');
+
+$conn = new mysqli('192.168.1.88', 'root', 'root', 'shengui');
+$username = $conn->real_escape_string($_GET['username']);
+
+// Adjust this query based on your auth table structure
+// Example: GMs have a 'gm' column with value > 0
+$result = $conn->query("SELECT gm FROM users WHERE name = '$username'");
+$row = $result->fetch_assoc();
+
+echo json_encode(['is_gm' => ($row && $row['gm'] > 0)]);
+?>`}
+            </pre>
+          </CardContent>
+        </Card>
+      </main>
+
+      <Footer />
+    </div>
+  );
+}
