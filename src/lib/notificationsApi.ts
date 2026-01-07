@@ -1,5 +1,5 @@
 // Configure your PHP API URL here
-const API_BASE_URL = 'http://192.168.1.88/api';
+const API_BASE_URL = 'https://woiendgame.online/api';
 
 export interface Notification {
   id: number;
