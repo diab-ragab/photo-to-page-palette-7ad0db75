@@ -108,6 +108,12 @@ export const Navbar = () => {
                   <Button variant="outline" size="sm" className="gap-2">
                     <User className="h-4 w-4" />
                     {user?.username}
+                    {isGM && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-primary/20 text-primary border border-primary/30">
+                        <Shield className="h-3 w-3" />
+                        GM
+                      </span>
+                    )}
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -237,6 +243,12 @@ export const Navbar = () => {
                 <div className="flex items-center gap-2 py-2 text-sm font-medium text-foreground">
                   <User className="w-4 h-4" />
                   {user?.username}
+                  {isGM && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-primary/20 text-primary border border-primary/30">
+                      <Shield className="h-3 w-3" />
+                      GM
+                    </span>
+                  )}
                 </div>
                 {isGM && (
                   <Link
