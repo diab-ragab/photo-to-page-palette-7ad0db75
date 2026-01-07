@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, User, Lock, Mail, ArrowLeft, KeyRound, Shield } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface AuthModalsProps {
   loginOpen: boolean;
@@ -34,6 +36,7 @@ export const AuthModals = ({
   const { toast } = useToast();
   const { login, user } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   
   // Login state
   const [loginData, setLoginData] = useState({ login: "", passwd: "" });
@@ -364,13 +367,47 @@ export const AuthModals = ({
 
   return (
     <>
+      {/* GM Choice - Mobile Drawer / Desktop Dialog */}
+      {isMobile ? (
+        <Drawer open={showGMChoice} onOpenChange={setShowGMChoice}>
+          <DrawerContent>
+            <DrawerHeader className="text-center">
+              <DrawerTitle className="text-2xl font-display text-primary">
+                Welcome, GM!
+              </DrawerTitle>
+              <DrawerDescription className="text-muted-foreground">
+                Where would you like to go?
+              </DrawerDescription>
+            </DrawerHeader>
+            
+            <div className="space-y-3 p-4 pb-8">
+              <Button 
+                className="w-full" 
+                onClick={() => handleGMChoice(true)}
+              >
+                <Shield className="mr-2 h-4 w-4" />
+                Go to GM Panel
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => handleGMChoice(false)}
+              >
+                <User className="mr-2 h-4 w-4" />
+                Go to Dashboard
+              </Button>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : null}
+
       {/* Login Modal */}
       <Dialog open={loginOpen} onOpenChange={(open) => {
         setLoginOpen(open);
         if (!open) setShowGMChoice(false);
       }}>
         <DialogContent className="sm:max-w-md bg-card border-primary/20">
-          {showGMChoice ? (
+          {showGMChoice && !isMobile ? (
             <>
               <DialogHeader>
                 <DialogTitle className="text-2xl font-display text-primary text-center">
