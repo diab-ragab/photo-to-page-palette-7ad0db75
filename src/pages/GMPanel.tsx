@@ -328,34 +328,6 @@ export default function GMPanel() {
             </CardContent>
           </Card>
         </div>
-
-        {/* PHP API Info */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="text-lg">PHP API Configuration</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              Create a <code className="bg-muted px-1 rounded">check_gm.php</code> file on your server to verify GM status:
-            </p>
-            <pre className="bg-muted p-3 rounded-lg overflow-x-auto text-xs">
-{`<?php
-header('Access-Control-Allow-Origin: *');
-header('Content-Type: application/json');
-
-$conn = new mysqli('192.168.1.88', 'root', 'root', 'shengui');
-$username = $conn->real_escape_string($_GET['username']);
-
-// Adjust this query based on your auth table structure
-// Example: GMs have a 'gm' column with value > 0
-$result = $conn->query("SELECT gm FROM users WHERE name = '$username'");
-$row = $result->fetch_assoc();
-
-echo json_encode(['is_gm' => ($row && $row['gm'] > 0)]);
-?>`}
-            </pre>
-          </CardContent>
-        </Card>
       </main>
 
       <Footer />
