@@ -11,9 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import { notificationsApi, Notification } from "@/lib/notificationsApi";
-import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User } from "lucide-react";
+import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User, Eye, Pencil, X, Save } from "lucide-react";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -35,6 +37,12 @@ export default function GMPanel() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGM, setIsGM] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  
+  // View/Edit modal state
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ title: "", message: "", type: "news" });
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const [newNotification, setNewNotification] = useState({
     title: "",
@@ -148,6 +156,55 @@ export default function GMPanel() {
     }
   };
 
+  const handleView = (notification: Notification) => {
+    setSelectedNotification(notification);
+    setEditData({
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+    });
+    setIsEditing(false);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedNotification(null);
+    setIsEditing(false);
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedNotification) return;
+    
+    if (!editData.title.trim() || !editData.message.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUpdating(true);
+    
+    const success = await notificationsApi.update(selectedNotification.id, editData);
+
+    if (success) {
+      toast({
+        title: "Success",
+        description: "Notification updated!",
+      });
+      fetchNotifications();
+      handleCloseModal();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to update notification.",
+        variant: "destructive",
+      });
+    }
+    
+    setIsUpdating(false);
+  };
+
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -159,6 +216,101 @@ export default function GMPanel() {
   if (!isGM) {
     return null;
   }
+
+  const NotificationModalContent = () => {
+    if (!selectedNotification) return null;
+    const Icon = typeIcons[selectedNotification.type as keyof typeof typeIcons] || Megaphone;
+    
+    return (
+      <div className="space-y-4">
+        {isEditing ? (
+          <>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Type</label>
+              <Select
+                value={editData.type}
+                onValueChange={(value) => setEditData({ ...editData, type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="news">
+                    <span className="flex items-center gap-2">
+                      <Megaphone className="h-4 w-4" /> News
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="update">
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" /> Update
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="maintenance">
+                    <span className="flex items-center gap-2">
+                      <Wrench className="h-4 w-4" /> Maintenance
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="event">
+                    <span className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" /> Event
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Title</label>
+              <Input
+                value={editData.title}
+                onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Message</label>
+              <Textarea
+                value={editData.message}
+                onChange={(e) => setEditData({ ...editData, message: e.target.value })}
+                rows={4}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleUpdate} disabled={isUpdating} className="flex-1">
+                <Save className="mr-2 h-4 w-4" />
+                {isUpdating ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="gap-1">
+                <Icon className="h-3 w-3" />
+                {selectedNotification.type}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                by {selectedNotification.created_by}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {selectedNotification.created_at &&
+                  format(new Date(selectedNotification.created_at), "MMM d, yyyy")}
+              </span>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border">
+              <p className="text-sm whitespace-pre-wrap">{selectedNotification.message}</p>
+            </div>
+            <Button onClick={() => setIsEditing(true)} className="w-full">
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Notification
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -287,7 +439,8 @@ export default function GMPanel() {
                     return (
                       <div 
                         key={notification.id} 
-                        className="p-3 rounded-lg border bg-card/50 space-y-2"
+                        className="p-3 rounded-lg border bg-card/50 space-y-2 cursor-pointer hover:bg-muted/30 transition-colors"
+                        onClick={() => handleView(notification)}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -300,15 +453,34 @@ export default function GMPanel() {
                             <p className="font-medium text-sm truncate">
                               {notification.title}
                             </p>
+                            <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                              {notification.message}
+                            </p>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
-                            onClick={() => handleDelete(notification.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleView(notification);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(notification.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -333,14 +505,18 @@ export default function GMPanel() {
                       <TableHead>Title</TableHead>
                       <TableHead>Created By</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
+                      <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {notifications.map((notification) => {
                       const Icon = typeIcons[notification.type as keyof typeof typeIcons] || Megaphone;
                       return (
-                        <TableRow key={notification.id}>
+                        <TableRow 
+                          key={notification.id} 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => handleView(notification)}
+                        >
                           <TableCell>
                             <Badge variant="outline" className="gap-1">
                               <Icon className="h-3 w-3" />
@@ -358,14 +534,30 @@ export default function GMPanel() {
                               format(new Date(notification.created_at), "MMM d, yyyy")}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(notification.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleView(notification);
+                                }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(notification.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -377,6 +569,38 @@ export default function GMPanel() {
           </Card>
         </div>
       </main>
+
+      {/* View/Edit Modal - Desktop */}
+      {!isMobile && (
+        <Dialog open={!!selectedNotification} onOpenChange={(open) => !open && handleCloseModal()}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{isEditing ? "Edit Notification" : selectedNotification?.title}</DialogTitle>
+              <DialogDescription>
+                {isEditing ? "Update the notification details" : "Full notification details"}
+              </DialogDescription>
+            </DialogHeader>
+            <NotificationModalContent />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* View/Edit Modal - Mobile Drawer */}
+      {isMobile && (
+        <Drawer open={!!selectedNotification} onOpenChange={(open) => !open && handleCloseModal()}>
+          <DrawerContent>
+            <DrawerHeader className="text-left">
+              <DrawerTitle>{isEditing ? "Edit Notification" : selectedNotification?.title}</DrawerTitle>
+              <DrawerDescription>
+                {isEditing ? "Update the notification details" : "Full notification details"}
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="p-4 pb-8">
+              <NotificationModalContent />
+            </div>
+          </DrawerContent>
+        </Drawer>
+      )}
 
       <Footer />
     </div>
