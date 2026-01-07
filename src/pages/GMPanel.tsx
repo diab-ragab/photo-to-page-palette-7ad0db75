@@ -13,8 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { notificationsApi, Notification } from "@/lib/notificationsApi";
-import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle } from "lucide-react";
+import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User } from "lucide-react";
 import { format } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const typeIcons = {
   news: Megaphone,
@@ -27,6 +28,7 @@ export default function GMPanel() {
   const { user, isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -168,21 +170,21 @@ export default function GMPanel() {
       <Navbar />
 
       <main className="container px-4 pt-24 pb-16">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-3 rounded-xl bg-primary/20">
-            <Shield className="h-8 w-8 text-primary" />
+        <div className="flex items-center gap-3 mb-6 md:mb-8">
+          <div className="p-2 md:p-3 rounded-xl bg-primary/20">
+            <Shield className="h-6 w-6 md:h-8 md:w-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-display font-bold">GM Panel</h1>
-            <p className="text-muted-foreground">Manage notifications and server updates</p>
+            <h1 className="text-2xl md:text-3xl font-display font-bold">GM Panel</h1>
+            <p className="text-sm md:text-base text-muted-foreground">Manage notifications</p>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="flex flex-col gap-6">
           {/* Create Notification Form */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Plus className="h-5 w-5" />
                 New Notification
               </CardTitle>
@@ -243,7 +245,7 @@ export default function GMPanel() {
                   <label className="text-sm font-medium mb-2 block">Message</label>
                   <Textarea
                     placeholder="Write your message..."
-                    rows={4}
+                    rows={3}
                     value={newNotification.message}
                     onChange={(e) =>
                       setNewNotification({ ...newNotification, message: e.target.value })
@@ -260,9 +262,9 @@ export default function GMPanel() {
           </Card>
 
           {/* Notifications List */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>All Notifications</CardTitle>
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg">All Notifications</CardTitle>
               <CardDescription>
                 {notifications.length} notification(s) sent
               </CardDescription>
@@ -274,10 +276,56 @@ export default function GMPanel() {
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="text-center py-8">
-                  <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <AlertTriangle className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
                   <p className="text-muted-foreground">No notifications yet</p>
                 </div>
+              ) : isMobile ? (
+                /* Mobile: Card-based layout */
+                <div className="space-y-3">
+                  {notifications.map((notification) => {
+                    const Icon = typeIcons[notification.type as keyof typeof typeIcons] || Megaphone;
+                    return (
+                      <div 
+                        key={notification.id} 
+                        className="p-3 rounded-lg border bg-card/50 space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="outline" className="gap-1 text-xs">
+                                <Icon className="h-3 w-3" />
+                                {notification.type}
+                              </Badge>
+                            </div>
+                            <p className="font-medium text-sm truncate">
+                              {notification.title}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
+                            onClick={() => handleDelete(notification.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {notification.created_by}
+                          </span>
+                          <span>
+                            {notification.created_at &&
+                              format(new Date(notification.created_at), "MMM d, yyyy")}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
+                /* Desktop: Table layout */
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -290,7 +338,7 @@ export default function GMPanel() {
                   </TableHeader>
                   <TableBody>
                     {notifications.map((notification) => {
-                      const Icon = typeIcons[notification.type] || Megaphone;
+                      const Icon = typeIcons[notification.type as keyof typeof typeIcons] || Megaphone;
                       return (
                         <TableRow key={notification.id}>
                           <TableCell>
