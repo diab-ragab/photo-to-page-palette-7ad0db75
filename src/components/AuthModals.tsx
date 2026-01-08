@@ -5,6 +5,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, User, Lock, Mail, ArrowLeft, KeyRound, Shield, AlertTriangle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -48,6 +49,7 @@ export const AuthModals = ({
   
   // Login state
   const [loginData, setLoginData] = useState({ login: "", passwd: "" });
+  const [rememberMe, setRememberMe] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   
   // Register state
@@ -110,7 +112,7 @@ export const AuthModals = ({
       const result = await response.json();
       
       if (result.success) {
-        login(validation.data.login, result.user?.email || "");
+        login(validation.data.login, result.user?.email || "", rememberMe);
         
         // Check if user is GM
         try {
@@ -122,6 +124,7 @@ export const AuthModals = ({
           if (gmData.is_gm) {
             setShowGMChoice(true);
             setLoginData({ login: "", passwd: "" });
+            setRememberMe(false);
             return;
           }
         } catch (gmError) {
@@ -134,6 +137,7 @@ export const AuthModals = ({
         });
         setLoginOpen(false);
         setLoginData({ login: "", passwd: "" });
+        setRememberMe(false);
         navigate("/dashboard");
       } else {
         toast({
@@ -475,6 +479,21 @@ export const AuthModals = ({
                       disabled={loginLoading}
                     />
                   </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="remember-me"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked === true)}
+                    disabled={loginLoading}
+                  />
+                  <Label 
+                    htmlFor="remember-me" 
+                    className="text-sm text-muted-foreground cursor-pointer"
+                  >
+                    Remember me for 7 days
+                  </Label>
                 </div>
                 
                 <Button 
