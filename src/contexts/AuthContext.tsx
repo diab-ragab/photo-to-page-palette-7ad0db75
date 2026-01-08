@@ -1,9 +1,8 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 
 interface User {
   username: string;
   email: string;
-  isGM?: boolean;
 }
 
 interface AuthContextType {
@@ -18,64 +17,98 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Security: Only store non-sensitive user data in localStorage
+// GM status is NEVER stored client-side - always fetched from server
+const STORAGE_KEY = "woi_user";
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem("woi_user");
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return null;
+      
+      const parsed = JSON.parse(saved);
+      // Security: Only restore username and email, never trust stored isGM
+      if (parsed && typeof parsed.username === "string" && typeof parsed.email === "string") {
+        return { username: parsed.username, email: parsed.email };
+      }
+      return null;
+    } catch {
+      // If parsing fails, clear potentially corrupted data
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
   });
+  
   const [gmLoading, setGmLoading] = useState(false);
+  const [isGM, setIsGM] = useState(false);
 
-  const checkGMStatus = async (): Promise<boolean> => {
-    if (!user?.username) return false;
+  const checkGMStatus = useCallback(async (): Promise<boolean> => {
+    if (!user?.username) {
+      setIsGM(false);
+      return false;
+    }
 
     setGmLoading(true);
     try {
       const response = await fetch(
-        `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(user.username)}`
+        `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(user.username)}`,
+        {
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+          },
+        }
       );
+      
+      if (!response.ok) {
+        throw new Error("GM check failed");
+      }
+      
       const data = await response.json();
-
-      const updatedUser = { ...user, isGM: !!data.is_gm };
-      setUser(updatedUser);
-      localStorage.setItem("woi_user", JSON.stringify(updatedUser));
-
-      return !!data.is_gm;
+      
+      // Security: GM status is stored in state only, never in localStorage
+      const gmStatus = !!data.is_gm;
+      setIsGM(gmStatus);
+      return gmStatus;
     } catch (error) {
       console.error("Error checking GM status:", error);
-      // Fail closed: if GM check fails, treat as non-GM
-      const updatedUser = { ...user, isGM: false };
-      setUser(updatedUser);
-      localStorage.setItem("woi_user", JSON.stringify(updatedUser));
+      // Security: Fail closed - if GM check fails, treat as non-GM
+      setIsGM(false);
       return false;
     } finally {
       setGmLoading(false);
     }
-  };
+  }, [user?.username]);
 
-  const login = (username: string, email: string) => {
-    // Don't assume role on login; fetch it from the server.
+  const login = useCallback((username: string, email: string) => {
+    // Security: Only store non-sensitive data
     const userData = { username, email };
     setUser(userData);
-    localStorage.setItem("woi_user", JSON.stringify(userData));
-  };
+    setIsGM(false); // Reset GM status, will be checked separately
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem("woi_user");
-  };
+    setIsGM(false);
+    localStorage.removeItem(STORAGE_KEY);
+  }, []);
 
   // Check GM status when user is available
   useEffect(() => {
     if (user?.username) {
       checkGMStatus();
+    } else {
+      setIsGM(false);
     }
-  }, [user?.username]);
+  }, [user?.username, checkGMStatus]);
 
   return (
     <AuthContext.Provider value={{ 
       user, 
       isLoggedIn: !!user, 
-      isGM: user?.isGM || false,
+      isGM,
       gmLoading,
       login, 
       logout,
