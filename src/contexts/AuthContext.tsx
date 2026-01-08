@@ -25,28 +25,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkGMStatus = async (): Promise<boolean> => {
     if (!user?.username) return false;
-    
+
     try {
       const response = await fetch(
         `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(user.username)}`
       );
       const data = await response.json();
-      
-      if (data.is_gm) {
-        const updatedUser = { ...user, isGM: true };
-        setUser(updatedUser);
-        localStorage.setItem("woi_user", JSON.stringify(updatedUser));
-        return true;
-      }
-      return false;
+
+      const updatedUser = { ...user, isGM: !!data.is_gm };
+      setUser(updatedUser);
+      localStorage.setItem("woi_user", JSON.stringify(updatedUser));
+
+      return !!data.is_gm;
     } catch (error) {
       console.error("Error checking GM status:", error);
+      // Fail closed: if GM check fails, treat as non-GM
+      const updatedUser = { ...user, isGM: false };
+      setUser(updatedUser);
+      localStorage.setItem("woi_user", JSON.stringify(updatedUser));
       return false;
     }
   };
 
   const login = (username: string, email: string) => {
-    const userData = { username, email, isGM: false };
+    // Don't assume role on login; fetch it from the server.
+    const userData = { username, email };
     setUser(userData);
     localStorage.setItem("woi_user", JSON.stringify(userData));
   };
@@ -56,9 +59,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem("woi_user");
   };
 
-  // Check GM status when user logs in
+  // Check GM status when user is available
   useEffect(() => {
-    if (user?.username && user.isGM === undefined) {
+    if (user?.username) {
       checkGMStatus();
     }
   }, [user?.username]);
