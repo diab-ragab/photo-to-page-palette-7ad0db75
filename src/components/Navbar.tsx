@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown, LayoutDashboard, Shield } from "lucide-react";
+import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown, LayoutDashboard, Shield, Loader2 } from "lucide-react";
 import { NotificationsPopover } from "@/components/NotificationsPopover";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -39,7 +39,7 @@ export const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/";
-  const { user, isLoggedIn, isGM, logout } = useAuth();
+  const { user, isLoggedIn, isGM, gmLoading, logout } = useAuth();
 
   const navLinks = [
     { label: t('nav.home'), href: "#hero" },
@@ -125,7 +125,12 @@ export const Navbar = () => {
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     Dashboard
                   </DropdownMenuItem>
-                  {isGM && (
+                  {gmLoading ? (
+                    <DropdownMenuItem disabled className="cursor-default">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Checking permissions...
+                    </DropdownMenuItem>
+                  ) : isGM && (
                     <DropdownMenuItem 
                       onClick={() => navigate('/gm-panel')}
                       className="cursor-pointer"
@@ -252,7 +257,12 @@ export const Navbar = () => {
                     </span>
                   )}
                 </div>
-                {isGM && (
+                {gmLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Checking permissions...
+                  </div>
+                ) : isGM && (
                   <Link
                     to="/gm-panel"
                     className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"

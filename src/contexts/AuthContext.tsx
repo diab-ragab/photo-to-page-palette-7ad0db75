@@ -10,6 +10,7 @@ interface AuthContextType {
   user: User | null;
   isLoggedIn: boolean;
   isGM: boolean;
+  gmLoading: boolean;
   login: (username: string, email: string) => void;
   logout: () => void;
   checkGMStatus: () => Promise<boolean>;
@@ -22,10 +23,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const saved = localStorage.getItem("woi_user");
     return saved ? JSON.parse(saved) : null;
   });
+  const [gmLoading, setGmLoading] = useState(false);
 
   const checkGMStatus = async (): Promise<boolean> => {
     if (!user?.username) return false;
 
+    setGmLoading(true);
     try {
       const response = await fetch(
         `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(user.username)}`
@@ -44,6 +47,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(updatedUser);
       localStorage.setItem("woi_user", JSON.stringify(updatedUser));
       return false;
+    } finally {
+      setGmLoading(false);
     }
   };
 
@@ -71,6 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user, 
       isLoggedIn: !!user, 
       isGM: user?.isGM || false,
+      gmLoading,
       login, 
       logout,
       checkGMStatus
