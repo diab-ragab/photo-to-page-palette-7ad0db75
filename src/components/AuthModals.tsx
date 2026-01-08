@@ -131,11 +131,12 @@ export const AuthModals = ({
       });
 
       const rawText = await response.text();
+      console.log("Auth API raw response:", rawText);
       let result: { success?: boolean; message?: string; user?: any; [key: string]: any };
       try {
         result = JSON.parse(rawText);
       } catch {
-        throw new Error(`Server returned non-JSON (status ${response.status})`);
+        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 200)}`);
       }
       
       if (result.success) {
