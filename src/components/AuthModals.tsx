@@ -119,15 +119,17 @@ export const AuthModals = ({
     setLoginLoading(true);
     
     try {
-      const formData = new FormData();
-      formData.append("action", "login");
-      formData.append("login", validation.data.login);
-      formData.append("passwd", validation.data.passwd);
-      formData.append("turnstile_token", loginCaptchaToken);
-
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
-        body: formData
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "login",
+          login: validation.data.login,
+          passwd: validation.data.passwd,
+          turnstile_token: loginCaptchaToken
+        })
       });
 
       const result = await response.json();
@@ -232,16 +234,19 @@ export const AuthModals = ({
     setRegisterLoading(true);
     
     try {
-      const formData = new FormData();
-      formData.append("action", "register");
-      formData.append("username", validation.data.login);
-      formData.append("password", validation.data.passwd);
-      formData.append("email", validation.data.email);
-      formData.append("turnstile_token", registerCaptchaToken);
-
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
-        body: formData
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "register",
+          login: validation.data.login,
+          passwd: validation.data.passwd,
+          repasswd: validation.data.passwd,
+          email: validation.data.email,
+          turnstile_token: registerCaptchaToken
+        })
       });
 
       const result = await response.json();
@@ -316,16 +321,19 @@ export const AuthModals = ({
     setForgotLoading(true);
     
     try {
-      const formData = new FormData();
-      formData.append("action", "reset");
-      formData.append("login", validation.data.login);
-      formData.append("email", validation.data.email);
-      formData.append("newpasswd", validation.data.newPasswd);
-      formData.append("turnstile_token", forgotCaptchaToken);
-
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
-        body: formData
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "reset",
+          login: validation.data.login,
+          email: validation.data.email,
+          newpass: validation.data.newPasswd,
+          renew: validation.data.newPasswd,
+          turnstile_token: forgotCaptchaToken
+        })
       });
 
       const result = await response.json();
