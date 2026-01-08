@@ -20,7 +20,8 @@ import {
   Award,
   TrendingUp,
   Gift,
-  Timer
+  Timer,
+  ArrowRightLeft
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -91,13 +92,28 @@ const Dashboard = () => {
       
       <main className="container mx-auto px-4 py-8 pt-24 md:pt-28">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-display text-primary mb-2">
-            Welcome back, {user?.username}!
-          </h1>
-          <p className="text-muted-foreground">
-            Manage your account and collect your daily rewards
-          </p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-display text-primary mb-2">
+              Welcome back, {user?.username}!
+            </h1>
+            <p className="text-muted-foreground">
+              Manage your account and collect your daily rewards
+            </p>
+          </div>
+          
+          {/* GM Panel Switch */}
+          {user?.isGM && (
+            <Button
+              onClick={() => navigate("/gm-panel")}
+              variant="outline"
+              className="group gap-2 border-primary/30 hover:border-primary hover:bg-primary/10"
+            >
+              <Shield className="h-4 w-4 text-primary" />
+              <span>GM Panel</span>
+              <ArrowRightLeft className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            </Button>
+          )}
         </div>
 
         {/* Stats Grid */}

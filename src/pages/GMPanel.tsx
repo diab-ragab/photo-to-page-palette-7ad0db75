@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import { notificationsApi, Notification } from "@/lib/notificationsApi";
-import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User, Eye, Pencil, X, Save } from "lucide-react";
+import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User, Eye, Pencil, X, Save, ArrowRightLeft, LayoutDashboard } from "lucide-react";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -322,14 +322,27 @@ export default function GMPanel() {
       <Navbar />
 
       <main className="container px-4 pt-24 pb-16">
-        <div className="flex items-center gap-3 mb-6 md:mb-8">
-          <div className="p-2 md:p-3 rounded-xl bg-primary/20">
-            <Shield className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 md:mb-8">
+          <div className="flex items-center gap-3">
+            <div className="p-2 md:p-3 rounded-xl bg-primary/20">
+              <Shield className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-display font-bold">GM Panel</h1>
+              <p className="text-sm md:text-base text-muted-foreground">Manage notifications</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-display font-bold">GM Panel</h1>
-            <p className="text-sm md:text-base text-muted-foreground">Manage notifications</p>
-          </div>
+          
+          {/* Dashboard Switch */}
+          <Button
+            onClick={() => navigate("/dashboard")}
+            variant="outline"
+            className="group gap-2 border-primary/30 hover:border-primary hover:bg-primary/10"
+          >
+            <LayoutDashboard className="h-4 w-4 text-primary" />
+            <span>Dashboard</span>
+            <ArrowRightLeft className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          </Button>
         </div>
 
         <div className="flex flex-col gap-6">
