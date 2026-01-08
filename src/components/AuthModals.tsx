@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
@@ -11,6 +11,7 @@ import { Loader2, User, Lock, Mail, ArrowLeft, KeyRound, Shield, AlertTriangle }
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import TurnstileWidget, { TurnstileWidgetRef } from "@/components/TurnstileWidget";
 import { 
   loginSchema, 
   registerSchema, 
@@ -71,6 +72,15 @@ export const AuthModals = ({
 
   const [showGMChoice, setShowGMChoice] = useState(false);
 
+  // Turnstile captcha state
+  const [loginCaptchaToken, setLoginCaptchaToken] = useState<string | null>(null);
+  const [registerCaptchaToken, setRegisterCaptchaToken] = useState<string | null>(null);
+  const [forgotCaptchaToken, setForgotCaptchaToken] = useState<string | null>(null);
+  
+  const loginTurnstileRef = useRef<TurnstileWidgetRef>(null);
+  const registerTurnstileRef = useRef<TurnstileWidgetRef>(null);
+  const forgotTurnstileRef = useRef<TurnstileWidgetRef>(null);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -96,6 +106,16 @@ export const AuthModals = ({
       return;
     }
 
+    // Check captcha
+    if (!loginCaptchaToken) {
+      toast({
+        title: "Verification Required",
+        description: "Please complete the captcha verification.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoginLoading(true);
     
     try {
@@ -103,6 +123,7 @@ export const AuthModals = ({
       formData.append("action", "login");
       formData.append("login", validation.data.login);
       formData.append("passwd", validation.data.passwd);
+      formData.append("turnstile_token", loginCaptchaToken);
 
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
@@ -138,6 +159,8 @@ export const AuthModals = ({
         setLoginOpen(false);
         setLoginData({ login: "", passwd: "" });
         setRememberMe(false);
+        setLoginCaptchaToken(null);
+        loginTurnstileRef.current?.reset();
         navigate("/dashboard");
       } else {
         toast({
@@ -145,6 +168,8 @@ export const AuthModals = ({
           description: result.message || "Invalid credentials",
           variant: "destructive"
         });
+        setLoginCaptchaToken(null);
+        loginTurnstileRef.current?.reset();
       }
     } catch (error) {
       toast({
@@ -152,6 +177,8 @@ export const AuthModals = ({
         description: "Connection error. Please try again.",
         variant: "destructive"
       });
+      setLoginCaptchaToken(null);
+      loginTurnstileRef.current?.reset();
     } finally {
       setLoginLoading(false);
     }
@@ -192,6 +219,16 @@ export const AuthModals = ({
       return;
     }
 
+    // Check captcha
+    if (!registerCaptchaToken) {
+      toast({
+        title: "Verification Required",
+        description: "Please complete the captcha verification.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setRegisterLoading(true);
     
     try {
@@ -200,6 +237,7 @@ export const AuthModals = ({
       formData.append("username", validation.data.login);
       formData.append("password", validation.data.passwd);
       formData.append("email", validation.data.email);
+      formData.append("turnstile_token", registerCaptchaToken);
 
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
@@ -215,6 +253,8 @@ export const AuthModals = ({
         });
         setRegisterOpen(false);
         setRegisterData({ login: "", passwd: "", repasswd: "", email: "" });
+        setRegisterCaptchaToken(null);
+        registerTurnstileRef.current?.reset();
         setLoginOpen(true);
       } else {
         toast({
@@ -222,6 +262,8 @@ export const AuthModals = ({
           description: result.message || "Registration failed!",
           variant: "destructive"
         });
+        setRegisterCaptchaToken(null);
+        registerTurnstileRef.current?.reset();
       }
     } catch (error) {
       toast({
@@ -229,6 +271,8 @@ export const AuthModals = ({
         description: "Connection error. Please try again.",
         variant: "destructive"
       });
+      setRegisterCaptchaToken(null);
+      registerTurnstileRef.current?.reset();
     } finally {
       setRegisterLoading(false);
     }
@@ -259,6 +303,16 @@ export const AuthModals = ({
       return;
     }
 
+    // Check captcha
+    if (!forgotCaptchaToken) {
+      toast({
+        title: "Verification Required",
+        description: "Please complete the captcha verification.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setForgotLoading(true);
     
     try {
@@ -267,6 +321,7 @@ export const AuthModals = ({
       formData.append("login", validation.data.login);
       formData.append("email", validation.data.email);
       formData.append("newpasswd", validation.data.newPasswd);
+      formData.append("turnstile_token", forgotCaptchaToken);
 
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
@@ -282,6 +337,8 @@ export const AuthModals = ({
         });
         setForgotPasswordOpen(false);
         setForgotData({ login: "", email: "", newPasswd: "", confirmPasswd: "" });
+        setForgotCaptchaToken(null);
+        forgotTurnstileRef.current?.reset();
         setLoginOpen(true);
       } else {
         toast({
@@ -289,6 +346,8 @@ export const AuthModals = ({
           description: result.message || "Password reset failed!",
           variant: "destructive"
         });
+        setForgotCaptchaToken(null);
+        forgotTurnstileRef.current?.reset();
       }
     } catch (error) {
       toast({
@@ -296,6 +355,8 @@ export const AuthModals = ({
         description: "Connection error. Please try again.",
         variant: "destructive"
       });
+      setForgotCaptchaToken(null);
+      forgotTurnstileRef.current?.reset();
     } finally {
       setForgotLoading(false);
     }
@@ -495,11 +556,18 @@ export const AuthModals = ({
                     Remember me for 7 days
                   </Label>
                 </div>
+
+                <TurnstileWidget
+                  ref={loginTurnstileRef}
+                  onSuccess={(token) => setLoginCaptchaToken(token)}
+                  onError={() => setLoginCaptchaToken(null)}
+                  onExpire={() => setLoginCaptchaToken(null)}
+                />
                 
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  disabled={loginLoading}
+                  disabled={loginLoading || !loginCaptchaToken}
                 >
                   {loginLoading ? (
                     <>
@@ -626,10 +694,17 @@ export const AuthModals = ({
               </div>
             </div>
             
+            <TurnstileWidget
+              ref={registerTurnstileRef}
+              onSuccess={(token) => setRegisterCaptchaToken(token)}
+              onError={() => setRegisterCaptchaToken(null)}
+              onExpire={() => setRegisterCaptchaToken(null)}
+            />
+
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={registerLoading}
+              disabled={registerLoading || !registerCaptchaToken}
             >
               {registerLoading ? (
                 <>
@@ -741,10 +816,17 @@ export const AuthModals = ({
               </div>
             </div>
             
+            <TurnstileWidget
+              ref={forgotTurnstileRef}
+              onSuccess={(token) => setForgotCaptchaToken(token)}
+              onError={() => setForgotCaptchaToken(null)}
+              onExpire={() => setForgotCaptchaToken(null)}
+            />
+
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={forgotLoading}
+              disabled={forgotLoading || !forgotCaptchaToken}
             >
               {forgotLoading ? (
                 <>
