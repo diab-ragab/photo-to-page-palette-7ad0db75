@@ -14,6 +14,7 @@ import { ScrollProgress } from "@/components/ScrollProgress";
 import { RecentPurchases } from "@/components/RecentPurchases";
 import { PageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
@@ -73,6 +74,7 @@ const App = () => (
                   <AnimatedRoutes />
                   <ScrollToTop />
                   <RecentPurchases />
+                  <SessionTimeoutWarning />
                 </BrowserRouter>
               </TooltipProvider>
             </CartProvider>
