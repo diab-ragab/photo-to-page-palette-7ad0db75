@@ -130,7 +130,13 @@ export const AuthModals = ({
         body: formData,
       });
 
-      const result = await response.json();
+      const rawText = await response.text();
+      let result: { success?: boolean; message?: string; user?: any; [key: string]: any };
+      try {
+        result = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Server returned non-JSON (status ${response.status})`);
+      }
       
       if (result.success) {
         login(validation.data.login, result.user?.email || "", rememberMe);
@@ -174,7 +180,7 @@ export const AuthModals = ({
     } catch (error) {
       toast({
         title: "Error",
-        description: "Connection error. Please try again.",
+        description: error instanceof Error ? error.message : "Connection error. Please try again.",
         variant: "destructive"
       });
       setLoginCaptchaToken(null);
@@ -245,7 +251,13 @@ export const AuthModals = ({
         body: formData,
       });
 
-      const result = await response.json();
+      const rawText = await response.text();
+      let result: { success?: boolean; message?: string; [key: string]: any };
+      try {
+        result = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Server returned non-JSON (status ${response.status})`);
+      }
       
       if (result.success) {
         toast({
@@ -269,7 +281,7 @@ export const AuthModals = ({
     } catch (error) {
       toast({
         title: "Error",
-        description: "Connection error. Please try again.",
+        description: error instanceof Error ? error.message : "Connection error. Please try again.",
         variant: "destructive"
       });
       setRegisterCaptchaToken(null);
@@ -330,7 +342,13 @@ export const AuthModals = ({
         body: formData,
       });
 
-      const result = await response.json();
+      const rawText = await response.text();
+      let result: { success?: boolean; message?: string; [key: string]: any };
+      try {
+        result = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Server returned non-JSON (status ${response.status})`);
+      }
       
       if (result.success) {
         toast({
@@ -354,7 +372,7 @@ export const AuthModals = ({
     } catch (error) {
       toast({
         title: "Error",
-        description: "Connection error. Please try again.",
+        description: error instanceof Error ? error.message : "Connection error. Please try again.",
         variant: "destructive"
       });
       setForgotCaptchaToken(null);
