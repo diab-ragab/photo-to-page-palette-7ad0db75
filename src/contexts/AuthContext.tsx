@@ -10,7 +10,8 @@ interface AuthContextType {
   isLoggedIn: boolean;
   isGM: boolean;
   gmLoading: boolean;
-  login: (username: string, email: string) => void;
+  rememberMe: boolean;
+  login: (username: string, email: string, rememberMe?: boolean) => void;
   logout: () => void;
   checkGMStatus: () => Promise<boolean>;
 }
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Security: Only store non-sensitive user data in localStorage
 // GM status is NEVER stored client-side - always fetched from server
 const STORAGE_KEY = "woi_user";
+const REMEMBER_ME_KEY = "woi_remember_me";
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(() => {
@@ -42,6 +44,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const [gmLoading, setGmLoading] = useState(false);
   const [isGM, setIsGM] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    try {
+      return localStorage.getItem(REMEMBER_ME_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
 
   const checkGMStatus = useCallback(async (): Promise<boolean> => {
     if (!user?.username) {
@@ -81,18 +90,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user?.username]);
 
-  const login = useCallback((username: string, email: string) => {
+  const login = useCallback((username: string, email: string, remember: boolean = false) => {
     // Security: Only store non-sensitive data
     const userData = { username, email };
     setUser(userData);
     setIsGM(false); // Reset GM status, will be checked separately
+    setRememberMe(remember);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+    localStorage.setItem(REMEMBER_ME_KEY, String(remember));
   }, []);
 
   const logout = useCallback(() => {
     setUser(null);
     setIsGM(false);
+    setRememberMe(false);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(REMEMBER_ME_KEY);
   }, []);
 
   // Check GM status when user is available
@@ -110,6 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isLoggedIn: !!user, 
       isGM,
       gmLoading,
+      rememberMe,
       login, 
       logout,
       checkGMStatus

@@ -2,7 +2,8 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const DEFAULT_SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const REMEMBER_ME_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const WARNING_BEFORE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes warning before timeout
 
 interface UseSessionTimeoutOptions {
@@ -13,8 +14,10 @@ interface UseSessionTimeoutOptions {
 
 export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
   const { enabled = true, onTimeout, onWarning } = options;
-  const { isLoggedIn, logout } = useAuth();
+  const { isLoggedIn, logout, rememberMe } = useAuth();
   const { toast } = useToast();
+  
+  const sessionTimeoutMs = rememberMe ? REMEMBER_ME_TIMEOUT_MS : DEFAULT_SESSION_TIMEOUT_MS;
   
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningRef = useRef<NodeJS.Timeout | null>(null);
@@ -82,23 +85,27 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     // Set warning timer (fires 2 minutes before timeout)
     warningRef.current = setTimeout(() => {
       handleWarning();
-    }, SESSION_TIMEOUT_MS - WARNING_BEFORE_TIMEOUT_MS);
+    }, sessionTimeoutMs - WARNING_BEFORE_TIMEOUT_MS);
 
     // Set timeout timer
     timeoutRef.current = setTimeout(() => {
       handleTimeout();
-    }, SESSION_TIMEOUT_MS);
-  }, [isLoggedIn, enabled, clearAllTimers, handleWarning, handleTimeout]);
+    }, sessionTimeoutMs);
+  }, [isLoggedIn, enabled, clearAllTimers, handleWarning, handleTimeout, sessionTimeoutMs]);
 
   const extendSession = useCallback(() => {
     setShowWarning(false);
     resetTimer();
     
+    const extendMessage = rememberMe 
+      ? "Your session has been extended for another 7 days."
+      : "Your session has been extended for another 30 minutes.";
+    
     toast({
       title: "Session Extended",
-      description: "Your session has been extended for another 30 minutes.",
+      description: extendMessage,
     });
-  }, [resetTimer, toast]);
+  }, [resetTimer, toast, rememberMe]);
 
   // Set up activity listeners
   useEffect(() => {
