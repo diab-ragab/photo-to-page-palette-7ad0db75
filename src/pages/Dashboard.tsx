@@ -26,7 +26,7 @@ import {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, isLoggedIn, logout } = useAuth();
+  const { user, isLoggedIn, isGM, logout } = useAuth();
   const { voteData, loading, timeRemaining, submitVote } = useVoteSystem();
   const [serverStats, setServerStats] = useState({
     players: 0,
@@ -103,7 +103,7 @@ const Dashboard = () => {
           </div>
           
           {/* GM Panel Switch */}
-          {user?.isGM && (
+          {isGM && (
             <Button
               onClick={() => navigate("/gm-panel")}
               variant="outline"

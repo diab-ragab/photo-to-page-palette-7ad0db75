@@ -6,10 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Lock, Mail, ArrowLeft, KeyRound, Shield } from "lucide-react";
+import { Loader2, User, Lock, Mail, ArrowLeft, KeyRound, Shield, AlertTriangle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { 
+  loginSchema, 
+  registerSchema, 
+  changePasswordSchema, 
+  forgotPasswordSchema,
+  checkRateLimit,
+  getRateLimitRemainingTime
+} from "@/lib/validation";
 
 interface AuthModalsProps {
   loginOpen: boolean;
@@ -64,10 +72,23 @@ export const AuthModals = ({
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!loginData.login || !loginData.passwd) {
+    // Rate limiting check
+    if (!checkRateLimit("login", 5, 60000)) {
+      const remaining = getRateLimitRemainingTime("login");
       toast({
-        title: "Error",
-        description: "Please fill in all fields!",
+        title: "Too Many Attempts",
+        description: `Please wait ${remaining} seconds before trying again.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate input with zod
+    const validation = loginSchema.safeParse(loginData);
+    if (!validation.success) {
+      toast({
+        title: "Validation Error",
+        description: validation.error.errors[0]?.message || "Invalid input",
         variant: "destructive"
       });
       return;
@@ -78,8 +99,8 @@ export const AuthModals = ({
     try {
       const formData = new FormData();
       formData.append("action", "login");
-      formData.append("login", loginData.login);
-      formData.append("passwd", loginData.passwd);
+      formData.append("login", validation.data.login);
+      formData.append("passwd", validation.data.passwd);
 
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
@@ -89,12 +110,12 @@ export const AuthModals = ({
       const result = await response.json();
       
       if (result.success) {
-        login(loginData.login, result.user?.email || "");
+        login(validation.data.login, result.user?.email || "");
         
         // Check if user is GM
         try {
           const gmResponse = await fetch(
-            `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(loginData.login)}`
+            `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(validation.data.login)}`
           );
           const gmData = await gmResponse.json();
           
@@ -104,12 +125,12 @@ export const AuthModals = ({
             return;
           }
         } catch (gmError) {
-          console.error("Error checking GM status:", gmError);
+          // Security: Don't expose GM check errors to console in production
         }
         
         toast({
           title: "Success",
-          description: result.message || "Login successful!"
+          description: "Login successful!"
         });
         setLoginOpen(false);
         setLoginData({ login: "", passwd: "" });
@@ -117,7 +138,7 @@ export const AuthModals = ({
       } else {
         toast({
           title: "Error",
-          description: result.message || "Login failed!",
+          description: result.message || "Invalid credentials",
           variant: "destructive"
         });
       }
@@ -145,37 +166,23 @@ export const AuthModals = ({
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!registerData.login || !registerData.passwd || !registerData.repasswd || !registerData.email) {
+    // Rate limiting check
+    if (!checkRateLimit("register", 3, 300000)) {
+      const remaining = getRateLimitRemainingTime("register");
       toast({
-        title: "Error",
-        description: "Please fill in all fields!",
+        title: "Too Many Attempts",
+        description: `Please wait ${Math.ceil(remaining / 60)} minutes before trying again.`,
         variant: "destructive"
       });
       return;
     }
 
-    if (registerData.login.length < 4 || registerData.login.length > 10) {
+    // Validate input with zod
+    const validation = registerSchema.safeParse(registerData);
+    if (!validation.success) {
       toast({
-        title: "Error",
-        description: "The account name must have 4 to 10 characters!",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (registerData.passwd.length < 3 || registerData.passwd.length > 16) {
-      toast({
-        title: "Error",
-        description: "The password must have 3 to 16 characters!",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (registerData.passwd !== registerData.repasswd) {
-      toast({
-        title: "Error",
-        description: "Passwords did not match!",
+        title: "Validation Error",
+        description: validation.error.errors[0]?.message || "Invalid input",
         variant: "destructive"
       });
       return;
@@ -186,9 +193,9 @@ export const AuthModals = ({
     try {
       const formData = new FormData();
       formData.append("action", "register");
-      formData.append("username", registerData.login);
-      formData.append("password", registerData.passwd);
-      formData.append("email", registerData.email);
+      formData.append("username", validation.data.login);
+      formData.append("password", validation.data.passwd);
+      formData.append("email", validation.data.email);
 
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
@@ -200,7 +207,7 @@ export const AuthModals = ({
       if (result.success) {
         toast({
           title: "Success",
-          description: result.message || "Account created successfully!"
+          description: "Account created successfully!"
         });
         setRegisterOpen(false);
         setRegisterData({ login: "", passwd: "", repasswd: "", email: "" });
@@ -226,28 +233,23 @@ export const AuthModals = ({
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!forgotData.login || !forgotData.email || !forgotData.newPasswd || !forgotData.confirmPasswd) {
+    // Rate limiting check
+    if (!checkRateLimit("forgot", 3, 300000)) {
+      const remaining = getRateLimitRemainingTime("forgot");
       toast({
-        title: "Error",
-        description: "Please fill in all fields!",
+        title: "Too Many Attempts",
+        description: `Please wait ${Math.ceil(remaining / 60)} minutes before trying again.`,
         variant: "destructive"
       });
       return;
     }
 
-    if (forgotData.newPasswd.length < 3 || forgotData.newPasswd.length > 16) {
+    // Validate input with zod
+    const validation = forgotPasswordSchema.safeParse(forgotData);
+    if (!validation.success) {
       toast({
-        title: "Error",
-        description: "The password must have 3 to 16 characters!",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (forgotData.newPasswd !== forgotData.confirmPasswd) {
-      toast({
-        title: "Error",
-        description: "Passwords did not match!",
+        title: "Validation Error",
+        description: validation.error.errors[0]?.message || "Invalid input",
         variant: "destructive"
       });
       return;
@@ -258,9 +260,9 @@ export const AuthModals = ({
     try {
       const formData = new FormData();
       formData.append("action", "reset");
-      formData.append("login", forgotData.login);
-      formData.append("email", forgotData.email);
-      formData.append("newpasswd", forgotData.newPasswd);
+      formData.append("login", validation.data.login);
+      formData.append("email", validation.data.email);
+      formData.append("newpasswd", validation.data.newPasswd);
 
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
@@ -272,7 +274,7 @@ export const AuthModals = ({
       if (result.success) {
         toast({
           title: "Success",
-          description: result.message || "Password reset successfully!"
+          description: "Password reset successfully!"
         });
         setForgotPasswordOpen(false);
         setForgotData({ login: "", email: "", newPasswd: "", confirmPasswd: "" });
@@ -280,7 +282,7 @@ export const AuthModals = ({
       } else {
         toast({
           title: "Error",
-          description: result.message || "Password reset failed! Check your username and email.",
+          description: result.message || "Password reset failed!",
           variant: "destructive"
         });
       }
@@ -298,28 +300,23 @@ export const AuthModals = ({
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!changeData.oldPasswd || !changeData.newPasswd || !changeData.confirmPasswd) {
+    // Rate limiting check
+    if (!checkRateLimit("change_password", 3, 300000)) {
+      const remaining = getRateLimitRemainingTime("change_password");
       toast({
-        title: "Error",
-        description: "Please fill in all fields!",
+        title: "Too Many Attempts",
+        description: `Please wait ${Math.ceil(remaining / 60)} minutes before trying again.`,
         variant: "destructive"
       });
       return;
     }
 
-    if (changeData.newPasswd.length < 3 || changeData.newPasswd.length > 16) {
+    // Validate input with zod
+    const validation = changePasswordSchema.safeParse(changeData);
+    if (!validation.success) {
       toast({
-        title: "Error",
-        description: "The password must have 3 to 16 characters!",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (changeData.newPasswd !== changeData.confirmPasswd) {
-      toast({
-        title: "Error",
-        description: "New passwords did not match!",
+        title: "Validation Error",
+        description: validation.error.errors[0]?.message || "Invalid input",
         variant: "destructive"
       });
       return;
@@ -330,8 +327,8 @@ export const AuthModals = ({
     try {
       const formData = new FormData();
       formData.append("login", user?.username || "");
-      formData.append("oldpasswd", changeData.oldPasswd);
-      formData.append("newpasswd", changeData.newPasswd);
+      formData.append("oldpasswd", validation.data.oldPasswd);
+      formData.append("newpasswd", validation.data.newPasswd);
 
       const response = await fetch("https://woiendgame.online/api/change_password.php", {
         method: "POST",
@@ -350,7 +347,7 @@ export const AuthModals = ({
       } else {
         toast({
           title: "Error",
-          description: result || "Password change failed!",
+          description: "Password change failed! Check your current password.",
           variant: "destructive"
         });
       }
