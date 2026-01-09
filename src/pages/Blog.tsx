@@ -2,13 +2,40 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
 import { BlogCard } from "@/components/blog/BlogCard";
-import { blogPosts } from "@/lib/blogData";
+import { staticBlogPosts, notificationToBlogPost, BlogPost } from "@/lib/blogData";
+import { notificationsApi } from "@/lib/notificationsApi";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ChevronRight, Home } from "lucide-react";
+import { ChevronRight, Home, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const Blog = () => {
+  const [allPosts, setAllPosts] = useState<BlogPost[]>(staticBlogPosts);
+  const [isLoading, setIsLoading] = useState(true);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const notifications = await notificationsApi.getAll();
+        const notificationPosts = notifications
+          .filter((n) => n.is_active === 1)
+          .map(notificationToBlogPost);
+        
+        // Merge and sort by date (newest first)
+        const merged = [...notificationPosts, ...staticBlogPosts].sort(
+          (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+        );
+        setAllPosts(merged);
+      } catch (error) {
+        console.error("Failed to fetch notifications:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
 
   const breadcrumbs = [
     { name: "Home", url: baseUrl },
@@ -63,11 +90,17 @@ const Blog = () => {
           </p>
         </motion.div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {blogPosts.map((post, index) => (
-            <BlogCard key={post.id} post={post} index={index} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {allPosts.map((post, index) => (
+              <BlogCard key={post.id} post={post} index={index} />
+            ))}
+          </div>
+        )}
       </main>
       <Footer />
     </div>

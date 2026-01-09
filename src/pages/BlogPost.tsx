@@ -2,17 +2,59 @@ import { useParams, Link, Navigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
-import { getBlogPostBySlug, getRecentPosts } from "@/lib/blogData";
+import { getBlogPostBySlug, getRecentPosts, notificationToBlogPost, BlogPost as BlogPostType } from "@/lib/blogData";
+import { notificationsApi } from "@/lib/notificationsApi";
 import { BlogCard } from "@/components/blog/BlogCard";
 import { motion } from "framer-motion";
-import { Calendar, Clock, User, ChevronRight, Home, ArrowLeft } from "lucide-react";
+import { Calendar, Clock, User, ChevronRight, Home, ArrowLeft, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
-  const post = slug ? getBlogPostBySlug(slug) : undefined;
+  const [post, setPost] = useState<BlogPostType | undefined | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const recentPosts = getRecentPosts(3).filter((p) => p.slug !== slug);
+
+  useEffect(() => {
+    const fetchPost = async () => {
+      if (!slug) {
+        setPost(undefined);
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if it's a notification slug
+      if (slug.startsWith("notification-")) {
+        const notifId = parseInt(slug.replace("notification-", ""), 10);
+        if (!isNaN(notifId)) {
+          const notifications = await notificationsApi.getAll();
+          const notification = notifications.find((n) => n.id === notifId);
+          if (notification) {
+            setPost(notificationToBlogPost(notification));
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+
+      // Otherwise check static posts
+      const staticPost = getBlogPostBySlug(slug);
+      setPost(staticPost);
+      setIsLoading(false);
+    };
+
+    fetchPost();
+  }, [slug]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!post) {
     return <Navigate to="/blog" replace />;
@@ -117,13 +159,15 @@ const BlogPost = () => {
               </div>
             </div>
 
-            <div className="aspect-video rounded-xl overflow-hidden mb-10">
-              <img
-                src={post.image}
-                alt={post.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
+            {!post.isNotification && (
+              <div className="aspect-video rounded-xl overflow-hidden mb-10">
+                <img
+                  src={post.image}
+                  alt={post.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
 
             <article className="prose prose-invert prose-primary max-w-none">
               {post.content.split("\n").map((paragraph, index) => {

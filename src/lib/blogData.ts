@@ -1,3 +1,5 @@
+import { Notification } from "./notificationsApi";
+
 export interface BlogPost {
   id: string;
   slug: string;
@@ -10,9 +12,39 @@ export interface BlogPost {
   category: string;
   image: string;
   readTime: number;
+  isNotification?: boolean;
 }
 
-export const blogPosts: BlogPost[] = [
+// Map notification type to category
+const typeToCategory: Record<string, string> = {
+  news: "News",
+  update: "Updates",
+  maintenance: "Maintenance",
+  event: "Events",
+};
+
+// Convert notification to blog post format
+export const notificationToBlogPost = (notification: Notification): BlogPost => {
+  const slug = `notification-${notification.id}`;
+  const wordCount = notification.message.split(/\s+/).length;
+  const readTime = Math.max(1, Math.ceil(wordCount / 200));
+
+  return {
+    id: `notif-${notification.id}`,
+    slug,
+    title: notification.title,
+    excerpt: notification.message.slice(0, 150) + (notification.message.length > 150 ? "..." : ""),
+    content: notification.message,
+    author: notification.created_by || "GM Team",
+    publishedAt: notification.created_at,
+    category: typeToCategory[notification.type] || "News",
+    image: "/og-image.jpg",
+    readTime,
+    isNotification: true,
+  };
+};
+
+export const staticBlogPosts: BlogPost[] = [
   {
     id: "1",
     slug: "season-5-update-new-dungeons",
@@ -194,12 +226,15 @@ See you in-game!
   },
 ];
 
+// Legacy export for backward compatibility
+export const blogPosts = staticBlogPosts;
+
 export const getBlogPostBySlug = (slug: string): BlogPost | undefined => {
-  return blogPosts.find((post) => post.slug === slug);
+  return staticBlogPosts.find((post) => post.slug === slug);
 };
 
 export const getRecentPosts = (count: number = 3): BlogPost[] => {
-  return [...blogPosts]
+  return [...staticBlogPosts]
     .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
     .slice(0, count);
 };
