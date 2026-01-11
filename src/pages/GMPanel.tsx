@@ -13,9 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { notificationsApi, Notification } from "@/lib/notificationsApi";
-import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User, Eye, Pencil, X, Save, ArrowRightLeft, LayoutDashboard } from "lucide-react";
+import { GamePassRewardsManager } from "@/components/gm/GamePassRewardsManager";
+import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User, Eye, Pencil, X, Save, ArrowRightLeft, LayoutDashboard, Gift, Bell } from "lucide-react";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -32,6 +34,7 @@ export default function GMPanel() {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
+  const [activeTab, setActiveTab] = useState("notifications");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -329,7 +332,7 @@ export default function GMPanel() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-display font-bold">GM Panel</h1>
-              <p className="text-sm md:text-base text-muted-foreground">Manage notifications</p>
+              <p className="text-sm md:text-base text-muted-foreground">Manage notifications & game pass</p>
             </div>
           </div>
           
@@ -345,209 +348,144 @@ export default function GMPanel() {
           </Button>
         </div>
 
-        <div className="flex flex-col gap-6">
-          {/* Create Notification Form */}
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Plus className="h-5 w-5" />
-                New Notification
-              </CardTitle>
-              <CardDescription>
-                Send a notification to all users
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Type</label>
-                  <Select
-                    value={newNotification.type}
-                    onValueChange={(value) =>
-                      setNewNotification({ ...newNotification, type: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="news">
-                        <span className="flex items-center gap-2">
-                          <Megaphone className="h-4 w-4" /> News
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="update">
-                        <span className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4" /> Update
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="maintenance">
-                        <span className="flex items-center gap-2">
-                          <Wrench className="h-4 w-4" /> Maintenance
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="event">
-                        <span className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" /> Event
-                        </span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="notifications" className="gap-2">
+              <Bell className="h-4 w-4" />
+              Notifications
+            </TabsTrigger>
+            <TabsTrigger value="gamepass" className="gap-2">
+              <Gift className="h-4 w-4" />
+              Game Pass
+            </TabsTrigger>
+          </TabsList>
 
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Title</label>
-                  <Input
-                    placeholder="Notification title..."
-                    value={newNotification.title}
-                    onChange={(e) =>
-                      setNewNotification({ ...newNotification, title: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Message</label>
-                  <Textarea
-                    placeholder="Write your message..."
-                    rows={3}
-                    value={newNotification.message}
-                    onChange={(e) =>
-                      setNewNotification({ ...newNotification, message: e.target.value })
-                    }
-                  />
-                </div>
-
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  <Send className="mr-2 h-4 w-4" />
-                  {isSubmitting ? "Sending..." : "Send Notification"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Notifications List */}
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg">All Notifications</CardTitle>
-              <CardDescription>
-                {notifications.length} notification(s) sent
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Loading notifications...
-                </div>
-              ) : notifications.length === 0 ? (
-                <div className="text-center py-8">
-                  <AlertTriangle className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-                  <p className="text-muted-foreground">No notifications yet</p>
-                </div>
-              ) : isMobile ? (
-                /* Mobile: Card-based layout */
-                <div className="space-y-3">
-                  {notifications.map((notification) => {
-                    const Icon = typeIcons[notification.type as keyof typeof typeIcons] || Megaphone;
-                    return (
-                      <div 
-                        key={notification.id} 
-                        className="p-3 rounded-lg border bg-card/50 space-y-2 cursor-pointer hover:bg-muted/30 transition-colors"
-                        onClick={() => handleView(notification)}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="outline" className="gap-1 text-xs">
-                                <Icon className="h-3 w-3" />
-                                {notification.type}
-                              </Badge>
-                            </div>
-                            <p className="font-medium text-sm truncate">
-                              {notification.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                              {notification.message}
-                            </p>
-                          </div>
-                          <div className="flex flex-col gap-1 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleView(notification);
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(notification.id);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {notification.created_by}
+          <TabsContent value="notifications" className="space-y-6">
+            {/* Create Notification Form */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Plus className="h-5 w-5" />
+                  New Notification
+                </CardTitle>
+                <CardDescription>
+                  Send a notification to all users
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Type</label>
+                    <Select
+                      value={newNotification.type}
+                      onValueChange={(value) =>
+                        setNewNotification({ ...newNotification, type: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="news">
+                          <span className="flex items-center gap-2">
+                            <Megaphone className="h-4 w-4" /> News
                           </span>
-                          <span>
-                            {notification.created_at &&
-                              format(new Date(notification.created_at), "MMM d, yyyy")}
+                        </SelectItem>
+                        <SelectItem value="update">
+                          <span className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4" /> Update
                           </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                /* Desktop: Table layout */
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Created By</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="w-[100px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                        </SelectItem>
+                        <SelectItem value="maintenance">
+                          <span className="flex items-center gap-2">
+                            <Wrench className="h-4 w-4" /> Maintenance
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="event">
+                          <span className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" /> Event
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Title</label>
+                    <Input
+                      placeholder="Notification title..."
+                      value={newNotification.title}
+                      onChange={(e) =>
+                        setNewNotification({ ...newNotification, title: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Message</label>
+                    <Textarea
+                      placeholder="Write your message..."
+                      rows={3}
+                      value={newNotification.message}
+                      onChange={(e) =>
+                        setNewNotification({ ...newNotification, message: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    <Send className="mr-2 h-4 w-4" />
+                    {isSubmitting ? "Sending..." : "Send Notification"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Notifications List */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">All Notifications</CardTitle>
+                <CardDescription>
+                  {notifications.length} notification(s) sent
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Loading notifications...
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="text-center py-8">
+                    <AlertTriangle className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                    <p className="text-muted-foreground">No notifications yet</p>
+                  </div>
+                ) : isMobile ? (
+                  /* Mobile: Card-based layout */
+                  <div className="space-y-3">
                     {notifications.map((notification) => {
                       const Icon = typeIcons[notification.type as keyof typeof typeIcons] || Megaphone;
                       return (
-                        <TableRow 
+                        <div 
                           key={notification.id} 
-                          className="cursor-pointer hover:bg-muted/50"
+                          className="p-3 rounded-lg border bg-card/50 space-y-2 cursor-pointer hover:bg-muted/30 transition-colors"
                           onClick={() => handleView(notification)}
                         >
-                          <TableCell>
-                            <Badge variant="outline" className="gap-1">
-                              <Icon className="h-3 w-3" />
-                              {notification.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-medium max-w-[200px] truncate">
-                            {notification.title}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {notification.created_by}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {notification.created_at &&
-                              format(new Date(notification.created_at), "MMM d, yyyy")}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="gap-1 text-xs">
+                                  <Icon className="h-3 w-3" />
+                                  {notification.type}
+                                </Badge>
+                              </div>
+                              <p className="font-medium text-sm truncate">
+                                {notification.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                                {notification.message}
+                              </p>
+                            </div>
+                            <div className="flex flex-col gap-1 shrink-0">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -571,16 +509,98 @@ export default function GMPanel() {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
-                          </TableCell>
-                        </TableRow>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {notification.created_by}
+                            </span>
+                            <span>
+                              {notification.created_at &&
+                                format(new Date(notification.created_at), "MMM d, yyyy")}
+                            </span>
+                          </div>
+                        </div>
                       );
                     })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                  </div>
+                ) : (
+                  /* Desktop: Table layout */
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Created By</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {notifications.map((notification) => {
+                        const Icon = typeIcons[notification.type as keyof typeof typeIcons] || Megaphone;
+                        return (
+                          <TableRow 
+                            key={notification.id} 
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleView(notification)}
+                          >
+                            <TableCell>
+                              <Badge variant="outline" className="gap-1">
+                                <Icon className="h-3 w-3" />
+                                {notification.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium max-w-[200px] truncate">
+                              {notification.title}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {notification.created_by}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {notification.created_at &&
+                                format(new Date(notification.created_at), "MMM d, yyyy")}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleView(notification);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(notification.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="gamepass">
+            <GamePassRewardsManager username={user?.username} />
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* View/Edit Modal - Desktop */}
