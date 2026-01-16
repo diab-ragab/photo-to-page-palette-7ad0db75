@@ -75,8 +75,8 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       if (data.success && data.rewards) {
         setRewards(data.rewards);
       }
-    } catch (error) {
-      console.error("Failed to fetch rewards:", error);
+    } catch {
+      // Silent fail - use demo data
       // Demo data
       setRewards([
         { id: 1, day: 1, tier: "free", item_id: 0, item_name: "10 Coins", quantity: 1, coins: 10, zen: 0, exp: 0, rarity: "common", icon: "🪙" },

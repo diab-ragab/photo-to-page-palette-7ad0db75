@@ -92,8 +92,8 @@ export const Leaderboards = () => {
           if (data.topVoters) setTopVoters(data.topVoters);
           if (data.vipRankings) setVipRankings(data.vipRankings);
         }
-      } catch (error) {
-        console.log("Using mock leaderboard data");
+      } catch {
+        // Silent fail - use mock leaderboard data
       } finally {
         setLoading(false);
       }
