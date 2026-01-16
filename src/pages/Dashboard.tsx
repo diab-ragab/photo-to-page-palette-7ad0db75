@@ -51,8 +51,8 @@ const Dashboard = () => {
           accounts: data.accounts || 0,
           uptime: data.uptime || ""
         });
-      } catch (error) {
-        console.error("Failed to fetch server stats:", error);
+      } catch {
+        // Silent fail - don't expose errors in production
       }
     };
 

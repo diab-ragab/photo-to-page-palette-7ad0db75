@@ -229,9 +229,8 @@ export const GamePass = () => {
             setCurrentDay(data.pass.currentDay || 1);
           }
         }
-      } catch (error) {
-        console.error("Failed to fetch rewards:", error);
-        // Keep fallback rewards
+      } catch {
+        // Silent fail - keep fallback rewards
       } finally {
         setIsLoadingRewards(false);
       }
@@ -256,9 +255,8 @@ export const GamePass = () => {
           setClaimedDays(data.claimedDays || []);
           if (data.currentDay) setCurrentDay(data.currentDay);
         }
-      } catch (error) {
-        console.error("Failed to fetch user pass status:", error);
-        // Use mock data for demo
+      } catch {
+        // Silent fail - use mock data for demo
         setClaimedDays([1, 2, 3, 4]);
       }
     };

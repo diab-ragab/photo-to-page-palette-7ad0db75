@@ -17,8 +17,8 @@ export const notificationsApi = {
       const response = await fetch(`${API_BASE_URL}/notifications.php?action=list`);
       if (!response.ok) throw new Error('Failed to fetch notifications');
       return await response.json();
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
+    } catch {
+      // Silent fail - don't expose errors in production
       return [];
     }
   },
@@ -32,8 +32,8 @@ export const notificationsApi = {
       });
       const result = await response.json();
       return result.success;
-    } catch (error) {
-      console.error('Error creating notification:', error);
+    } catch {
+      // Silent fail - don't expose errors in production
       return false;
     }
   },
@@ -47,8 +47,8 @@ export const notificationsApi = {
       });
       const result = await response.json();
       return result.success;
-    } catch (error) {
-      console.error('Error updating notification:', error);
+    } catch {
+      // Silent fail - don't expose errors in production
       return false;
     }
   },
@@ -60,8 +60,8 @@ export const notificationsApi = {
       });
       const result = await response.json();
       return result.success;
-    } catch (error) {
-      console.error('Error deleting notification:', error);
+    } catch {
+      // Silent fail - don't expose errors in production
       return false;
     }
   },

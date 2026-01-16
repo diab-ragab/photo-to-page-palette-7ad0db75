@@ -110,7 +110,6 @@ export const AuthModals = ({
       });
 
       const rawText = await response.text();
-      console.log("Auth API raw response:", rawText);
       let result: { success?: boolean; message?: string; user?: any; [key: string]: any };
       try {
         result = JSON.parse(rawText);
