@@ -79,10 +79,13 @@ export default function GMPanel() {
           navigate("/dashboard");
         }
       } catch (error) {
-        console.error("Error checking GM status:", error);
-        // For development: allow access if API is not available
-        // Remove this in production!
-        setIsGM(true);
+        // Fail closed: deny access on any error
+        toast({
+          title: "Authorization Error",
+          description: "Unable to verify GM status. Access denied.",
+          variant: "destructive",
+        });
+        navigate("/dashboard");
       } finally {
         setCheckingAuth(false);
       }
