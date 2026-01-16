@@ -51,6 +51,20 @@ const getSeasonName = () => {
   return monthNames[month];
 };
 
+interface ApiReward {
+  id: number;
+  day: number;
+  tier: "free" | "elite";
+  item_id: number;
+  item_name: string;
+  quantity: number;
+  coins: number;
+  zen: number;
+  exp: number;
+  rarity: "common" | "rare" | "epic" | "legendary";
+  icon: string;
+}
+
 interface PassReward {
   day: number;
   freeReward: {
@@ -69,63 +83,99 @@ interface PassReward {
   };
 }
 
-// Generate 30 days of rewards
-const generateRewards = (): PassReward[] => {
+interface PassStatus {
+  status: "not_started" | "active" | "ended";
+  currentDay: number;
+  totalDays: number;
+  startDate: string;
+  endDate: string;
+}
+
+// Convert API rewards to PassReward format
+const convertApiRewards = (apiRewards: ApiReward[]): PassReward[] => {
+  const rewards: PassReward[] = [];
+  
+  // Group by day
+  const rewardsByDay: Record<number, { free?: ApiReward; elite?: ApiReward }> = {};
+  
+  apiRewards.forEach(reward => {
+    if (!rewardsByDay[reward.day]) {
+      rewardsByDay[reward.day] = {};
+    }
+    if (reward.tier === "free") {
+      rewardsByDay[reward.day].free = reward;
+    } else {
+      rewardsByDay[reward.day].elite = reward;
+    }
+  });
+  
+  // Create PassReward for each day
+  for (let day = 1; day <= 30; day++) {
+    const dayRewards = rewardsByDay[day];
+    
+    const defaultFree: PassReward["freeReward"] = { name: "Coming Soon", icon: "🎁", type: "item", rarity: "common" };
+    const defaultElite: PassReward["eliteReward"] = { name: "Coming Soon", icon: "👑", type: "item", rarity: "rare" };
+    
+    let freeReward: PassReward["freeReward"] = defaultFree;
+    let eliteReward: PassReward["eliteReward"] = defaultElite;
+    
+    if (dayRewards?.free) {
+      const r = dayRewards.free;
+      const rewardType: "coins" | "vip_points" | "item" = r.coins > 0 ? "coins" : r.zen > 0 ? "vip_points" : "item";
+      freeReward = {
+        name: r.item_name,
+        icon: r.icon,
+        type: rewardType,
+        amount: r.coins > 0 ? r.coins : r.zen > 0 ? r.zen : undefined,
+        rarity: r.rarity,
+      };
+    }
+    
+    if (dayRewards?.elite) {
+      const r = dayRewards.elite;
+      const rewardType: "coins" | "vip_points" | "item" = r.coins > 0 ? "coins" : r.zen > 0 ? "vip_points" : "item";
+      eliteReward = {
+        name: r.item_name,
+        icon: r.icon,
+        type: rewardType,
+        amount: r.coins > 0 ? r.coins : r.zen > 0 ? r.zen : undefined,
+        rarity: r.rarity,
+      };
+    }
+    
+    rewards.push({ day, freeReward, eliteReward });
+  }
+  
+  return rewards;
+};
+
+// Fallback static rewards
+const generateFallbackRewards = (): PassReward[] => {
   const rewards: PassReward[] = [];
   const freeItems = [
     { name: "10 Coins", icon: "🪙", type: "coins" as const, amount: 10 },
     { name: "5 VIP Points", icon: "⭐", type: "vip_points" as const, amount: 5 },
     { name: "25 Coins", icon: "🪙", type: "coins" as const, amount: 25 },
-    { name: "10 VIP Points", icon: "⭐", type: "vip_points" as const, amount: 10 },
     { name: "Health Potion", icon: "🧪", type: "item" as const, rarity: "common" as const },
-    { name: "Mana Potion", icon: "💧", type: "item" as const, rarity: "common" as const },
-    { name: "50 Coins", icon: "🪙", type: "coins" as const, amount: 50 },
-    { name: "Stamina Elixir", icon: "⚡", type: "item" as const, rarity: "rare" as const },
   ];
 
   const eliteItems = [
     { name: "100 Coins", icon: "💰", type: "coins" as const, amount: 100 },
     { name: "25 VIP Points", icon: "🌟", type: "vip_points" as const, amount: 25 },
-    { name: "200 Coins", icon: "💰", type: "coins" as const, amount: 200 },
-    { name: "50 VIP Points", icon: "🌟", type: "vip_points" as const, amount: 50 },
     { name: "Epic Chest", icon: "📦", type: "item" as const, rarity: "epic" as const },
-    { name: "Shadow Blade", icon: "🗡️", type: "item" as const, rarity: "epic" as const },
-    { name: "500 Coins", icon: "💰", type: "coins" as const, amount: 500 },
-    { name: "Phoenix Wings", icon: "🔥", type: "item" as const, rarity: "legendary" as const },
+    { name: "Shadow Blade", icon: "🗡️", type: "item" as const, rarity: "legendary" as const },
   ];
 
   for (let day = 1; day <= 30; day++) {
-    // Special rewards on milestone days
-    if (day === 7 || day === 14 || day === 21 || day === 30) {
-      rewards.push({
-        day,
-        freeReward: {
-          name: day === 30 ? "100 Coins" : "Epic Treasure",
-          icon: day === 30 ? "💰" : "🎁",
-          type: day === 30 ? "coins" : "item",
-          amount: day === 30 ? 100 : undefined,
-          rarity: day === 30 ? undefined : "epic",
-        },
-        eliteReward: {
-          name: day === 30 ? "Legendary Pet Egg" : day === 21 ? "Dragon Mount" : day === 14 ? "Elite Armor Set" : "Legendary Chest",
-          icon: day === 30 ? "🥚" : day === 21 ? "🐉" : day === 14 ? "🛡️" : "✨",
-          type: "item",
-          rarity: "legendary",
-        },
-      });
-    } else {
-      rewards.push({
-        day,
-        freeReward: freeItems[(day - 1) % freeItems.length],
-        eliteReward: eliteItems[(day - 1) % eliteItems.length],
-      });
-    }
+    rewards.push({
+      day,
+      freeReward: freeItems[(day - 1) % freeItems.length],
+      eliteReward: eliteItems[(day - 1) % eliteItems.length],
+    });
   }
 
   return rewards;
 };
-
-const rewards = generateRewards();
 
 const rarityColors = {
   common: "border-muted-foreground/30 bg-muted/20",
@@ -149,6 +199,9 @@ export const GamePass = () => {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(getSeasonResetTime());
+  const [rewards, setRewards] = useState<PassReward[]>(generateFallbackRewards());
+  const [passStatus, setPassStatus] = useState<PassStatus | null>(null);
+  const [isLoadingRewards, setIsLoadingRewards] = useState(true);
 
   // Update countdown every second
   useEffect(() => {
@@ -159,9 +212,37 @@ export const GamePass = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch pass status from PHP backend
+  // Fetch rewards from API
   useEffect(() => {
-    const fetchPassStatus = async () => {
+    const fetchRewards = async () => {
+      setIsLoadingRewards(true);
+      try {
+        const response = await fetch(
+          "https://woiendgame.online/api/gamepass_admin.php?action=get_public_rewards"
+        );
+        const data = await response.json();
+        
+        if (data.success && data.rewards && data.rewards.length > 0) {
+          setRewards(convertApiRewards(data.rewards));
+          if (data.pass) {
+            setPassStatus(data.pass);
+            setCurrentDay(data.pass.currentDay || 1);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch rewards:", error);
+        // Keep fallback rewards
+      } finally {
+        setIsLoadingRewards(false);
+      }
+    };
+
+    fetchRewards();
+  }, []);
+
+  // Fetch user pass status from PHP backend
+  useEffect(() => {
+    const fetchUserPassStatus = async () => {
       if (!user) return;
       
       try {
@@ -173,17 +254,16 @@ export const GamePass = () => {
         if (data.success) {
           setHasElitePass(data.hasElitePass || false);
           setClaimedDays(data.claimedDays || []);
-          setCurrentDay(data.currentDay || 1);
+          if (data.currentDay) setCurrentDay(data.currentDay);
         }
       } catch (error) {
-        console.error("Failed to fetch pass status:", error);
+        console.error("Failed to fetch user pass status:", error);
         // Use mock data for demo
-        setCurrentDay(5);
         setClaimedDays([1, 2, 3, 4]);
       }
     };
 
-    fetchPassStatus();
+    fetchUserPassStatus();
   }, [user]);
 
   const claimReward = async (day: number, isElite: boolean) => {
