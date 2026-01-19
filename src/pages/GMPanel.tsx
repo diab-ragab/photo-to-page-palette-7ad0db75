@@ -17,7 +17,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { notificationsApi, Notification } from "@/lib/notificationsApi";
 import { GamePassRewardsManager } from "@/components/gm/GamePassRewardsManager";
-import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User, Eye, Pencil, X, Save, ArrowRightLeft, LayoutDashboard, Gift, Bell } from "lucide-react";
+import { VoteSitesManager } from "@/components/gm/VoteSitesManager";
+import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User, Eye, Pencil, X, Save, ArrowRightLeft, LayoutDashboard, Gift, Bell, Vote } from "lucide-react";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -335,7 +336,7 @@ export default function GMPanel() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-display font-bold">GM Panel</h1>
-              <p className="text-sm md:text-base text-muted-foreground">Manage notifications & game pass</p>
+              <p className="text-sm md:text-base text-muted-foreground">Manage notifications, game pass & vote sites</p>
             </div>
           </div>
           
@@ -352,14 +353,21 @@ export default function GMPanel() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="notifications" className="gap-2">
               <Bell className="h-4 w-4" />
-              Notifications
+              <span className="hidden sm:inline">Notifications</span>
+              <span className="sm:hidden">Notifs</span>
             </TabsTrigger>
             <TabsTrigger value="gamepass" className="gap-2">
               <Gift className="h-4 w-4" />
-              Game Pass
+              <span className="hidden sm:inline">Game Pass</span>
+              <span className="sm:hidden">Pass</span>
+            </TabsTrigger>
+            <TabsTrigger value="votesites" className="gap-2">
+              <Vote className="h-4 w-4" />
+              <span className="hidden sm:inline">Vote Sites</span>
+              <span className="sm:hidden">Votes</span>
             </TabsTrigger>
           </TabsList>
 
@@ -602,6 +610,10 @@ export default function GMPanel() {
 
           <TabsContent value="gamepass">
             <GamePassRewardsManager username={user?.username} />
+          </TabsContent>
+
+          <TabsContent value="votesites">
+            <VoteSitesManager />
           </TabsContent>
         </Tabs>
       </main>

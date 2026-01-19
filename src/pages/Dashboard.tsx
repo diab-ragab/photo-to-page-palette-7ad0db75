@@ -7,27 +7,28 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useVoteSystem } from "@/hooks/useVoteSystem";
 import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
+import { VoteSiteCard } from "@/components/VoteSiteCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   User, 
   Coins, 
   Crown, 
   Vote, 
-  Clock, 
   Shield, 
   Award,
   TrendingUp,
   Gift,
-  Timer,
-  ArrowRightLeft
+  ArrowRightLeft,
+  CheckCircle2
 } from "lucide-react";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isLoggedIn, isGM, logout } = useAuth();
-  const { voteData, loading, timeRemaining, submitVote } = useVoteSystem();
+  const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites } = useVoteSystem();
   const [serverStats, setServerStats] = useState({
     players: 0,
     accounts: 0,
@@ -200,75 +201,65 @@ const Dashboard = () => {
           {/* Vote Section */}
           <Card className="lg:col-span-2 bg-card border-primary/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Gift className="h-5 w-5 text-primary" />
-                Vote Rewards
-              </CardTitle>
-              <CardDescription>
-                Vote every 12 hours to earn coins and VIP points
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Vote Button Area */}
-              <div className="flex flex-col md:flex-row items-center gap-4 p-6 bg-background/50 rounded-lg border border-border">
-                <div className="flex-1 text-center md:text-left">
-                  <h3 className="text-lg font-semibold mb-1">Daily Vote</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Earn <span className="text-yellow-500 font-medium">50 Coins</span> and{" "}
-                    <span className="text-purple-400 font-medium">25 VIP Points</span>
-                  </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Gift className="h-5 w-5 text-primary" />
+                    Vote Rewards
+                  </CardTitle>
+                  <CardDescription>
+                    Vote on multiple sites to earn coins and VIP points
+                  </CardDescription>
                 </div>
-                
-                {voteData.canVote ? (
-                  <Button 
-                    size="lg" 
-                    onClick={submitVote}
-                    disabled={loading}
-                    className="w-full md:w-auto min-w-[160px] bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
-                  >
-                    {loading ? (
-                      <>
-                        <Timer className="mr-2 h-4 w-4 animate-spin" />
-                        Voting...
-                      </>
+                {/* Vote Progress */}
+                {totalSites > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-full">
+                    {availableVotes === 0 ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
                     ) : (
-                      <>
-                        <Vote className="mr-2 h-4 w-4" />
-                        Vote Now
-                      </>
+                      <Vote className="h-4 w-4 text-primary" />
                     )}
-                  </Button>
-                ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span className="text-sm">Next vote in:</span>
-                    </div>
-                    <div className="text-2xl font-mono font-bold text-primary">
-                      {timeRemaining || "Loading..."}
-                    </div>
+                    <span className="text-sm font-medium">
+                      {totalSites - availableVotes}/{totalSites} voted
+                    </span>
                   </div>
                 )}
               </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Vote Sites Grid */}
+              {sitesLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-[140px] rounded-xl" />
+                  ))}
+                </div>
+              ) : voteSites.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No vote sites configured yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {voteSites.map((site) => (
+                    <VoteSiteCard
+                      key={site.id}
+                      site={site}
+                      onVote={submitVote}
+                      loading={loading}
+                    />
+                  ))}
+                </div>
+              )}
 
-              {/* Rewards Info */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-background/30 rounded-lg border border-border/50 text-center">
-                  <Coins className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-                  <div className="font-semibold">50 Coins</div>
-                  <div className="text-xs text-muted-foreground">Per vote</div>
+              {/* All Voted Message */}
+              {!sitesLoading && availableVotes === 0 && totalSites > 0 && (
+                <div className="flex items-center justify-center gap-2 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  <span className="text-green-500 font-medium">
+                    All sites voted! Check back later.
+                  </span>
                 </div>
-                <div className="p-4 bg-background/30 rounded-lg border border-border/50 text-center">
-                  <Crown className="h-8 w-8 text-purple-400 mx-auto mb-2" />
-                  <div className="font-semibold">25 VIP Points</div>
-                  <div className="text-xs text-muted-foreground">Per vote</div>
-                </div>
-                <div className="p-4 bg-background/30 rounded-lg border border-border/50 text-center">
-                  <Shield className="h-8 w-8 text-primary mx-auto mb-2" />
-                  <div className="font-semibold">12 Hour Cooldown</div>
-                  <div className="text-xs text-muted-foreground">Anti-abuse protection</div>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 

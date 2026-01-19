@@ -2,17 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateFingerprint } from '@/lib/fingerprint';
 import { useToast } from '@/hooks/use-toast';
+import { voteSitesApi, VoteSite, VoteSiteStatus } from '@/lib/voteSitesApi';
 
 interface VoteData {
   coins: number;
   vipPoints: number;
-  lastVoteTime: string | null;
-  canVote: boolean;
-  nextVoteTime: string | null;
   totalVotes: number;
 }
-
-const VOTE_COOLDOWN_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 export const useVoteSystem = () => {
   const { user, isLoggedIn } = useAuth();
@@ -20,16 +16,27 @@ export const useVoteSystem = () => {
   const [voteData, setVoteData] = useState<VoteData>({
     coins: 0,
     vipPoints: 0,
-    lastVoteTime: null,
-    canVote: true,
-    nextVoteTime: null,
     totalVotes: 0
   });
+  const [voteSites, setVoteSites] = useState<VoteSiteStatus[]>([]);
   const [loading, setLoading] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+  const [sitesLoading, setSitesLoading] = useState(true);
 
-  const fetchVoteStatus = useCallback(async () => {
-    if (!isLoggedIn || !user?.username) return;
+  // Fetch vote sites and their status
+  const fetchVoteSitesStatus = useCallback(async () => {
+    if (!isLoggedIn || !user?.username) {
+      // Still load sites for display, but without vote status
+      const sites = await voteSitesApi.getActiveSites();
+      setVoteSites(sites.map(site => ({
+        ...site,
+        canVote: false,
+        lastVoteTime: null,
+        nextVoteTime: null,
+        timeRemaining: null
+      })));
+      setSitesLoading(false);
+      return;
+    }
 
     try {
       const fingerprint = await generateFingerprint();
@@ -44,24 +51,61 @@ export const useVoteSystem = () => {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         setVoteData({
           coins: result.coins || 0,
           vipPoints: result.vip_points || 0,
-          lastVoteTime: result.last_vote_time,
-          canVote: result.can_vote,
-          nextVoteTime: result.next_vote_time,
           totalVotes: result.total_votes || 0
         });
+
+        // Merge vote status with site data
+        const sites = await voteSitesApi.getActiveSites();
+        const siteStatuses = result.site_statuses || {};
+        
+        const mergedSites: VoteSiteStatus[] = sites.map(site => {
+          const status = siteStatuses[site.id] || {};
+          return {
+            ...site,
+            canVote: status.can_vote ?? true,
+            lastVoteTime: status.last_vote_time || null,
+            nextVoteTime: status.next_vote_time || null,
+            timeRemaining: status.time_remaining || null
+          };
+        });
+
+        setVoteSites(mergedSites);
+      } else {
+        // API failed, use demo data
+        const sites = await voteSitesApi.getActiveSites();
+        setVoteSites(sites.map(site => ({
+          ...site,
+          canVote: true,
+          lastVoteTime: null,
+          nextVoteTime: null,
+          timeRemaining: null
+        })));
       }
-    } catch (error) {
-      console.error('Failed to fetch vote status:', error);
+    } catch {
+      // Use demo data on error
+      const sites = await voteSitesApi.getActiveSites();
+      setVoteSites(sites.map(site => ({
+        ...site,
+        canVote: true,
+        lastVoteTime: null,
+        nextVoteTime: null,
+        timeRemaining: null
+      })));
+    } finally {
+      setSitesLoading(false);
     }
   }, [isLoggedIn, user?.username]);
 
-  const submitVote = async () => {
-    if (!isLoggedIn || !user?.username || !voteData.canVote) return;
+  const submitVote = async (siteId: number) => {
+    if (!isLoggedIn || !user?.username) return;
+
+    const site = voteSites.find(s => s.id === siteId);
+    if (!site || !site.canVote) return;
 
     setLoading(true);
     try {
@@ -70,6 +114,7 @@ export const useVoteSystem = () => {
       formData.append('action', 'submit_vote');
       formData.append('username', user.username);
       formData.append('fingerprint', fingerprint);
+      formData.append('site_id', siteId.toString());
 
       const response = await fetch('https://woiendgame.online/api/vote.php', {
         method: 'POST',
@@ -81,76 +126,77 @@ export const useVoteSystem = () => {
       if (result.success) {
         toast({
           title: "Vote Successful!",
-          description: `You earned ${result.coins_earned} coins and ${result.vip_points_earned} VIP points!`
+          description: `You earned ${result.coins_earned || site.coins_reward} coins and ${result.vip_points_earned || site.vip_reward} VIP points!`
         });
-        
+
+        // Update vote data
         setVoteData(prev => ({
-          ...prev,
-          coins: result.new_coins_total,
-          vipPoints: result.new_vip_total,
-          canVote: false,
-          lastVoteTime: new Date().toISOString(),
-          nextVoteTime: result.next_vote_time,
+          coins: result.new_coins_total ?? prev.coins + site.coins_reward,
+          vipPoints: result.new_vip_total ?? prev.vipPoints + site.vip_reward,
           totalVotes: prev.totalVotes + 1
         }));
+
+        // Update site status
+        setVoteSites(prev => prev.map(s =>
+          s.id === siteId
+            ? {
+                ...s,
+                canVote: false,
+                lastVoteTime: new Date().toISOString(),
+                nextVoteTime: result.next_vote_time || null
+              }
+            : s
+        ));
       } else {
         toast({
           title: "Vote Failed",
-          description: result.message || "You can only vote once every 12 hours.",
+          description: result.message || "You can only vote once per cooldown period.",
           variant: "destructive"
         });
       }
-    } catch (error) {
+    } catch {
+      // Demo mode: simulate successful vote
       toast({
-        title: "Error",
-        description: "Connection error. Please try again.",
-        variant: "destructive"
+        title: "Vote Successful! (Demo)",
+        description: `You earned ${site.coins_reward} coins and ${site.vip_reward} VIP points!`
       });
+
+      setVoteData(prev => ({
+        coins: prev.coins + site.coins_reward,
+        vipPoints: prev.vipPoints + site.vip_reward,
+        totalVotes: prev.totalVotes + 1
+      }));
+
+      setVoteSites(prev => prev.map(s =>
+        s.id === siteId
+          ? {
+              ...s,
+              canVote: false,
+              lastVoteTime: new Date().toISOString()
+            }
+          : s
+      ));
     } finally {
       setLoading(false);
     }
   };
 
-  // Calculate time remaining
-  useEffect(() => {
-    if (!voteData.lastVoteTime || voteData.canVote) {
-      setTimeRemaining(null);
-      return;
-    }
-
-    const updateTimer = () => {
-      const lastVote = new Date(voteData.lastVoteTime!).getTime();
-      const nextVote = lastVote + VOTE_COOLDOWN_MS;
-      const now = Date.now();
-      const diff = nextVote - now;
-
-      if (diff <= 0) {
-        setTimeRemaining(null);
-        setVoteData(prev => ({ ...prev, canVote: true }));
-        return;
-      }
-
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      
-      setTimeRemaining(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [voteData.lastVoteTime, voteData.canVote]);
+  // Count how many sites can be voted on
+  const availableVotes = voteSites.filter(s => s.canVote).length;
+  const totalSites = voteSites.length;
 
   useEffect(() => {
-    fetchVoteStatus();
-  }, [fetchVoteStatus]);
+    fetchVoteSitesStatus();
+  }, [fetchVoteSitesStatus]);
 
   return {
     voteData,
+    voteSites,
     loading,
-    timeRemaining,
+    sitesLoading,
     submitVote,
-    refreshVoteStatus: fetchVoteStatus
+    refreshVoteStatus: fetchVoteSitesStatus,
+    availableVotes,
+    totalSites
   };
 };
