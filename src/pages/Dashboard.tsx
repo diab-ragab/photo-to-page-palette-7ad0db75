@@ -8,6 +8,7 @@ import { useVoteSystem } from "@/hooks/useVoteSystem";
 import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
 import { VoteSiteCard } from "@/components/VoteSiteCard";
+import { VoteStreakCard } from "@/components/VoteStreakCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -28,7 +29,7 @@ import {
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isLoggedIn, isGM, logout } = useAuth();
-  const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites } = useVoteSystem();
+  const { voteData, voteSites, streakData, loading, sitesLoading, streakLoading, submitVote, availableVotes, totalSites } = useVoteSystem();
   const [serverStats, setServerStats] = useState({
     players: 0,
     accounts: 0,
@@ -263,7 +264,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Profile & VIP Progress */}
+          {/* Profile, Streak & VIP Progress */}
           <div className="space-y-6">
             {/* Profile Card */}
             <Card className="bg-card border-primary/20">
@@ -299,6 +300,9 @@ const Dashboard = () => {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Vote Streak Card */}
+            <VoteStreakCard streakData={streakData} loading={streakLoading} />
 
             {/* VIP Progress Card */}
             <Card className="bg-card border-primary/20">

@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { generateFingerprint } from '@/lib/fingerprint';
 import { useToast } from '@/hooks/use-toast';
 import { voteSitesApi, VoteSite, VoteSiteStatus } from '@/lib/voteSitesApi';
+import { voteStreakApi, VoteStreakData } from '@/lib/voteStreakApi';
 
 interface VoteData {
   coins: number;
@@ -19,8 +20,28 @@ export const useVoteSystem = () => {
     totalVotes: 0
   });
   const [voteSites, setVoteSites] = useState<VoteSiteStatus[]>([]);
+  const [streakData, setStreakData] = useState<VoteStreakData | null>(null);
   const [loading, setLoading] = useState(false);
   const [sitesLoading, setSitesLoading] = useState(true);
+  const [streakLoading, setStreakLoading] = useState(true);
+
+  // Fetch streak data
+  const fetchStreakData = useCallback(async () => {
+    if (!isLoggedIn || !user?.username) {
+      setStreakData(null);
+      setStreakLoading(false);
+      return;
+    }
+
+    try {
+      const data = await voteStreakApi.getStreakData(user.username);
+      setStreakData(data);
+    } catch {
+      setStreakData(null);
+    } finally {
+      setStreakLoading(false);
+    }
+  }, [isLoggedIn, user?.username]);
 
   // Fetch vote sites and their status
   const fetchVoteSitesStatus = useCallback(async () => {
@@ -124,9 +145,16 @@ export const useVoteSystem = () => {
       const result = await response.json();
 
       if (result.success) {
+        // Build enhanced toast message with streak info
+        let description = `You earned ${result.coins_earned || site.coins_reward} coins and ${result.vip_points_earned || site.vip_reward} VIP points!`;
+        
+        if (result.streak_bonus) {
+          description += ` (${result.streak_multiplier}x streak bonus!)`;
+        }
+
         toast({
-          title: "Vote Successful!",
-          description: `You earned ${result.coins_earned || site.coins_reward} coins and ${result.vip_points_earned || site.vip_reward} VIP points!`
+          title: result.new_streak ? `🔥 Streak: ${result.new_streak} days!` : "Vote Successful!",
+          description
         });
 
         // Update vote data
@@ -147,6 +175,9 @@ export const useVoteSystem = () => {
               }
             : s
         ));
+
+        // Refresh streak data after successful vote
+        fetchStreakData();
       } else {
         toast({
           title: "Vote Failed",
@@ -155,15 +186,18 @@ export const useVoteSystem = () => {
         });
       }
     } catch {
-      // Demo mode: simulate successful vote
+      // Demo mode: simulate successful vote with streak
+      const currentStreak = (streakData?.currentStreak || 0) + 1;
+      const multiplier = streakData?.currentMultiplier || 1;
+
       toast({
-        title: "Vote Successful! (Demo)",
-        description: `You earned ${site.coins_reward} coins and ${site.vip_reward} VIP points!`
+        title: `🔥 Streak: ${currentStreak} day${currentStreak !== 1 ? 's' : ''}!`,
+        description: `You earned ${Math.round(site.coins_reward * multiplier)} coins and ${Math.round(site.vip_reward * multiplier)} VIP points! (${multiplier}x bonus)`
       });
 
       setVoteData(prev => ({
-        coins: prev.coins + site.coins_reward,
-        vipPoints: prev.vipPoints + site.vip_reward,
+        coins: prev.coins + Math.round(site.coins_reward * multiplier),
+        vipPoints: prev.vipPoints + Math.round(site.vip_reward * multiplier),
         totalVotes: prev.totalVotes + 1
       }));
 
@@ -176,6 +210,17 @@ export const useVoteSystem = () => {
             }
           : s
       ));
+
+      // Update demo streak
+      if (streakData) {
+        setStreakData({
+          ...streakData,
+          currentStreak: currentStreak,
+          longestStreak: Math.max(streakData.longestStreak, currentStreak),
+          lastStreakVote: new Date().toISOString(),
+          streakExpiresAt: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString()
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -187,15 +232,19 @@ export const useVoteSystem = () => {
 
   useEffect(() => {
     fetchVoteSitesStatus();
-  }, [fetchVoteSitesStatus]);
+    fetchStreakData();
+  }, [fetchVoteSitesStatus, fetchStreakData]);
 
   return {
     voteData,
     voteSites,
+    streakData,
     loading,
     sitesLoading,
+    streakLoading,
     submitVote,
     refreshVoteStatus: fetchVoteSitesStatus,
+    refreshStreak: fetchStreakData,
     availableVotes,
     totalSites
   };
