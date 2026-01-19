@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVoteSystem } from "@/hooks/useVoteSystem";
+import { toast } from "sonner";
 import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
 import { VoteSiteCard } from "@/components/VoteSiteCard";
@@ -41,6 +42,45 @@ const Dashboard = () => {
       navigate("/");
     }
   }, [isLoggedIn, navigate]);
+
+  // Streak expiration warning notification
+  const hasShownWarning = useRef(false);
+  
+  useEffect(() => {
+    if (!streakData?.streakExpiresAt || streakData.currentStreak === 0) {
+      hasShownWarning.current = false;
+      return;
+    }
+
+    const checkExpiration = () => {
+      const now = new Date().getTime();
+      const expires = new Date(streakData.streakExpiresAt!).getTime();
+      const diff = expires - now;
+      const hoursRemaining = diff / (1000 * 60 * 60);
+
+      // Show warning when less than 6 hours remain (only once per session)
+      if (hoursRemaining > 0 && hoursRemaining < 6 && !hasShownWarning.current) {
+        hasShownWarning.current = true;
+        const hours = Math.floor(hoursRemaining);
+        const minutes = Math.floor((hoursRemaining - hours) * 60);
+        
+        toast.warning("🔥 Your streak is about to expire!", {
+          description: `Vote within ${hours}h ${minutes}m to keep your ${streakData.currentStreak}-day streak!`,
+          duration: 10000,
+          action: {
+            label: "Vote Now",
+            onClick: () => {
+              document.getElementById("vote-section")?.scrollIntoView({ behavior: "smooth" });
+            },
+          },
+        });
+      }
+    };
+
+    checkExpiration();
+    const interval = setInterval(checkExpiration, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [streakData]);
 
   // Fetch server stats
   useEffect(() => {
@@ -200,7 +240,7 @@ const Dashboard = () => {
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Vote Section */}
-          <Card className="lg:col-span-2 bg-card border-primary/20">
+          <Card id="vote-section" className="lg:col-span-2 bg-card border-primary/20">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
