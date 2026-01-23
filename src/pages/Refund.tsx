@@ -35,42 +35,47 @@ const Refund = () => {
         <div className="prose prose-invert max-w-none space-y-6 text-muted-foreground">
           <section>
             <h2 className="text-xl font-display font-semibold text-foreground mb-4">1. Donations</h2>
-            <p>All donations are voluntary contributions to support our server. Donations are non-refundable as they are gifts to support the community.</p>
+            <p>All donations are voluntary contributions made to support WOI Endgame. Donations are non-refundable, as they are considered gifts to help maintain and improve the server.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-4">2. VIP Memberships</h2>
-            <p>VIP membership purchases may be eligible for a refund within 24 hours of purchase if:</p>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">2. VIP Memberships / Elite Pass</h2>
+            <p>VIP Memberships and Elite Pass purchases may be eligible for a refund within 24 hours of purchase ONLY if all of the following conditions are met:</p>
             <ul className="list-disc list-inside space-y-2 mt-2">
-              <li>No VIP benefits have been used</li>
-              <li>The request is made within 24 hours of purchase</li>
-              <li>This is your first refund request</li>
+              <li>No VIP/Elite benefits have been used or claimed</li>
+              <li>The refund request is submitted within 24 hours of purchase</li>
+              <li>This is the customer's first refund request</li>
             </ul>
+            <p className="mt-2">If any VIP/Elite benefits have been used, activated, or claimed, the purchase becomes non-refundable.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-4">3. In-Game Credits</h2>
-            <p>In-game credit purchases are non-refundable once the credits have been added to your account. If credits were not delivered due to a technical issue, please contact support.</p>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">3. Virtual Currency (Zen) & In-Game Items</h2>
+            <p>Zen (virtual currency) and in-game item purchases are non-refundable once delivered to the player's account.</p>
+            <p className="mt-2">If the product was not delivered due to a verified technical issue on our side, please contact support and we will assist with delivery or review the request.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-4">4. Subscription Cancellation</h2>
-            <p>Monthly subscriptions can be cancelled at any time. You will retain access to VIP benefits until the end of your current billing period.</p>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">4. Subscription Cancellation (If Applicable)</h2>
+            <p>If you have a monthly subscription, you may cancel at any time.</p>
+            <p className="mt-2">You will keep access to your VIP benefits until the end of your current billing cycle. No partial refunds are provided for unused time unless required by law.</p>
           </section>
 
           <section>
             <h2 className="text-xl font-display font-semibold text-foreground mb-4">5. How to Request a Refund</h2>
-            <p>To request a refund:</p>
+            <p>To request a refund, please contact us through our official Discord server and provide:</p>
             <ul className="list-disc list-inside space-y-2 mt-2">
-              <li>Contact us through our Discord server</li>
-              <li>Provide your username and transaction details</li>
-              <li>Allow up to 7 business days for processing</li>
+              <li>Account username / Character name</li>
+              <li>Transaction ID / Order ID</li>
+              <li>Proof of payment (if available)</li>
             </ul>
+            <p className="mt-2">Refund requests are reviewed manually. Please allow up to 7 business days for processing (if approved).</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-4">6. Chargebacks</h2>
-            <p>Filing a chargeback without first contacting us will result in permanent account suspension. Please reach out to us first to resolve any issues.</p>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">6. Chargebacks & Payment Disputes</h2>
+            <p>Please contact our support team before opening a dispute or filing a chargeback.</p>
+            <p className="mt-2">Unauthorized chargebacks or fraudulent disputes may result in account restrictions, suspension, or permanent ban to protect the server economy and prevent abuse.</p>
           </section>
         </div>
       </main>
