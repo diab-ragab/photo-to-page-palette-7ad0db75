@@ -109,7 +109,7 @@ export const Footer = () => {
               </li>
               <li>
                 <Link to="/refund" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                  Refund Policy
+                  Refund & Delivery
                 </Link>
               </li>
               <li>
