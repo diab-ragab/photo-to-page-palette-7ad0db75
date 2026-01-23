@@ -3,6 +3,7 @@ import { Footer } from "@/components/Footer";
 import { ShopHero } from "@/components/shop/ShopHero";
 import { ShopCategories } from "@/components/shop/ShopCategories";
 import { ShopProducts } from "@/components/shop/ShopProducts";
+import { StoreFAQ } from "@/components/shop/StoreFAQ";
 import { SEO } from "@/components/SEO";
 import { useState } from "react";
 
@@ -43,6 +44,7 @@ const Shop = () => {
         onSelectCategory={setSelectedCategory} 
       />
       <ShopProducts selectedCategory={selectedCategory} />
+      <StoreFAQ />
       <Footer />
     </div>
   );
