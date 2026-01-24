@@ -332,8 +332,8 @@ const Dashboard = () => {
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => {
-                    logout();
+                  onClick={async () => {
+                    await logout();
                     navigate("/");
                   }}
                 >
