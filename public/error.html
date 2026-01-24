@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error - WOI Endgame</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: 142 76% 36%;
+      --primary-foreground: 355 7% 97%;
+      --background: 240 10% 4%;
+      --foreground: 0 0% 95%;
+      --muted-foreground: 240 5% 64.9%;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: hsl(var(--background));
+      color: hsl(var(--foreground));
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Background effects */
+    .bg-gradient {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, hsl(var(--primary) / 0.05), transparent, transparent);
+    }
+
+    .bg-radial {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, hsl(var(--primary) / 0.1), transparent);
+      opacity: 0.5;
+    }
+
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      opacity: 0.1;
+      background-image: 
+        linear-gradient(hsl(var(--primary) / 0.3) 1px, transparent 1px),
+        linear-gradient(90deg, hsl(var(--primary) / 0.3) 1px, transparent 1px);
+      background-size: 50px 50px;
+    }
+
+    .container {
+      position: relative;
+      z-index: 10;
+      max-width: 600px;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .error-code {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(6rem, 20vw, 10rem);
+      font-weight: 900;
+      line-height: 1;
+      color: hsl(var(--primary));
+      text-shadow: 
+        0 0 20px hsl(var(--primary) / 0.5),
+        0 0 40px hsl(var(--primary) / 0.3),
+        0 0 60px hsl(var(--primary) / 0.2);
+      margin-bottom: 0.5rem;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .error-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      letter-spacing: 0.1em;
+    }
+
+    .error-message {
+      font-size: 1rem;
+      color: hsl(var(--muted-foreground));
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: hsl(var(--primary-foreground));
+      background-color: hsl(var(--primary));
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background-color: hsl(var(--primary) / 0.9);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px hsl(var(--primary) / 0.3);
+    }
+
+    .btn svg {
+      width: 1rem;
+      height: 1rem;
+    }
+
+    .skull {
+      position: absolute;
+      bottom: -5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 15rem;
+      opacity: 0.05;
+      pointer-events: none;
+      color: hsl(var(--primary));
+    }
+
+    .warning-icon {
+      width: 4rem;
+      height: 4rem;
+      margin: 0 auto 1.5rem;
+      color: hsl(var(--primary));
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-radial"></div>
+  <div class="bg-grid"></div>
+
+  <div class="container">
+    <!-- Warning icon -->
+    <svg class="warning-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+      <path d="M12 9v4"/>
+      <path d="M12 17h.01"/>
+    </svg>
+
+    <h1 class="error-code" id="errorCode">ERROR</h1>
+    <h2 class="error-title">ACCESS DENIED</h2>
+    <p class="error-message">
+      The realm you seek is forbidden or does not exist.<br>
+      You may have followed a broken link, or the path has been sealed by dark forces.
+    </p>
+
+    <a href="/" class="btn">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m12 19-7-7 7-7"/>
+        <path d="M19 12H5"/>
+      </svg>
+      Return to Safety
+    </a>
+
+    <div class="skull">💀</div>
+  </div>
+
+  <script>
+    // Try to detect error code from URL or referrer
+    (function() {
+      var code = 'ERROR';
+      var title = 'ACCESS DENIED';
+      var msg = 'The realm you seek is forbidden or does not exist.';
+      
+      // Check for common error patterns in URL
+      var path = window.location.pathname.toLowerCase();
+      
+      if (path.includes('.php') || path.includes('/api/') || path.includes('config')) {
+        code = '403';
+        title = 'FORBIDDEN';
+        msg = 'Access to this resource is restricted. Nice try, adventurer.';
+      } else if (path.includes('.env') || path.includes('.sql') || path.includes('.log')) {
+        code = '403';
+        title = 'FORBIDDEN';
+        msg = 'These secrets are not meant for mortal eyes.';
+      }
+      
+      document.getElementById('errorCode').textContent = code;
+    })();
+  </script>
+</body>
+</html>
