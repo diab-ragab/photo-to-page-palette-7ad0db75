@@ -1,6 +1,19 @@
+# Security: Disable directory listing
+Options -Indexes
+
+# Custom error pages
+ErrorDocument 403 /error.html
+ErrorDocument 404 /error.html
+ErrorDocument 500 /error.html
+ErrorDocument 502 /error.html
+ErrorDocument 503 /error.html
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # Block direct access to sensitive file patterns
+  RewriteRule ^.*\.(env|log|sql|bak|config)$ - [F,L]
 
   # If it's a real file or directory, serve it
   RewriteCond %{REQUEST_FILENAME} !-f
@@ -8,4 +21,11 @@
 
   # Otherwise serve index.html (SPA fallback)
   RewriteRule ^ index.html [L]
+</IfModule>
+
+# Security headers
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "DENY"
+  Header set X-XSS-Protection "1; mode=block"
 </IfModule>
