@@ -147,7 +147,9 @@ export const AuthModals = ({
         setLoginOpen(false);
         setLoginData({ login: "", passwd: "" });
         setRememberMe(false);
-        navigate("/dashboard");
+        // Let AuthContext state commit before navigating to a protected route
+        // (prevents a brief redirect/blank state on slower devices).
+        window.setTimeout(() => navigate("/dashboard"), 0);
       } else {
         toast({
           title: "Error",
