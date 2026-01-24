@@ -107,10 +107,11 @@ export const AuthModals = ({
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         body: formData,
+        credentials: 'include',
       });
 
       const rawText = await response.text();
-      let result: { success?: boolean; message?: string; user?: any; [key: string]: any };
+      let result: { success?: boolean; message?: string; user?: { email?: string }; csrf_token?: string; [key: string]: unknown };
       try {
         result = JSON.parse(rawText);
       } catch {
@@ -118,12 +119,14 @@ export const AuthModals = ({
       }
       
       if (result.success) {
-        login(validation.data.login, result.user?.email || "", rememberMe);
+        // Login with CSRF token from response
+        login(validation.data.login, result.user?.email || "", rememberMe, result.csrf_token);
         
         // Check if user is GM
         try {
           const gmResponse = await fetch(
-            `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(validation.data.login)}`
+            `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(validation.data.login)}`,
+            { credentials: 'include' }
           );
           const gmData = await gmResponse.json();
           
@@ -211,10 +214,11 @@ export const AuthModals = ({
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         body: formData,
+        credentials: 'include',
       });
 
       const rawText = await response.text();
-      let result: { success?: boolean; message?: string; [key: string]: any };
+      let result: { success?: boolean; message?: string; [key: string]: unknown };
       try {
         result = JSON.parse(rawText);
       } catch {
@@ -285,10 +289,11 @@ export const AuthModals = ({
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         body: formData,
+        credentials: 'include',
       });
 
       const rawText = await response.text();
-      let result: { success?: boolean; message?: string; [key: string]: any };
+      let result: { success?: boolean; message?: string; [key: string]: unknown };
       try {
         result = JSON.parse(rawText);
       } catch {
@@ -356,7 +361,8 @@ export const AuthModals = ({
 
       const response = await fetch("https://woiendgame.online/api/change_password.php", {
         method: "POST",
-        body: formData
+        body: formData,
+        credentials: 'include',
       });
 
       const result = await response.text();

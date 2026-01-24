@@ -115,7 +115,7 @@ export const Leaderboards = () => {
     const fetchLeaderboards = async () => {
       setLoading(true);
       try {
-        const response = await fetch("https://woiendgame.online/api/leaderboards.php");
+        const response = await fetch("https://woiendgame.online/api/leaderboards.php", { credentials: 'include' });
         if (response.ok) {
           const data = await response.json();
           if (data.topVoters) setTopVoters(data.topVoters);

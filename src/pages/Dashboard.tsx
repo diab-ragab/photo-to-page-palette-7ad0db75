@@ -86,7 +86,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchServerStats = async () => {
       try {
-        const response = await fetch("https://woiendgame.online/api/server-status.php");
+        const response = await fetch("https://woiendgame.online/api/server-status.php", { credentials: 'include' });
         const data = await response.json();
         setServerStats({
           players: data.players || 0,

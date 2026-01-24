@@ -68,7 +68,8 @@ export const useVoteSystem = () => {
 
       const response = await fetch('https://woiendgame.online/api/vote.php', {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include'
       });
 
       const result = await response.json();
@@ -139,7 +140,8 @@ export const useVoteSystem = () => {
 
       const response = await fetch('https://woiendgame.online/api/vote.php', {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include'
       });
 
       const result = await response.json();
