@@ -30,6 +30,15 @@ const typeIcons = {
   event: Calendar,
 };
 
+/**
+ * GM Panel - Admin interface for game management.
+ * 
+ * SECURITY NOTE: The client-side GM check (checkGMStatus) is for UX only.
+ * All privileged operations (create/update/delete notifications, manage 
+ * vote sites, etc.) are protected server-side by the requireGM() middleware
+ * in the PHP backend. Even if an attacker bypasses the client-side redirect,
+ * they cannot perform any admin actions without a valid GM session.
+ */
 export default function GMPanel() {
   const { user, isLoggedIn } = useAuth();
   const navigate = useNavigate();

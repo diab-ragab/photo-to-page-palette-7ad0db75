@@ -72,30 +72,22 @@ export const forgotPasswordSchema = z.object({
 });
 
 // Notification validation schema
+// Note: We only validate format/length here. React JSX automatically escapes 
+// content when rendered as {variable}, preventing XSS. Server-side sanitization
+// is handled by the PHP backend before database insertion.
 export const notificationSchema = z.object({
   title: z
     .string()
     .min(1, "Title is required")
     .max(200, "Title is too long")
-    .transform((val) => sanitizeInput(val)),
+    .transform((val) => val.trim()),
   message: z
     .string()
     .min(1, "Message is required")
     .max(2000, "Message is too long")
-    .transform((val) => sanitizeInput(val)),
+    .transform((val) => val.trim()),
   type: z.enum(["news", "update", "maintenance", "event"]),
 });
-
-// Sanitize user input to prevent XSS
-export function sanitizeInput(input: string): string {
-  return input
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;")
-    .replace(/\//g, "&#x2F;")
-    .trim();
-}
 
 // Rate limiting helper (client-side)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
