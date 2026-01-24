@@ -46,7 +46,7 @@ export const ServerStatusCard = ({
 
     setLoading(true);
     try {
-      const response = await fetch(apiEndpoint);
+      const response = await fetch(apiEndpoint, { credentials: 'include' });
       if (response.ok) {
         const data = await response.json();
         setStatus({

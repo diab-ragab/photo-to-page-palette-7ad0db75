@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://woiendgame.online/api";
+import { apiGet, apiPost } from './apiClient';
 
 export interface VoteSite {
   id: number;
@@ -34,9 +34,7 @@ export const voteSitesApi = {
   // Get all active vote sites (for users)
   async getActiveSites(): Promise<VoteSite[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vote_sites.php?action=list`);
-      if (!response.ok) throw new Error("Failed to fetch vote sites");
-      const data = await response.json();
+      const data = await apiGet<{ sites?: VoteSite[] }>('/vote_sites.php?action=list');
       return data.sites || [];
     } catch {
       // Return demo data for development
@@ -51,9 +49,7 @@ export const voteSitesApi = {
   // Get all vote sites including inactive (for GM)
   async getAllSites(): Promise<VoteSite[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vote_sites.php?action=list_all`);
-      if (!response.ok) throw new Error("Failed to fetch vote sites");
-      const data = await response.json();
+      const data = await apiGet<{ sites?: VoteSite[] }>('/vote_sites.php?action=list_all');
       return data.sites || [];
     } catch {
       return [];
@@ -63,12 +59,7 @@ export const voteSitesApi = {
   // Add new vote site (GM only)
   async addSite(site: VoteSiteFormData): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vote_sites.php`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "add", ...site }),
-      });
-      const result = await response.json();
+      const result = await apiPost<{ success: boolean }>('/vote_sites.php', { action: "add", ...site });
       return result.success;
     } catch {
       return false;
@@ -78,12 +69,7 @@ export const voteSitesApi = {
   // Update vote site (GM only)
   async updateSite(id: number, site: Partial<VoteSiteFormData>): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vote_sites.php`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "update", id, ...site }),
-      });
-      const result = await response.json();
+      const result = await apiPost<{ success: boolean }>('/vote_sites.php', { action: "update", id, ...site });
       return result.success;
     } catch {
       return false;
@@ -93,12 +79,7 @@ export const voteSitesApi = {
   // Delete vote site (GM only)
   async deleteSite(id: number): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vote_sites.php`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", id }),
-      });
-      const result = await response.json();
+      const result = await apiPost<{ success: boolean }>('/vote_sites.php', { action: "delete", id });
       return result.success;
     } catch {
       return false;

@@ -218,7 +218,8 @@ export const GamePass = () => {
       setIsLoadingRewards(true);
       try {
         const response = await fetch(
-          "https://woiendgame.online/api/gamepass_admin.php?action=get_public_rewards"
+          "https://woiendgame.online/api/gamepass_admin.php?action=get_public_rewards",
+          { credentials: 'include' }
         );
         const data = await response.json();
         
@@ -246,7 +247,8 @@ export const GamePass = () => {
       
       try {
         const response = await fetch(
-          `https://woiendgame.online/api/gamepass.php?action=get_status&user_id=${user.username}`
+          `https://woiendgame.online/api/gamepass.php?action=get_status&user_id=${user.username}`,
+          { credentials: 'include' }
         );
         const data = await response.json();
         
@@ -273,6 +275,7 @@ export const GamePass = () => {
       const response = await fetch("https://woiendgame.online/api/gamepass.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',
         body: JSON.stringify({
           action: "claim_reward",
           user_id: user?.username,

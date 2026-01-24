@@ -66,7 +66,8 @@ export default function GMPanel() {
       try {
         // Call your PHP API to check GM status
         const response = await fetch(
-          `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(user.username)}`
+          `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(user.username)}`,
+          { credentials: 'include' }
         );
         const data = await response.json();
         

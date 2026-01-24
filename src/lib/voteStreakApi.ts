@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://woiendgame.online/api";
+import { apiGet, apiPost } from './apiClient';
 
 export interface VoteStreakTier {
   id: number;
@@ -38,11 +38,18 @@ export const voteStreakApi = {
   // Get user's streak data
   async getStreakData(username: string): Promise<VoteStreakData | null> {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/vote_streaks.php?action=get_streak&username=${encodeURIComponent(username)}`
-      );
-      if (!response.ok) throw new Error("Failed to fetch streak data");
-      const data = await response.json();
+      const data = await apiGet<{
+        success?: boolean;
+        current_streak?: number;
+        longest_streak?: number;
+        last_streak_vote?: string;
+        streak_expires_at?: string;
+        current_multiplier?: number;
+        current_tier?: VoteStreakTier;
+        next_tier?: { days: number; multiplier: number; badge_name: string | null };
+        streak_badge?: { name: string; icon: string };
+      }>(`/vote_streaks.php?action=get_streak&username=${encodeURIComponent(username)}`);
+      
       if (data.success) {
         return {
           currentStreak: data.current_streak || 0,
@@ -84,9 +91,7 @@ export const voteStreakApi = {
   // Get all streak tiers (for GM)
   async getAllTiers(): Promise<VoteStreakTier[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vote_streaks.php?action=list_tiers`);
-      if (!response.ok) throw new Error("Failed to fetch streak tiers");
-      const data = await response.json();
+      const data = await apiGet<{ tiers?: VoteStreakTier[] }>('/vote_streaks.php?action=list_tiers');
       return data.tiers || [];
     } catch {
       // Return demo data
@@ -103,12 +108,7 @@ export const voteStreakApi = {
   // Add new tier (GM only)
   async addTier(tier: VoteStreakTierFormData): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vote_streaks.php`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "add_tier", ...tier }),
-      });
-      const result = await response.json();
+      const result = await apiPost<{ success: boolean }>('/vote_streaks.php', { action: "add_tier", ...tier });
       return result.success;
     } catch {
       return false;
@@ -118,12 +118,7 @@ export const voteStreakApi = {
   // Update tier (GM only)
   async updateTier(id: number, tier: Partial<VoteStreakTierFormData>): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vote_streaks.php`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "update_tier", id, ...tier }),
-      });
-      const result = await response.json();
+      const result = await apiPost<{ success: boolean }>('/vote_streaks.php', { action: "update_tier", id, ...tier });
       return result.success;
     } catch {
       return false;
@@ -133,12 +128,7 @@ export const voteStreakApi = {
   // Delete tier (GM only)
   async deleteTier(id: number): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vote_streaks.php`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete_tier", id }),
-      });
-      const result = await response.json();
+      const result = await apiPost<{ success: boolean }>('/vote_streaks.php', { action: "delete_tier", id });
       return result.success;
     } catch {
       return false;
@@ -153,9 +143,9 @@ export const voteStreakApi = {
   // Get streak leaderboard
   async getLeaderboard(): Promise<{ username: string; current_streak: number; longest_streak: number }[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vote_streaks.php?action=leaderboard`);
-      if (!response.ok) throw new Error("Failed to fetch leaderboard");
-      const data = await response.json();
+      const data = await apiGet<{ leaderboard?: { username: string; current_streak: number; longest_streak: number }[] }>(
+        '/vote_streaks.php?action=leaderboard'
+      );
       return data.leaderboard || [];
     } catch {
       return [];
