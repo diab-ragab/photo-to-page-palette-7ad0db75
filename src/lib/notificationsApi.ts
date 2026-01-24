@@ -10,10 +10,21 @@ export interface Notification {
   is_active: number;
 }
 
+const coerceNotificationArray = (value: unknown): Notification[] => {
+  if (Array.isArray(value)) return value as Notification[];
+  if (value && typeof value === "object") {
+    const v = value as Record<string, unknown>;
+    const nested = v.notifications ?? v.data ?? v.items;
+    if (Array.isArray(nested)) return nested as Notification[];
+  }
+  return [];
+};
+
 export const notificationsApi = {
   async getAll(): Promise<Notification[]> {
     try {
-      return await apiGet<Notification[]>('/notifications.php?action=list');
+      const data = await apiGet<unknown>('/notifications.php?action=list');
+      return coerceNotificationArray(data);
     } catch {
       // Silent fail - don't expose errors in production
       return [];

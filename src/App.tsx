@@ -15,6 +15,7 @@ import { RecentPurchases } from "@/components/RecentPurchases";
 import { PageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -62,27 +63,29 @@ const AnimatedRoutes = () => {
 
 const App = () => (
   <HelmetProvider>
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-        <LanguageProvider>
-          <AuthProvider>
-            <CartProvider>
-              <BrowserRouter>
-                <TooltipProvider>
-                  <Toaster />
-                  <Sonner />
-                  <ScrollProgress />
-                  <AnimatedRoutes />
-                  <ScrollToTop />
-                  <RecentPurchases />
-                  <SessionTimeoutWarning />
-                </TooltipProvider>
-              </BrowserRouter>
-            </CartProvider>
-          </AuthProvider>
-        </LanguageProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          <LanguageProvider>
+            <AuthProvider>
+              <CartProvider>
+                <BrowserRouter>
+                  <TooltipProvider>
+                    <Toaster />
+                    <Sonner />
+                    <ScrollProgress />
+                    <AnimatedRoutes />
+                    <ScrollToTop />
+                    <RecentPurchases />
+                    <SessionTimeoutWarning />
+                  </TooltipProvider>
+                </BrowserRouter>
+              </CartProvider>
+            </AuthProvider>
+          </LanguageProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   </HelmetProvider>
 );
 
