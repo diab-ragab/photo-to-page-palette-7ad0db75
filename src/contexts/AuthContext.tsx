@@ -111,7 +111,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Security: GM check uses session-based auth only - no username in URL
   // This prevents enumeration of GM accounts via the endpoint
   const checkGMStatus = useCallback(async (): Promise<boolean> => {
-    if (!user?.username) {
+    // Use ref for latest user to avoid stale closures
+    const currentUser = userRef.current;
+    if (!currentUser?.username) {
       setIsGM(false);
       return false;
     }
@@ -124,14 +126,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const gmStatus = !!data.is_gm;
       setIsGM(gmStatus);
       return gmStatus;
-    } catch {
-      // Fail closed for GM
+    } catch (error) {
+      // Fail closed for GM - but log in dev for debugging
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("GM check failed:", error);
+      }
       setIsGM(false);
       return false;
     } finally {
       setGmLoading(false);
     }
-  }, [user?.username]);
+  }, []);
 
   const login = useCallback(
     (
@@ -165,12 +171,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const logout = useCallback(async () => {
-    try {
-      await apiGet("/auth.php?action=logout");
-    } catch {
-      // ignore
-    }
-
+    // Clear local state immediately for instant UI feedback
     setUser(null);
     setIsGM(false);
     setRememberMe(false);
@@ -180,7 +181,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(REMEMBER_ME_KEY);
     } catch {
-      // ignore
+      // ignore storage errors
+    }
+
+    // Best-effort server-side logout (don't block on network errors)
+    try {
+      await apiGet("/auth.php?action=logout");
+    } catch {
+      // ignore - user is already logged out client-side
     }
   }, []);
 
