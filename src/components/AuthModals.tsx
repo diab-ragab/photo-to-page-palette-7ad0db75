@@ -43,7 +43,7 @@ export const AuthModals = ({
 }: AuthModalsProps) => {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const { login, user } = useAuth();
+  const { login, user, checkGMStatus } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   
@@ -122,22 +122,13 @@ export const AuthModals = ({
         // Login with CSRF token from response
         login(validation.data.login, result.user?.email || "", rememberMe, result.csrf_token);
         
-        // Check if user is GM - uses session auth, no username in URL to prevent enumeration
-        try {
-          const gmResponse = await fetch(
-            "https://woiendgame.online/api/check_gm.php",
-            { credentials: 'include' }
-          );
-          const gmData = await gmResponse.json();
-          
-          if (gmData.is_gm) {
-            setShowGMChoice(true);
-            setLoginData({ login: "", passwd: "" });
-            setRememberMe(false);
-            return;
-          }
-        } catch (gmError) {
-          // Security: Don't expose GM check errors to console in production
+        // Check if user is GM (session-based, no username in URL)
+        const gm = await checkGMStatus();
+        if (gm) {
+          setShowGMChoice(true);
+          setLoginData({ login: "", passwd: "" });
+          setRememberMe(false);
+          return;
         }
         
         toast({
