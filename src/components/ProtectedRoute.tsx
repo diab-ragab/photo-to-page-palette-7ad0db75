@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import { AppLoadingSkeleton } from "@/components/AppLoadingSkeleton";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -35,9 +36,12 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }, [isLoggedIn, hasPersistedUser]);
 
   if (!isLoggedIn && hasPersistedUser && !gracePeriodExpired) {
-    if (location.pathname === "/dashboard") return <DashboardSkeleton />;
+    // Handle trailing slashes and child dashboard routes (e.g. /dashboard/)
+    if (location.pathname === "/dashboard" || location.pathname.startsWith("/dashboard/")) {
+      return <DashboardSkeleton />;
+    }
 
-    return <div className="min-h-screen bg-background" aria-busy="true" />;
+    return <AppLoadingSkeleton />;
   }
 
   if (!isLoggedIn) {
