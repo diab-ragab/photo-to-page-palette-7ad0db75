@@ -184,34 +184,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Initial hydration: restore server session even when we didn't persist localStorage.
+  // Initial hydration: restore server session and GM status.
   useEffect(() => {
     let cancelled = false;
 
     const hydrate = async () => {
       setLoading(true);
-      await checkSession();
+      const isAuthenticated = await checkSession();
       if (cancelled) return;
       didInitialHydration.current = true;
       setLoading(false);
+
+      // Only check GM status after successful session restoration
+      if (isAuthenticated && userRef.current?.username) {
+        checkGMStatus();
+      }
     };
 
     hydrate();
     return () => {
       cancelled = true;
     };
-  }, [checkSession]);
+  }, [checkSession, checkGMStatus]);
 
-  // If the user changes later (login/logout), sync against server once.
+  // If the user logs in later (after initial hydration), check GM status
   useEffect(() => {
     if (!didInitialHydration.current) return;
-    if (user?.username) {
-      checkSession();
-    }
-  }, [user?.username, checkSession]);
-
-  // Check GM status when user is available
-  useEffect(() => {
     if (user?.username) {
       checkGMStatus();
     } else {
