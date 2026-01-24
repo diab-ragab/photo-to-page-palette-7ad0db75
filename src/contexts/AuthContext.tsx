@@ -101,6 +101,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user?.username]);
 
+  // Security: GM check uses session-based auth only - no username in URL
+  // This prevents enumeration of GM accounts via the endpoint
   const checkGMStatus = useCallback(async (): Promise<boolean> => {
     if (!user?.username) {
       setIsGM(false);
@@ -109,9 +111,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setGmLoading(true);
     try {
-      const data = await apiGet<{ is_gm?: boolean }>(
-        `/check_gm.php?user=${encodeURIComponent(user.username)}`
-      );
+      // Backend validates the CURRENT session user's GM status
+      const data = await apiGet<{ is_gm?: boolean }>("/check_gm.php");
 
       const gmStatus = !!data.is_gm;
       setIsGM(gmStatus);

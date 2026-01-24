@@ -65,6 +65,7 @@ export default function GMPanel() {
   });
 
   // Check if user is GM from your MySQL database
+  // Security: Uses session-based auth only - no username in URL to prevent enumeration
   useEffect(() => {
     const checkGMStatus = async () => {
       if (!isLoggedIn || !user) {
@@ -73,9 +74,9 @@ export default function GMPanel() {
       }
 
       try {
-        // Call your PHP API to check GM status
+        // Backend validates the CURRENT session user's GM status
         const response = await fetch(
-          `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(user.username)}`,
+          "https://woiendgame.online/api/check_gm.php",
           { credentials: 'include' }
         );
         const data = await response.json();

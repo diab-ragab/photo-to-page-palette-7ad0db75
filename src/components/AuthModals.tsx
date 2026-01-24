@@ -122,10 +122,10 @@ export const AuthModals = ({
         // Login with CSRF token from response
         login(validation.data.login, result.user?.email || "", rememberMe, result.csrf_token);
         
-        // Check if user is GM
+        // Check if user is GM - uses session auth, no username in URL to prevent enumeration
         try {
           const gmResponse = await fetch(
-            `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(validation.data.login)}`,
+            "https://woiendgame.online/api/check_gm.php",
             { credentials: 'include' }
           );
           const gmData = await gmResponse.json();
