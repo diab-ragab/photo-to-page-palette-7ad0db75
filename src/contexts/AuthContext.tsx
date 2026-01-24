@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { setCsrfToken, clearCsrfToken, apiGet } from "@/lib/apiClient";
 
 interface User {
@@ -12,6 +20,7 @@ interface AuthContextType {
   isGM: boolean;
   gmLoading: boolean;
   rememberMe: boolean;
+  loading: boolean;
   login: (username: string, email: string, rememberMe?: boolean, csrfToken?: string) => void;
   logout: () => void;
   checkGMStatus: () => Promise<boolean>;
@@ -30,22 +39,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return null;
-      
+
       const parsed = JSON.parse(saved);
-      // Security: Only restore username and email, never trust stored isGM
-      if (parsed && typeof parsed.username === "string" && typeof parsed.email === "string") {
+      if (
+        parsed &&
+        typeof parsed.username === "string" &&
+        typeof parsed.email === "string"
+      ) {
         return { username: parsed.username, email: parsed.email };
       }
+
       return null;
     } catch {
-      // If parsing fails, clear potentially corrupted data
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
   });
-  
+
+  const [loading, setLoading] = useState(true);
   const [gmLoading, setGmLoading] = useState(false);
   const [isGM, setIsGM] = useState(false);
+
   const [rememberMe, setRememberMe] = useState(() => {
     try {
       return localStorage.getItem(REMEMBER_ME_KEY) === "true";
@@ -56,30 +70,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Check if session is still valid on the server
   const checkSession = useCallback(async (): Promise<boolean> => {
+    if (!user?.username) return false;
+
     try {
-      const data = await apiGet<{ authenticated: boolean; user?: { username: string; email: string }; csrf_token?: string }>(
-        "/auth.php?action=check_session"
-      );
-      
+      const data = await apiGet<{
+        authenticated: boolean;
+        user?: { username: string; email: string };
+        csrf_token?: string;
+      }>("/auth.php?action=check_session");
+
       if (data.authenticated && data.user) {
         setUser({ username: data.user.username, email: data.user.email || "" });
+
         if (data.csrf_token) {
           setCsrfToken(data.csrf_token);
         }
+
         return true;
-      } else {
-        // Session expired - clear local state
-        setUser(null);
-        setIsGM(false);
-        clearCsrfToken();
-        localStorage.removeItem(STORAGE_KEY);
-        return false;
       }
-    } catch {
-      // Network error - keep local state but flag as potentially stale
+
+      // Session expired - clear local state
+      setUser(null);
+      setIsGM(false);
+      clearCsrfToken();
+      localStorage.removeItem(STORAGE_KEY);
       return false;
+    } catch {
+      // Fail-open: if network/server fails, don't lock user on skeleton
+      return true;
     }
-  }, []);
+  }, [user?.username]);
 
   const checkGMStatus = useCallback(async (): Promise<boolean> => {
     if (!user?.username) {
@@ -92,13 +112,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const data = await apiGet<{ is_gm?: boolean }>(
         `/check_gm.php?user=${encodeURIComponent(user.username)}`
       );
-      
-      // Security: GM status is stored in state only, never in localStorage
+
       const gmStatus = !!data.is_gm;
       setIsGM(gmStatus);
       return gmStatus;
     } catch {
-      // Security: Fail closed - if GM check fails, treat as non-GM
+      // Fail closed for GM
       setIsGM(false);
       return false;
     } finally {
@@ -106,43 +125,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user?.username]);
 
-  const login = useCallback((username: string, email: string, remember: boolean = false, csrfTokenValue?: string) => {
-    // Security: Only store non-sensitive data
-    const userData = { username, email };
-    setUser(userData);
-    setIsGM(false); // Reset GM status, will be checked separately
-    setRememberMe(remember);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
-    localStorage.setItem(REMEMBER_ME_KEY, String(remember));
-    
-    // Store CSRF token if provided
-    if (csrfTokenValue) {
-      setCsrfToken(csrfTokenValue);
-    }
-  }, []);
+  const login = useCallback(
+    (
+      username: string,
+      email: string,
+      remember: boolean = false,
+      csrfTokenValue?: string
+    ) => {
+      const userData: User = { username, email };
+
+      setUser(userData);
+      setIsGM(false);
+      setRememberMe(remember);
+
+      try {
+        if (remember) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+        localStorage.setItem(REMEMBER_ME_KEY, String(remember));
+      } catch {
+        // ignore storage errors
+      }
+
+      if (csrfTokenValue) {
+        setCsrfToken(csrfTokenValue);
+      }
+    },
+    []
+  );
 
   const logout = useCallback(async () => {
-    // Call server logout endpoint to destroy session
     try {
       await apiGet("/auth.php?action=logout");
     } catch {
-      // Continue with local logout even if server call fails
+      // ignore
     }
-    
+
     setUser(null);
     setIsGM(false);
     setRememberMe(false);
     clearCsrfToken();
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(REMEMBER_ME_KEY);
+
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(REMEMBER_ME_KEY);
+    } catch {
+      // ignore
+    }
   }, []);
 
-  // Check session on mount if user data exists
+  // Boot: mark loading false after initial mount
+  useEffect(() => {
+    setLoading(false);
+  }, []);
+
+  // Check session whenever user changes
   useEffect(() => {
     if (user?.username) {
       checkSession();
     }
-  }, []); // Only on mount
+  }, [user?.username, checkSession]);
 
   // Check GM status when user is available
   useEffect(() => {
@@ -153,21 +197,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user?.username, checkGMStatus]);
 
-  return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isLoggedIn: !!user, 
+  const value = useMemo<AuthContextType>(
+    () => ({
+      user,
+      isLoggedIn: !!user,
       isGM,
       gmLoading,
       rememberMe,
-      login, 
+      loading,
+      login,
       logout,
       checkGMStatus,
-      checkSession
-    }}>
-      {children}
-    </AuthContext.Provider>
+      checkSession,
+    }),
+    [user, isGM, gmLoading, rememberMe, loading, login, logout, checkGMStatus, checkSession]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

@@ -15,6 +15,7 @@ import { RecentPurchases } from "@/components/RecentPurchases";
 import { PageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
+
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
@@ -35,9 +36,9 @@ const queryClient = new QueryClient();
 
 const AnimatedRoutes = () => {
   const location = useLocation();
-  
+
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence mode="sync" initial={false}>
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<PageTransition><Index /></PageTransition>} />
         <Route path="/dashboard" element={<PageTransition><ProtectedRoute><Dashboard /></ProtectedRoute></PageTransition>} />
@@ -66,17 +67,17 @@ const App = () => (
         <LanguageProvider>
           <AuthProvider>
             <CartProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <ScrollProgress />
-                <BrowserRouter>
+              <BrowserRouter>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <ScrollProgress />
                   <AnimatedRoutes />
                   <ScrollToTop />
                   <RecentPurchases />
                   <SessionTimeoutWarning />
-                </BrowserRouter>
-              </TooltipProvider>
+                </TooltipProvider>
+              </BrowserRouter>
             </CartProvider>
           </AuthProvider>
         </LanguageProvider>
