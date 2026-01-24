@@ -37,11 +37,8 @@ const Dashboard = () => {
     uptime: ""
   });
 
-  useEffect(() => {
-    if (!isLoggedIn) {
-      navigate("/");
-    }
-  }, [isLoggedIn, navigate]);
+  // Note: ProtectedRoute already handles redirect to "/" if not logged in
+  // This is just a backup for edge cases
 
   // Streak expiration warning notification
   const hasShownWarning = useRef(false);
@@ -122,7 +119,14 @@ const Dashboard = () => {
   const vipProgress = getNextVipThreshold(voteData.vipPoints);
   const progressPercent = ((voteData.vipPoints - vipProgress.current) / (vipProgress.next - vipProgress.current)) * 100;
 
-  if (!isLoggedIn) return null;
+  // Show loading state while checking auth - ProtectedRoute handles redirect
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
