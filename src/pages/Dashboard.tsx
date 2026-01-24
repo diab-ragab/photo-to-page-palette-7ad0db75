@@ -10,6 +10,7 @@ import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
 import { VoteSiteCard } from "@/components/VoteSiteCard";
 import { VoteStreakCard } from "@/components/VoteStreakCard";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -119,13 +120,9 @@ const Dashboard = () => {
   const vipProgress = getNextVipThreshold(voteData.vipPoints);
   const progressPercent = ((voteData.vipPoints - vipProgress.current) / (vipProgress.next - vipProgress.current)) * 100;
 
-  // Show loading state while checking auth - ProtectedRoute handles redirect
+  // Show skeleton loading state while checking auth - ProtectedRoute handles redirect
   if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
