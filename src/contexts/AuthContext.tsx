@@ -149,6 +149,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userData: User = { username, email };
 
       setUser(userData);
+      // Keep ref in sync immediately so downstream checks (GM check) can run right after login.
+      userRef.current = userData;
       setIsGM(false);
       setRememberMe(remember);
 
