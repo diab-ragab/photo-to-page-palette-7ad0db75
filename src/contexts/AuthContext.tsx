@@ -6,6 +6,7 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
 import { setCsrfToken, clearCsrfToken, apiGet } from "@/lib/apiClient";
 
@@ -59,6 +60,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [gmLoading, setGmLoading] = useState(false);
   const [isGM, setIsGM] = useState(false);
+  const didInitialHydration = useRef(false);
+  const userRef = useRef<User | null>(user);
 
   const [rememberMe, setRememberMe] = useState(() => {
     try {
@@ -68,10 +71,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   });
 
+  // Keep a ref to the latest user so callbacks can stay stable.
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   // Check if session is still valid on the server
   const checkSession = useCallback(async (): Promise<boolean> => {
-    if (!user?.username) return false;
-
     try {
       const data = await apiGet<{
         authenticated: boolean;
@@ -96,10 +102,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem(STORAGE_KEY);
       return false;
     } catch {
-      // Fail-open: if network/server fails, don't lock user on skeleton
-      return true;
+      // If the network is down, keep whatever client state we already have.
+      // If we had no user, we must treat as logged out.
+      return !!userRef.current;
     }
-  }, [user?.username]);
+  }, []);
 
   // Security: GM check uses session-based auth only - no username in URL
   // This prevents enumeration of GM accounts via the endpoint
@@ -177,13 +184,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Boot: mark loading false after initial mount
+  // Initial hydration: restore server session even when we didn't persist localStorage.
   useEffect(() => {
-    setLoading(false);
-  }, []);
+    let cancelled = false;
 
-  // Check session whenever user changes
+    const hydrate = async () => {
+      setLoading(true);
+      await checkSession();
+      if (cancelled) return;
+      didInitialHydration.current = true;
+      setLoading(false);
+    };
+
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [checkSession]);
+
+  // If the user changes later (login/logout), sync against server once.
   useEffect(() => {
+    if (!didInitialHydration.current) return;
     if (user?.username) {
       checkSession();
     }

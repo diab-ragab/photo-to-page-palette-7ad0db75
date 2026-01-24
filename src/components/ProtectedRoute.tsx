@@ -15,11 +15,24 @@
  * all data operations require valid server-side authentication.
  */
 import { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import { AppLoadingSkeleton } from "@/components/AppLoadingSkeleton";
 
 export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
-  const { isLoggedIn } = useAuth();
-  if (!isLoggedIn) return <Navigate to="/" replace />;
+  const { isLoggedIn, loading } = useAuth();
+  const location = useLocation();
+
+  // During auth hydration, never render a blank screen.
+  if (loading) {
+    return location.pathname.startsWith("/dashboard") ? (
+      <DashboardSkeleton />
+    ) : (
+      <AppLoadingSkeleton />
+    );
+  }
+
+  if (!isLoggedIn) return <Navigate to="/" replace state={{ from: location.pathname }} />;
   return <>{children}</>;
 };
