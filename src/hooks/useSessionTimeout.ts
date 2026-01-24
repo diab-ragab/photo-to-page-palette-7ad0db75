@@ -1,10 +1,13 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { apiGet, setCsrfToken } from "@/lib/apiClient";
 
 const DEFAULT_SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const REMEMBER_ME_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const WARNING_BEFORE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes warning before timeout
+const SESSION_REFRESH_INTERVAL_MS = 10 * 60 * 1000; // Refresh session every 10 minutes if active
+const ACTIVITY_THRESHOLD_MS = 5 * 60 * 1000; // Consider user "active" if activity in last 5 minutes
 
 interface UseSessionTimeoutOptions {
   enabled?: boolean;
@@ -22,9 +25,11 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showWarning, setShowWarning] = useState(false);
   const [remainingTime, setRemainingTime] = useState(0);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const clearAllTimers = useCallback(() => {
     if (timeoutRef.current) {
@@ -39,7 +44,42 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
       clearInterval(countdownRef.current);
       countdownRef.current = null;
     }
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
+    }
   }, []);
+
+  // Refresh session on the server
+  const refreshServerSession = useCallback(async (): Promise<boolean> => {
+    if (isRefreshing) return false;
+    
+    setIsRefreshing(true);
+    try {
+      const data = await apiGet<{
+        authenticated: boolean;
+        refreshed?: boolean;
+        csrf_token?: string;
+        expires_at?: string;
+      }>("/auth.php?action=refresh_session");
+      
+      if (data.authenticated) {
+        // Update CSRF token if a new one is provided
+        if (data.csrf_token) {
+          setCsrfToken(data.csrf_token);
+        }
+        return true;
+      } else {
+        // Session is no longer valid on server
+        return false;
+      }
+    } catch {
+      // Network error - don't logout, just continue with local timeout
+      return false;
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing]);
 
   const handleTimeout = useCallback(() => {
     clearAllTimers();
@@ -93,19 +133,55 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     }, sessionTimeoutMs);
   }, [isLoggedIn, enabled, clearAllTimers, handleWarning, handleTimeout, sessionTimeoutMs]);
 
-  const extendSession = useCallback(() => {
+  const extendSession = useCallback(async () => {
     setShowWarning(false);
-    resetTimer();
     
-    const extendMessage = rememberMe 
-      ? "Your session has been extended for another 7 days."
-      : "Your session has been extended for another 30 minutes.";
+    // Try to refresh server session when user clicks "Stay logged in"
+    const refreshed = await refreshServerSession();
     
-    toast({
-      title: "Session Extended",
-      description: extendMessage,
-    });
-  }, [resetTimer, toast, rememberMe]);
+    if (refreshed) {
+      resetTimer();
+      const extendMessage = rememberMe 
+        ? "Your session has been extended for another 7 days."
+        : "Your session has been extended for another 30 minutes.";
+      
+      toast({
+        title: "Session Extended",
+        description: extendMessage,
+      });
+    } else {
+      // Server session expired or error - just reset local timer
+      resetTimer();
+      toast({
+        title: "Session Extended",
+        description: "Your session has been extended locally.",
+      });
+    }
+  }, [resetTimer, refreshServerSession, toast, rememberMe]);
+
+  // Automatic session refresh when user is active
+  useEffect(() => {
+    if (!isLoggedIn || !enabled) return;
+
+    const checkAndRefreshSession = async () => {
+      const timeSinceLastActivity = Date.now() - lastActivityRef.current;
+      
+      // Only refresh if user has been active recently
+      if (timeSinceLastActivity < ACTIVITY_THRESHOLD_MS) {
+        await refreshServerSession();
+      }
+    };
+
+    // Set up periodic session refresh
+    refreshIntervalRef.current = setInterval(checkAndRefreshSession, SESSION_REFRESH_INTERVAL_MS);
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    };
+  }, [isLoggedIn, enabled, refreshServerSession]);
 
   // Set up activity listeners
   useEffect(() => {
@@ -126,6 +202,9 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     // Throttle activity updates to prevent excessive timer resets
     let throttleTimeout: NodeJS.Timeout | null = null;
     const throttledResetTimer = () => {
+      // Always update last activity time
+      lastActivityRef.current = Date.now();
+      
       if (throttleTimeout) return;
       
       throttleTimeout = setTimeout(() => {
@@ -170,5 +249,6 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     remainingTime,
     extendSession,
     resetTimer,
+    isRefreshing,
   };
 };
