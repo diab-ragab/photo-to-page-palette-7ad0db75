@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown, LayoutDashboard, Shield, Loader2 } from "lucide-react";
+import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown, LayoutDashboard, Shield, Loader2, AlertTriangle } from "lucide-react";
 import { NotificationsPopover } from "@/components/NotificationsPopover";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -39,7 +39,7 @@ export const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/";
-  const { user, isLoggedIn, isGM, gmLoading, logout } = useAuth();
+  const { user, isLoggedIn, isGM, gmLoading, gmError, checkGMStatus, logout } = useAuth();
 
   const navLinks = [
     { label: t('nav.home'), href: "#hero" },
@@ -114,6 +114,15 @@ export const Navbar = () => {
                         GM
                       </span>
                     )}
+                    {!isGM && gmError && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-destructive/10 text-destructive border border-destructive/20"
+                        title="Unable to verify GM status"
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                        Perms
+                      </span>
+                    )}
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -130,6 +139,20 @@ export const Navbar = () => {
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Checking permissions...
                     </DropdownMenuItem>
+                  ) : gmError ? (
+                    <>
+                      <DropdownMenuItem disabled className="cursor-default text-destructive focus:text-destructive">
+                        <AlertTriangle className="mr-2 h-4 w-4" />
+                        GM check failed
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => checkGMStatus()}
+                        className="cursor-pointer"
+                      >
+                        <Loader2 className="mr-2 h-4 w-4" />
+                        Retry permissions
+                      </DropdownMenuItem>
+                    </>
                   ) : isGM && (
                     <DropdownMenuItem 
                       onClick={() => navigate('/gm-panel')}
@@ -256,12 +279,35 @@ export const Navbar = () => {
                       GM
                     </span>
                   )}
+                  {!isGM && gmError && (
+                    <span
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-destructive/10 text-destructive border border-destructive/20"
+                      title="Unable to verify GM status"
+                    >
+                      <AlertTriangle className="h-3 w-3" />
+                      Perms
+                    </span>
+                  )}
                 </div>
                 {gmLoading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Checking permissions...
                   </div>
+                ) : gmError ? (
+                  <>
+                    <div className="flex items-center gap-2 text-sm text-destructive py-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      GM check failed
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => checkGMStatus()}
+                    >
+                      Retry permissions
+                    </Button>
+                  </>
                 ) : isGM && (
                   <Link
                     to="/gm-panel"
