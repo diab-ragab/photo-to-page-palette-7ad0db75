@@ -1,16 +1,13 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVoteSystem } from "@/hooks/useVoteSystem";
-import { toast } from "sonner";
 import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
 import { VoteSiteCard } from "@/components/VoteSiteCard";
-import { VoteStreakCard } from "@/components/VoteStreakCard";
-import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -31,60 +28,24 @@ import {
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isLoggedIn, isGM, logout } = useAuth();
-  const { voteData, voteSites, streakData, loading, sitesLoading, streakLoading, submitVote, availableVotes, totalSites } = useVoteSystem();
+  const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites } = useVoteSystem();
   const [serverStats, setServerStats] = useState({
     players: 0,
     accounts: 0,
     uptime: ""
   });
 
-  // Note: ProtectedRoute already handles redirect to "/" if not logged in
-  // This is just a backup for edge cases
-
-  // Streak expiration warning notification
-  const hasShownWarning = useRef(false);
-  
   useEffect(() => {
-    if (!streakData?.streakExpiresAt || streakData.currentStreak === 0) {
-      hasShownWarning.current = false;
-      return;
+    if (!isLoggedIn) {
+      navigate("/");
     }
-
-    const checkExpiration = () => {
-      const now = new Date().getTime();
-      const expires = new Date(streakData.streakExpiresAt!).getTime();
-      const diff = expires - now;
-      const hoursRemaining = diff / (1000 * 60 * 60);
-
-      // Show warning when less than 6 hours remain (only once per session)
-      if (hoursRemaining > 0 && hoursRemaining < 6 && !hasShownWarning.current) {
-        hasShownWarning.current = true;
-        const hours = Math.floor(hoursRemaining);
-        const minutes = Math.floor((hoursRemaining - hours) * 60);
-        
-        toast.warning("🔥 Your streak is about to expire!", {
-          description: `Vote within ${hours}h ${minutes}m to keep your ${streakData.currentStreak}-day streak!`,
-          duration: 10000,
-          action: {
-            label: "Vote Now",
-            onClick: () => {
-              document.getElementById("vote-section")?.scrollIntoView({ behavior: "smooth" });
-            },
-          },
-        });
-      }
-    };
-
-    checkExpiration();
-    const interval = setInterval(checkExpiration, 60000); // Check every minute
-    return () => clearInterval(interval);
-  }, [streakData]);
+  }, [isLoggedIn, navigate]);
 
   // Fetch server stats
   useEffect(() => {
     const fetchServerStats = async () => {
       try {
-        const response = await fetch("https://woiendgame.online/api/server-status.php", { credentials: 'include' });
+        const response = await fetch("https://woiendgame.online/api/server-status.php");
         const data = await response.json();
         setServerStats({
           players: data.players || 0,
@@ -120,10 +81,7 @@ const Dashboard = () => {
   const vipProgress = getNextVipThreshold(voteData.vipPoints);
   const progressPercent = ((voteData.vipPoints - vipProgress.current) / (vipProgress.next - vipProgress.current)) * 100;
 
-  // Show skeleton loading state while checking auth - ProtectedRoute handles redirect
-  if (!isLoggedIn) {
-    return <DashboardSkeleton />;
-  }
+  if (!isLoggedIn) return null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -241,7 +199,7 @@ const Dashboard = () => {
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Vote Section */}
-          <Card id="vote-section" className="lg:col-span-2 bg-card border-primary/20">
+          <Card className="lg:col-span-2 bg-card border-primary/20">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -305,7 +263,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Profile, Streak & VIP Progress */}
+          {/* Profile & VIP Progress */}
           <div className="space-y-6">
             {/* Profile Card */}
             <Card className="bg-card border-primary/20">
@@ -332,8 +290,8 @@ const Dashboard = () => {
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={async () => {
-                    await logout();
+                  onClick={() => {
+                    logout();
                     navigate("/");
                   }}
                 >
@@ -341,9 +299,6 @@ const Dashboard = () => {
                 </Button>
               </CardContent>
             </Card>
-
-            {/* Vote Streak Card */}
-            <VoteStreakCard streakData={streakData} loading={streakLoading} />
 
             {/* VIP Progress Card */}
             <Card className="bg-card border-primary/20">

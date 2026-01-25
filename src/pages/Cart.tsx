@@ -127,11 +127,6 @@ const Cart = () => {
                 </div>
               </div>
 
-              <p className="text-xs text-muted-foreground mb-4 text-center">
-                By purchasing, you agree this is a digital product delivered to your WOI Endgame account. No refunds once delivered.{" "}
-                <Link to="/refund" className="text-primary hover:underline">Learn more</Link>
-              </p>
-
               <Link to="/checkout">
                 <Button className="w-full gap-2" size="lg">
                   {t('cart.checkout')}

@@ -62,20 +62,13 @@ export const NotificationsPopover = () => {
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [readIds, setReadIds] = useState<number[]>(() => {
     const saved = localStorage.getItem("woi_read_notifications");
-    if (!saved) return [];
-    try {
-      const parsed: unknown = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.filter((n): n is number => typeof n === "number");
-    } catch {
-      return [];
-    }
+    return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
     const fetchNotifications = async () => {
       const data = await notificationsApi.getAll();
-      setNotifications(Array.isArray(data) ? data : []);
+      setNotifications(data);
     };
 
     fetchNotifications();

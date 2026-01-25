@@ -1,4 +1,5 @@
-import { apiGet, apiPost, apiPut, apiDelete } from './apiClient';
+// Configure your PHP API URL here
+const API_BASE_URL = 'https://woiendgame.online/api';
 
 export interface Notification {
   id: number;
@@ -10,21 +11,12 @@ export interface Notification {
   is_active: number;
 }
 
-const coerceNotificationArray = (value: unknown): Notification[] => {
-  if (Array.isArray(value)) return value as Notification[];
-  if (value && typeof value === "object") {
-    const v = value as Record<string, unknown>;
-    const nested = v.notifications ?? v.data ?? v.items;
-    if (Array.isArray(nested)) return nested as Notification[];
-  }
-  return [];
-};
-
 export const notificationsApi = {
   async getAll(): Promise<Notification[]> {
     try {
-      const data = await apiGet<unknown>('/notifications.php?action=list');
-      return coerceNotificationArray(data);
+      const response = await fetch(`${API_BASE_URL}/notifications.php?action=list`);
+      if (!response.ok) throw new Error('Failed to fetch notifications');
+      return await response.json();
     } catch {
       // Silent fail - don't expose errors in production
       return [];
@@ -33,7 +25,12 @@ export const notificationsApi = {
 
   async create(notification: { title: string; message: string; type: string; created_by: string }): Promise<boolean> {
     try {
-      const result = await apiPost<{ success: boolean }>('/notifications.php?action=create', notification);
+      const response = await fetch(`${API_BASE_URL}/notifications.php?action=create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notification),
+      });
+      const result = await response.json();
       return result.success;
     } catch {
       // Silent fail - don't expose errors in production
@@ -43,7 +40,12 @@ export const notificationsApi = {
 
   async update(id: number, notification: { title: string; message: string; type: string }): Promise<boolean> {
     try {
-      const result = await apiPut<{ success: boolean }>(`/notifications.php?action=update&id=${id}`, notification);
+      const response = await fetch(`${API_BASE_URL}/notifications.php?action=update&id=${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notification),
+      });
+      const result = await response.json();
       return result.success;
     } catch {
       // Silent fail - don't expose errors in production
@@ -53,7 +55,10 @@ export const notificationsApi = {
 
   async delete(id: number): Promise<boolean> {
     try {
-      const result = await apiDelete<{ success: boolean }>(`/notifications.php?action=delete&id=${id}`);
+      const response = await fetch(`${API_BASE_URL}/notifications.php?action=delete&id=${id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
       return result.success;
     } catch {
       // Silent fail - don't expose errors in production

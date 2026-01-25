@@ -18,8 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { notificationsApi, Notification } from "@/lib/notificationsApi";
 import { GamePassRewardsManager } from "@/components/gm/GamePassRewardsManager";
 import { VoteSitesManager } from "@/components/gm/VoteSitesManager";
-import { VoteStreakManager } from "@/components/gm/VoteStreakManager";
-import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User, Eye, Pencil, X, Save, ArrowRightLeft, LayoutDashboard, Gift, Bell, Vote, Flame } from "lucide-react";
+import { Shield, Plus, Trash2, Send, Megaphone, Wrench, Calendar, Sparkles, AlertTriangle, User, Eye, Pencil, X, Save, ArrowRightLeft, LayoutDashboard, Gift, Bell, Vote } from "lucide-react";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -30,17 +29,8 @@ const typeIcons = {
   event: Calendar,
 };
 
-/**
- * GM Panel - Admin interface for game management.
- * 
- * SECURITY NOTE: The client-side GM check (checkGMStatus) is for UX only.
- * All privileged operations (create/update/delete notifications, manage 
- * vote sites, etc.) are protected server-side by the requireGM() middleware
- * in the PHP backend. Even if an attacker bypasses the client-side redirect,
- * they cannot perform any admin actions without a valid GM session.
- */
 export default function GMPanel() {
-  const { user, isLoggedIn, checkGMStatus } = useAuth();
+  const { user, isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -65,18 +55,21 @@ export default function GMPanel() {
   });
 
   // Check if user is GM from your MySQL database
-  // Security: Uses session-based auth only - no username in URL to prevent enumeration
   useEffect(() => {
-    const verifyGM = async () => {
+    const checkGMStatus = async () => {
       if (!isLoggedIn || !user) {
         navigate("/");
         return;
       }
 
       try {
-        // Backend validates the CURRENT session user's GM status
-        const gm = await checkGMStatus();
-        if (gm) {
+        // Call your PHP API to check GM status
+        const response = await fetch(
+          `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(user.username)}`
+        );
+        const data = await response.json();
+        
+        if (data.is_gm) {
           setIsGM(true);
         } else {
           toast({
@@ -99,8 +92,8 @@ export default function GMPanel() {
       }
     };
 
-    verifyGM();
-  }, [isLoggedIn, user, navigate, toast, checkGMStatus]);
+    checkGMStatus();
+  }, [isLoggedIn, user, navigate, toast]);
 
   useEffect(() => {
     if (isGM) {
@@ -343,7 +336,7 @@ export default function GMPanel() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-display font-bold">GM Panel</h1>
-              <p className="text-sm md:text-base text-muted-foreground">Manage notifications, game pass, vote sites & streaks</p>
+              <p className="text-sm md:text-base text-muted-foreground">Manage notifications, game pass & vote sites</p>
             </div>
           </div>
           
@@ -360,7 +353,7 @@ export default function GMPanel() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="notifications" className="gap-2">
               <Bell className="h-4 w-4" />
               <span className="hidden sm:inline">Notifications</span>
@@ -375,11 +368,6 @@ export default function GMPanel() {
               <Vote className="h-4 w-4" />
               <span className="hidden sm:inline">Vote Sites</span>
               <span className="sm:hidden">Votes</span>
-            </TabsTrigger>
-            <TabsTrigger value="streaks" className="gap-2">
-              <Flame className="h-4 w-4" />
-              <span className="hidden sm:inline">Streaks</span>
-              <span className="sm:hidden">🔥</span>
             </TabsTrigger>
           </TabsList>
 
@@ -626,10 +614,6 @@ export default function GMPanel() {
 
           <TabsContent value="votesites">
             <VoteSitesManager />
-          </TabsContent>
-
-          <TabsContent value="streaks">
-            <VoteStreakManager />
           </TabsContent>
         </Tabs>
       </main>

@@ -1,14 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
-import { setCsrfToken, clearCsrfToken, apiGet } from "@/lib/apiClient";
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 
 interface User {
   username: string;
@@ -20,13 +10,10 @@ interface AuthContextType {
   isLoggedIn: boolean;
   isGM: boolean;
   gmLoading: boolean;
-  gmError: boolean;
   rememberMe: boolean;
-  loading: boolean;
-  login: (username: string, email: string, rememberMe?: boolean, csrfToken?: string) => void;
+  login: (username: string, email: string, rememberMe?: boolean) => void;
   logout: () => void;
   checkGMStatus: () => Promise<boolean>;
-  checkSession: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,30 +28,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return null;
-
+      
       const parsed = JSON.parse(saved);
-      if (
-        parsed &&
-        typeof parsed.username === "string" &&
-        typeof parsed.email === "string"
-      ) {
+      // Security: Only restore username and email, never trust stored isGM
+      if (parsed && typeof parsed.username === "string" && typeof parsed.email === "string") {
         return { username: parsed.username, email: parsed.email };
       }
-
       return null;
     } catch {
+      // If parsing fails, clear potentially corrupted data
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
   });
-
-  const [loading, setLoading] = useState(true);
+  
   const [gmLoading, setGmLoading] = useState(false);
   const [isGM, setIsGM] = useState(false);
-  const [gmError, setGmError] = useState(false);
-  const didInitialHydration = useRef(false);
-  const userRef = useRef<User | null>(user);
-
   const [rememberMe, setRememberMe] = useState(() => {
     try {
       return localStorage.getItem(REMEMBER_ME_KEY) === "true";
@@ -73,187 +52,85 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   });
 
-  // Keep a ref to the latest user so callbacks can stay stable.
-  useEffect(() => {
-    userRef.current = user;
-  }, [user]);
-
-  // Check if session is still valid on the server
-  const checkSession = useCallback(async (): Promise<boolean> => {
-    try {
-      const data = await apiGet<{
-        authenticated: boolean;
-        user?: { username: string; email: string };
-        csrf_token?: string;
-      }>("/auth.php?action=check_session");
-
-      if (data.authenticated && data.user) {
-        setUser({ username: data.user.username, email: data.user.email || "" });
-
-        if (data.csrf_token) {
-          setCsrfToken(data.csrf_token);
-        }
-
-        return true;
-      }
-
-      // Session expired - clear local state
-      setUser(null);
-      setIsGM(false);
-      clearCsrfToken();
-      localStorage.removeItem(STORAGE_KEY);
-      return false;
-    } catch {
-      // If the network is down, keep whatever client state we already have.
-      // If we had no user, we must treat as logged out.
-      return !!userRef.current;
-    }
-  }, []);
-
-  // Security: GM check uses session-based auth only - no username in URL
-  // This prevents enumeration of GM accounts via the endpoint
   const checkGMStatus = useCallback(async (): Promise<boolean> => {
-    // Use ref for latest user to avoid stale closures
-    const currentUser = userRef.current;
-    if (!currentUser?.username) {
+    if (!user?.username) {
       setIsGM(false);
-      setGmError(false);
       return false;
     }
 
     setGmLoading(true);
-    setGmError(false);
     try {
-      // Backend validates the CURRENT session user's GM status
-      const data = await apiGet<{ is_gm?: boolean }>("/check_gm.php");
-
+      const response = await fetch(
+        `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(user.username)}`,
+        {
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error("GM check failed");
+      }
+      
+      const data = await response.json();
+      
+      // Security: GM status is stored in state only, never in localStorage
       const gmStatus = !!data.is_gm;
       setIsGM(gmStatus);
-      setGmError(false);
       return gmStatus;
     } catch (error) {
-      // Fail closed for GM - but log in dev for debugging
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.warn("GM check failed:", error);
-      }
+      // Security: Don't expose GM check errors in production
+      // Security: Fail closed - if GM check fails, treat as non-GM
       setIsGM(false);
-      setGmError(true);
       return false;
     } finally {
       setGmLoading(false);
     }
+  }, [user?.username]);
+
+  const login = useCallback((username: string, email: string, remember: boolean = false) => {
+    // Security: Only store non-sensitive data
+    const userData = { username, email };
+    setUser(userData);
+    setIsGM(false); // Reset GM status, will be checked separately
+    setRememberMe(remember);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+    localStorage.setItem(REMEMBER_ME_KEY, String(remember));
   }, []);
 
-  const login = useCallback(
-    (
-      username: string,
-      email: string,
-      remember: boolean = false,
-      csrfTokenValue?: string
-    ) => {
-      const userData: User = { username, email };
-
-      setUser(userData);
-      // Keep ref in sync immediately so downstream checks (GM check) can run right after login.
-      userRef.current = userData;
-      setIsGM(false);
-      setGmError(false);
-      setRememberMe(remember);
-
-      try {
-        if (remember) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
-        } else {
-          localStorage.removeItem(STORAGE_KEY);
-        }
-        localStorage.setItem(REMEMBER_ME_KEY, String(remember));
-      } catch {
-        // ignore storage errors
-      }
-
-      if (csrfTokenValue) {
-        setCsrfToken(csrfTokenValue);
-      }
-    },
-    []
-  );
-
-  const logout = useCallback(async () => {
-    // Clear local state immediately for instant UI feedback
+  const logout = useCallback(() => {
     setUser(null);
     setIsGM(false);
-    setGmError(false);
     setRememberMe(false);
-    clearCsrfToken();
-
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(REMEMBER_ME_KEY);
-    } catch {
-      // ignore storage errors
-    }
-
-    // Best-effort server-side logout (don't block on network errors)
-    try {
-      await apiGet("/auth.php?action=logout");
-    } catch {
-      // ignore - user is already logged out client-side
-    }
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(REMEMBER_ME_KEY);
   }, []);
 
-  // Initial hydration: restore server session and GM status.
+  // Check GM status when user is available
   useEffect(() => {
-    let cancelled = false;
-
-    const hydrate = async () => {
-      setLoading(true);
-      const isAuthenticated = await checkSession();
-      if (cancelled) return;
-      didInitialHydration.current = true;
-      setLoading(false);
-
-      // Only check GM status after successful session restoration
-      if (isAuthenticated && userRef.current?.username) {
-        checkGMStatus();
-      }
-    };
-
-    hydrate();
-    return () => {
-      cancelled = true;
-    };
-  }, [checkSession, checkGMStatus]);
-
-  // If the user logs in later (after initial hydration), check GM status
-  useEffect(() => {
-    if (!didInitialHydration.current) return;
     if (user?.username) {
       checkGMStatus();
     } else {
       setIsGM(false);
-      setGmError(false);
     }
   }, [user?.username, checkGMStatus]);
 
-  const value = useMemo<AuthContextType>(
-    () => ({
-      user,
-      isLoggedIn: !!user,
+  return (
+    <AuthContext.Provider value={{ 
+      user, 
+      isLoggedIn: !!user, 
       isGM,
       gmLoading,
-      gmError,
       rememberMe,
-      loading,
-      login,
+      login, 
       logout,
-      checkGMStatus,
-      checkSession,
-    }),
-    [user, isGM, gmLoading, gmError, rememberMe, loading, login, logout, checkGMStatus, checkSession]
+      checkGMStatus
+    }}>
+      {children}
+    </AuthContext.Provider>
   );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

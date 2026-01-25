@@ -70,7 +70,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   const fetchRewards = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=get_rewards", { credentials: 'include' });
+      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=get_rewards");
       const data = await response.json();
       if (data.success && data.rewards) {
         setRewards(data.rewards);
@@ -104,7 +104,6 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: 'include',
         body: JSON.stringify({
           ...editData,
           id: selectedReward?.id,
@@ -147,7 +146,6 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=delete_reward", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: 'include',
         body: JSON.stringify({ id }),
       });
 

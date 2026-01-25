@@ -19,7 +19,6 @@ import {
   checkRateLimit,
   getRateLimitRemainingTime
 } from "@/lib/validation";
-import { apiPost } from "@/lib/apiClient";
 
 interface AuthModalsProps {
   loginOpen: boolean;
@@ -44,7 +43,7 @@ export const AuthModals = ({
 }: AuthModalsProps) => {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const { login, user, checkGMStatus } = useAuth();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   
@@ -100,28 +99,42 @@ export const AuthModals = ({
     setLoginLoading(true);
     
     try {
-      const result = await apiPost<{
-        success?: boolean;
-        message?: string;
-        user?: { username?: string; email?: string };
-        csrf_token?: string;
-      }>("/auth.php?action=login", {
-        username: validation.data.login,
-        password: validation.data.passwd,
-        remember_me: rememberMe,
+      const formData = new FormData();
+      formData.append("action", "login");
+      formData.append("login", validation.data.login);
+      formData.append("passwd", validation.data.passwd);
+
+      const response = await fetch("https://woiendgame.online/api/auth.php", {
+        method: "POST",
+        body: formData,
       });
+
+      const rawText = await response.text();
+      let result: { success?: boolean; message?: string; user?: any; [key: string]: any };
+      try {
+        result = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 200)}`);
+      }
       
       if (result.success) {
-        // Login with CSRF token from response
-        login(result.user?.username || validation.data.login, result.user?.email || "", rememberMe, result.csrf_token);
+        login(validation.data.login, result.user?.email || "", rememberMe);
         
-        // Check if user is GM (session-based, no username in URL)
-        const gm = await checkGMStatus();
-        if (gm) {
-          setShowGMChoice(true);
-          setLoginData({ login: "", passwd: "" });
-          setRememberMe(false);
-          return;
+        // Check if user is GM
+        try {
+          const gmResponse = await fetch(
+            `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(validation.data.login)}`
+          );
+          const gmData = await gmResponse.json();
+          
+          if (gmData.is_gm) {
+            setShowGMChoice(true);
+            setLoginData({ login: "", passwd: "" });
+            setRememberMe(false);
+            return;
+          }
+        } catch (gmError) {
+          // Security: Don't expose GM check errors to console in production
         }
         
         toast({
@@ -131,9 +144,7 @@ export const AuthModals = ({
         setLoginOpen(false);
         setLoginData({ login: "", passwd: "" });
         setRememberMe(false);
-        // Let AuthContext state commit before navigating to a protected route
-        // (prevents a brief redirect/blank state on slower devices).
-        window.setTimeout(() => navigate("/dashboard"), 0);
+        navigate("/dashboard");
       } else {
         toast({
           title: "Error",
@@ -200,11 +211,10 @@ export const AuthModals = ({
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         body: formData,
-        credentials: 'include',
       });
 
       const rawText = await response.text();
-      let result: { success?: boolean; message?: string; [key: string]: unknown };
+      let result: { success?: boolean; message?: string; [key: string]: any };
       try {
         result = JSON.parse(rawText);
       } catch {
@@ -275,11 +285,10 @@ export const AuthModals = ({
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         body: formData,
-        credentials: 'include',
       });
 
       const rawText = await response.text();
-      let result: { success?: boolean; message?: string; [key: string]: unknown };
+      let result: { success?: boolean; message?: string; [key: string]: any };
       try {
         result = JSON.parse(rawText);
       } catch {
@@ -347,8 +356,7 @@ export const AuthModals = ({
 
       const response = await fetch("https://woiendgame.online/api/change_password.php", {
         method: "POST",
-        body: formData,
-        credentials: 'include',
+        body: formData
       });
 
       const result = await response.text();

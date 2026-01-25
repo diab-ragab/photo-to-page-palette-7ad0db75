@@ -46,7 +46,7 @@ export const ServerStatusCard = ({
 
     setLoading(true);
     try {
-      const response = await fetch(apiEndpoint, { credentials: 'include' });
+      const response = await fetch(apiEndpoint);
       if (response.ok) {
         const data = await response.json();
         setStatus({
@@ -59,8 +59,8 @@ export const ServerStatusCard = ({
       } else {
         setStatus(prev => ({ ...prev, online: false }));
       }
-    } catch {
-      // Silent fail in production - backend may be temporarily unreachable
+    } catch (error) {
+      console.error("Failed to fetch server status:", error);
       setStatus(prev => ({ ...prev, online: false }));
     } finally {
       setLoading(false);

@@ -15,8 +15,6 @@ import { RecentPurchases } from "@/components/RecentPurchases";
 import { PageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
-import { AppErrorBoundary } from "@/components/AppErrorBoundary";
-
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
@@ -37,9 +35,9 @@ const queryClient = new QueryClient();
 
 const AnimatedRoutes = () => {
   const location = useLocation();
-
+  
   return (
-    <AnimatePresence mode="sync" initial={false}>
+    <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<PageTransition><Index /></PageTransition>} />
         <Route path="/dashboard" element={<PageTransition><ProtectedRoute><Dashboard /></ProtectedRoute></PageTransition>} />
@@ -63,29 +61,27 @@ const AnimatedRoutes = () => {
 
 const App = () => (
   <HelmetProvider>
-    <AppErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <LanguageProvider>
-            <AuthProvider>
-              <CartProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <LanguageProvider>
+          <AuthProvider>
+            <CartProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <ScrollProgress />
                 <BrowserRouter>
-                  <TooltipProvider>
-                    <Toaster />
-                    <Sonner />
-                    <ScrollProgress />
-                    <AnimatedRoutes />
-                    <ScrollToTop />
-                    <RecentPurchases />
-                    <SessionTimeoutWarning />
-                  </TooltipProvider>
+                  <AnimatedRoutes />
+                  <ScrollToTop />
+                  <RecentPurchases />
+                  <SessionTimeoutWarning />
                 </BrowserRouter>
-              </CartProvider>
-            </AuthProvider>
-          </LanguageProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
-    </AppErrorBoundary>
+              </TooltipProvider>
+            </CartProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   </HelmetProvider>
 );
 
