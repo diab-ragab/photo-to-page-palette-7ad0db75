@@ -59,8 +59,8 @@ export const ServerStatusCard = ({
       } else {
         setStatus(prev => ({ ...prev, online: false }));
       }
-    } catch (error) {
-      console.error("Failed to fetch server status:", error);
+    } catch {
+      // Silent fail in production - backend may be temporarily unreachable
       setStatus(prev => ({ ...prev, online: false }));
     } finally {
       setLoading(false);

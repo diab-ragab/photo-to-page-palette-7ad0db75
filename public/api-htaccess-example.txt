@@ -22,4 +22,10 @@ Options -Indexes
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "DENY"
+    Header set X-XSS-Protection "1; mode=block"
 </IfModule>
+
+# Prevent PHP files from being downloaded
+<FilesMatch "\.php$">
+    SetHandler application/x-httpd-php
+</FilesMatch>
