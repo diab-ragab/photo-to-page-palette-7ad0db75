@@ -104,7 +104,9 @@ export const AuthModals = ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
+        redirect: "error",
         body: JSON.stringify({
           action: "login",
           login: validation.data.login,
@@ -214,7 +216,9 @@ export const AuthModals = ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
+        redirect: "error",
         body: JSON.stringify({
           action: "register",
           login: validation.data.login,
@@ -291,7 +295,9 @@ export const AuthModals = ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
+        redirect: "error",
         body: JSON.stringify({
           action: "reset",
           login: validation.data.login,
@@ -370,7 +376,9 @@ export const AuthModals = ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
+        redirect: "error",
         body: JSON.stringify({
           action: "reset",
           login: user?.username || "",
