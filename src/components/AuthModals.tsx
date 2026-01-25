@@ -99,18 +99,19 @@ export const AuthModals = ({
     setLoginLoading(true);
     
     try {
-      const formData = new FormData();
-      formData.append("action", "login");
-      formData.append("login", validation.data.login);
-      formData.append("passwd", validation.data.passwd);
-
-      const response = await fetch("https://woiendgame.online/api/auth.php", {
+      const response = await fetch("https://woiendgame.online/api/auth.php?action=login", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: validation.data.login,
+          password: validation.data.passwd,
+        }),
       });
 
       const rawText = await response.text();
-      let result: { success?: boolean; message?: string; user?: any; [key: string]: any };
+      let result: { success?: boolean; message?: string; user?: any; sessionToken?: string; [key: string]: any };
       try {
         result = JSON.parse(rawText);
       } catch {
@@ -118,9 +119,14 @@ export const AuthModals = ({
       }
       
       if (result.success) {
+        // Store session token if provided
+        if (result.sessionToken) {
+          localStorage.setItem("woi_session_token", result.sessionToken);
+        }
+        
         login(validation.data.login, result.user?.email || "", rememberMe);
         
-        // Check if user is GM
+        // Check if user is GM (use the dedicated check_gm.php)
         try {
           const gmResponse = await fetch(
             `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(validation.data.login)}`
@@ -201,16 +207,16 @@ export const AuthModals = ({
     setRegisterLoading(true);
     
     try {
-      const formData = new FormData();
-      formData.append("action", "register");
-      formData.append("login", validation.data.login);
-      formData.append("passwd", validation.data.passwd);
-      formData.append("repasswd", validation.data.repasswd);
-      formData.append("email", validation.data.email);
-
-      const response = await fetch("https://woiendgame.online/api/auth.php", {
+      const response = await fetch("https://woiendgame.online/api/auth.php?action=register", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: validation.data.login,
+          email: validation.data.email,
+          password: validation.data.passwd,
+        }),
       });
 
       const rawText = await response.text();
@@ -275,16 +281,14 @@ export const AuthModals = ({
     setForgotLoading(true);
     
     try {
-      const formData = new FormData();
-      formData.append("action", "reset");
-      formData.append("login", validation.data.login);
-      formData.append("email", validation.data.email);
-      formData.append("newpass", validation.data.newPasswd);
-      formData.append("renew", validation.data.newPasswd);
-
-      const response = await fetch("https://woiendgame.online/api/auth.php", {
+      const response = await fetch("https://woiendgame.online/api/auth.php?action=forgot-password", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: validation.data.email,
+        }),
       });
 
       const rawText = await response.text();
@@ -298,11 +302,10 @@ export const AuthModals = ({
       if (result.success) {
         toast({
           title: "Success",
-          description: "Password reset successfully!"
+          description: result.message || "If the email exists, a reset link has been sent."
         });
         setForgotPasswordOpen(false);
         setForgotData({ login: "", email: "", newPasswd: "", confirmPasswd: "" });
-        setLoginOpen(true);
       } else {
         toast({
           title: "Error",
@@ -349,19 +352,27 @@ export const AuthModals = ({
     setChangeLoading(true);
     
     try {
-      const formData = new FormData();
-      formData.append("login", user?.username || "");
-      formData.append("oldpasswd", validation.data.oldPasswd);
-      formData.append("newpasswd", validation.data.newPasswd);
-
-      const response = await fetch("https://woiendgame.online/api/change_password.php", {
+      const response = await fetch("https://woiendgame.online/api/auth.php?action=change-password", {
         method: "POST",
-        body: formData
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: user?.username || "",
+          currentPassword: validation.data.oldPasswd,
+          newPassword: validation.data.newPasswd,
+        }),
       });
 
-      const result = await response.text();
+      const rawText = await response.text();
+      let result: { success?: boolean; message?: string; [key: string]: any };
+      try {
+        result = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Server returned non-JSON (status ${response.status})`);
+      }
       
-      if (result.includes("success") || response.ok) {
+      if (result.success) {
         toast({
           title: "Success",
           description: "Password changed successfully!"
@@ -371,14 +382,14 @@ export const AuthModals = ({
       } else {
         toast({
           title: "Error",
-          description: "Password change failed! Check your current password.",
+          description: result.message || "Password change failed! Check your current password.",
           variant: "destructive"
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Connection error. Please try again.",
+        description: error instanceof Error ? error.message : "Connection error. Please try again.",
         variant: "destructive"
       });
     } finally {
