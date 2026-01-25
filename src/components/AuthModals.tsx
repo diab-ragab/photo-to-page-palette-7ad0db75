@@ -99,14 +99,16 @@ export const AuthModals = ({
     setLoginLoading(true);
     
     try {
-      const response = await fetch("https://woiendgame.online/api/auth.php?action=login", {
+      // API expects: action, login, passwd in POST body
+      const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username: validation.data.login,
-          password: validation.data.passwd,
+          action: "login",
+          login: validation.data.login,
+          passwd: validation.data.passwd,
         }),
       });
 
@@ -207,15 +209,18 @@ export const AuthModals = ({
     setRegisterLoading(true);
     
     try {
-      const response = await fetch("https://woiendgame.online/api/auth.php?action=register", {
+      // API expects: action, login, email, passwd, repasswd in POST body
+      const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username: validation.data.login,
+          action: "register",
+          login: validation.data.login,
           email: validation.data.email,
-          password: validation.data.passwd,
+          passwd: validation.data.passwd,
+          repasswd: validation.data.repasswd,
         }),
       });
 
@@ -281,13 +286,18 @@ export const AuthModals = ({
     setForgotLoading(true);
     
     try {
-      const response = await fetch("https://woiendgame.online/api/auth.php?action=forgot-password", {
+      // API expects: action=reset, login, email, newpass, renew in POST body
+      const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          action: "reset",
+          login: validation.data.login,
           email: validation.data.email,
+          newpass: validation.data.newPasswd,
+          renew: validation.data.confirmPasswd,
         }),
       });
 
@@ -302,10 +312,11 @@ export const AuthModals = ({
       if (result.success) {
         toast({
           title: "Success",
-          description: result.message || "If the email exists, a reset link has been sent."
+          description: result.message || "Password reset successfully!"
         });
         setForgotPasswordOpen(false);
         setForgotData({ login: "", email: "", newPasswd: "", confirmPasswd: "" });
+        setLoginOpen(true);
       } else {
         toast({
           title: "Error",
@@ -352,15 +363,20 @@ export const AuthModals = ({
     setChangeLoading(true);
     
     try {
-      const response = await fetch("https://woiendgame.online/api/auth.php?action=change-password", {
+      // Note: The current auth.php doesn't have a change-password action
+      // This would need to be added to the PHP backend
+      // For now, we use the reset action with verified login
+      const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username: user?.username || "",
-          currentPassword: validation.data.oldPasswd,
-          newPassword: validation.data.newPasswd,
+          action: "reset",
+          login: user?.username || "",
+          email: user?.email || "",
+          newpass: validation.data.newPasswd,
+          renew: validation.data.confirmPasswd,
         }),
       });
 
@@ -382,7 +398,7 @@ export const AuthModals = ({
       } else {
         toast({
           title: "Error",
-          description: result.message || "Password change failed! Check your current password.",
+          description: result.message || "Password change failed!",
           variant: "destructive"
         });
       }
