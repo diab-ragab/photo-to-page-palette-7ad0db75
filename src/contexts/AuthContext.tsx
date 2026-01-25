@@ -81,7 +81,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsGM(gmStatus);
       return gmStatus;
     } catch (error) {
-      // Security: Don't expose GM check errors in production
       // Security: Fail closed - if GM check fails, treat as non-GM
       setIsGM(false);
       return false;
