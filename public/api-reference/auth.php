@@ -11,7 +11,8 @@ handleCors(['GET', 'POST', 'OPTIONS']);
 
 header('Content-Type: application/json');
 
-$action = $_GET['action'] ?? '';
+// Support action from query string OR form data
+$action = $_GET['action'] ?? $_POST['action'] ?? '';
 
 switch ($action) {
     case 'login':
@@ -38,10 +39,19 @@ function handleLogin(): void {
         jsonFail(405, 'Method not allowed');
     }
     
-    $input = getJsonInput();
-    $username = sanitizeInput($input['username'] ?? '', 50);
-    $password = $input['password'] ?? '';
-    $rememberMe = (bool)($input['remember_me'] ?? false);
+    // Support both JSON body and FormData
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+    if (stripos($contentType, 'application/json') !== false) {
+        $input = getJsonInput();
+        $username = sanitizeInput($input['username'] ?? $input['login'] ?? '', 50);
+        $password = $input['password'] ?? $input['passwd'] ?? '';
+        $rememberMe = (bool)($input['remember_me'] ?? false);
+    } else {
+        // FormData from frontend
+        $username = sanitizeInput($_POST['login'] ?? '', 50);
+        $password = $_POST['passwd'] ?? '';
+        $rememberMe = (bool)($_POST['remember_me'] ?? false);
+    }
     
     if (empty($username) || empty($password)) {
         jsonFail(400, 'Username and password required');
