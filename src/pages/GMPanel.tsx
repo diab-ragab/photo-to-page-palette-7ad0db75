@@ -40,7 +40,7 @@ const typeIcons = {
  * they cannot perform any admin actions without a valid GM session.
  */
 export default function GMPanel() {
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, checkGMStatus } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -67,7 +67,7 @@ export default function GMPanel() {
   // Check if user is GM from your MySQL database
   // Security: Uses session-based auth only - no username in URL to prevent enumeration
   useEffect(() => {
-    const checkGMStatus = async () => {
+    const verifyGM = async () => {
       if (!isLoggedIn || !user) {
         navigate("/");
         return;
@@ -75,13 +75,8 @@ export default function GMPanel() {
 
       try {
         // Backend validates the CURRENT session user's GM status
-        const response = await fetch(
-          "https://woiendgame.online/api/check_gm.php",
-          { credentials: 'include' }
-        );
-        const data = await response.json();
-        
-        if (data.is_gm) {
+        const gm = await checkGMStatus();
+        if (gm) {
           setIsGM(true);
         } else {
           toast({
@@ -104,8 +99,8 @@ export default function GMPanel() {
       }
     };
 
-    checkGMStatus();
-  }, [isLoggedIn, user, navigate, toast]);
+    verifyGM();
+  }, [isLoggedIn, user, navigate, toast, checkGMStatus]);
 
   useEffect(() => {
     if (isGM) {
