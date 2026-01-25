@@ -20,6 +20,7 @@ interface AuthContextType {
   isLoggedIn: boolean;
   isGM: boolean;
   gmLoading: boolean;
+  gmError: boolean;
   rememberMe: boolean;
   loading: boolean;
   login: (username: string, email: string, rememberMe?: boolean, csrfToken?: string) => void;
@@ -60,6 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [gmLoading, setGmLoading] = useState(false);
   const [isGM, setIsGM] = useState(false);
+  const [gmError, setGmError] = useState(false);
   const didInitialHydration = useRef(false);
   const userRef = useRef<User | null>(user);
 
@@ -115,16 +117,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const currentUser = userRef.current;
     if (!currentUser?.username) {
       setIsGM(false);
+      setGmError(false);
       return false;
     }
 
     setGmLoading(true);
+    setGmError(false);
     try {
       // Backend validates the CURRENT session user's GM status
       const data = await apiGet<{ is_gm?: boolean }>("/check_gm.php");
 
       const gmStatus = !!data.is_gm;
       setIsGM(gmStatus);
+      setGmError(false);
       return gmStatus;
     } catch (error) {
       // Fail closed for GM - but log in dev for debugging
@@ -133,6 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.warn("GM check failed:", error);
       }
       setIsGM(false);
+      setGmError(true);
       return false;
     } finally {
       setGmLoading(false);
@@ -152,6 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Keep ref in sync immediately so downstream checks (GM check) can run right after login.
       userRef.current = userData;
       setIsGM(false);
+      setGmError(false);
       setRememberMe(remember);
 
       try {
@@ -176,6 +183,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Clear local state immediately for instant UI feedback
     setUser(null);
     setIsGM(false);
+    setGmError(false);
     setRememberMe(false);
     clearCsrfToken();
 
@@ -224,6 +232,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       checkGMStatus();
     } else {
       setIsGM(false);
+      setGmError(false);
     }
   }, [user?.username, checkGMStatus]);
 
@@ -233,6 +242,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isLoggedIn: !!user,
       isGM,
       gmLoading,
+      gmError,
       rememberMe,
       loading,
       login,
@@ -240,7 +250,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       checkGMStatus,
       checkSession,
     }),
-    [user, isGM, gmLoading, rememberMe, loading, login, logout, checkGMStatus, checkSession]
+    [user, isGM, gmLoading, gmError, rememberMe, loading, login, logout, checkGMStatus, checkSession]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
