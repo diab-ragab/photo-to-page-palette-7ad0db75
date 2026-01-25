@@ -19,6 +19,7 @@ import {
   checkRateLimit,
   getRateLimitRemainingTime
 } from "@/lib/validation";
+import { apiPost } from "@/lib/apiClient";
 
 interface AuthModalsProps {
   loginOpen: boolean;
@@ -99,28 +100,20 @@ export const AuthModals = ({
     setLoginLoading(true);
     
     try {
-      const formData = new FormData();
-      formData.append("action", "login");
-      formData.append("login", validation.data.login);
-      formData.append("passwd", validation.data.passwd);
-
-      const response = await fetch("https://woiendgame.online/api/auth.php", {
-        method: "POST",
-        body: formData,
-        credentials: 'include',
+      const result = await apiPost<{
+        success?: boolean;
+        message?: string;
+        user?: { username?: string; email?: string };
+        csrf_token?: string;
+      }>("/auth.php?action=login", {
+        username: validation.data.login,
+        password: validation.data.passwd,
+        remember_me: rememberMe,
       });
-
-      const rawText = await response.text();
-      let result: { success?: boolean; message?: string; user?: { email?: string }; csrf_token?: string; [key: string]: unknown };
-      try {
-        result = JSON.parse(rawText);
-      } catch {
-        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 200)}`);
-      }
       
       if (result.success) {
         // Login with CSRF token from response
-        login(validation.data.login, result.user?.email || "", rememberMe, result.csrf_token);
+        login(result.user?.username || validation.data.login, result.user?.email || "", rememberMe, result.csrf_token);
         
         // Check if user is GM (session-based, no username in URL)
         const gm = await checkGMStatus();
