@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UserWallet } from "@/components/UserWallet";
+import { VoteRewardsCard } from "@/components/VoteRewardsCard";
 import { 
   User, 
   Coins, 
@@ -263,8 +265,17 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Profile & VIP Progress */}
+          {/* Sidebar: Wallet, Rewards & Profile */}
           <div className="space-y-6">
+            {/* User Wallet */}
+            <UserWallet 
+              coins={voteData.coins} 
+              vipPoints={voteData.vipPoints}
+            />
+
+            {/* Vote Rewards Summary */}
+            <VoteRewardsCard sites={voteSites} loading={sitesLoading} />
+
             {/* Profile Card */}
             <Card className="bg-card border-primary/20">
               <CardHeader>
