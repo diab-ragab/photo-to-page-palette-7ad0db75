@@ -369,9 +369,6 @@ export const AuthModals = ({
     setChangeLoading(true);
     
     try {
-      // Note: The current auth.php doesn't have a change-password action
-      // This would need to be added to the PHP backend
-      // For now, we use the reset action with verified login
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         headers: {
@@ -380,11 +377,11 @@ export const AuthModals = ({
         },
         redirect: "error",
         body: JSON.stringify({
-          action: "reset",
+          action: "change_password",
           login: user?.username || "",
-          email: user?.email || "",
-          newpass: validation.data.newPasswd,
-          renew: validation.data.confirmPasswd,
+          oldPasswd: validation.data.oldPasswd,
+          newPasswd: validation.data.newPasswd,
+          confirmPasswd: validation.data.confirmPasswd,
         }),
       });
 
