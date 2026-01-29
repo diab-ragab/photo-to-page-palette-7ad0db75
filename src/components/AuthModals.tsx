@@ -102,6 +102,7 @@ export const AuthModals = ({
       // API expects: action, login, passwd in POST body
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -133,7 +134,16 @@ export const AuthModals = ({
         // Check if user is admin
         try {
           const adminResponse = await fetch(
-            `https://woiendgame.online/api/check_admin.php?user=${encodeURIComponent(validation.data.login)}`
+            `https://woiendgame.online/api/check_admin.php`,
+            {
+              method: "GET",
+              credentials: "include",
+              headers: {
+                "Accept": "application/json",
+                "X-Session-Token": result.sessionToken || "",
+                "Authorization": `Bearer ${result.sessionToken || ""}`,
+              },
+            }
           );
           const adminData = await adminResponse.json();
           
@@ -214,6 +224,7 @@ export const AuthModals = ({
       // API expects: action, login, email, passwd, repasswd in POST body
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -293,6 +304,7 @@ export const AuthModals = ({
       // API expects: action=reset, login, email, newpass, renew in POST body
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -371,6 +383,7 @@ export const AuthModals = ({
     try {
       const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
