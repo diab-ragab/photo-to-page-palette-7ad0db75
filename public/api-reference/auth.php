@@ -185,12 +185,18 @@ if ($action === 'login') {
   $sessionMinutes = $rememberMe ? SESSION_REMEMBER_MINUTES : SESSION_MINUTES;
   $sessionToken = bin2hex(random_bytes(32));
   $csrfToken = csrf();
-  $expiresAt = date('Y-m-d H:i:s', time() + $sessionMinutes*60);
   $ua = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 2000);
 
+  // IMPORTANT: compute expiry using DB time (NOW) to avoid PHP/MySQL clock skew
   $pdo->prepare("INSERT INTO user_sessions (user_id, session_token, csrf_token, ip_address, user_agent, created_at, expires_at, last_activity)
-                 VALUES (?, ?, ?, ?, ?, NOW(), ?, NOW())")
-      ->execute([(int)$user['ID'], $sessionToken, $csrfToken, $clientIP, $ua, $expiresAt]);
+                 VALUES (?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), NOW())")
+      ->execute([(int)$user['ID'], $sessionToken, $csrfToken, $clientIP, $ua, (int)$sessionMinutes]);
+
+  // Read back the computed expiry (keeps frontend aligned with DB)
+  $stmt = $pdo->prepare("SELECT expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
+  $stmt->execute([$sessionToken]);
+  $expiresAtRow = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+  $expiresAt = (string)($expiresAtRow['expires_at'] ?? '');
 
   out_json(200, [
     "success"=>true,
