@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const sessionToken = localStorage.getItem("woi_session_token") || "";
       
       const response = await fetch(
-        `https://woiendgame.online/api/check_admin.php?user=${encodeURIComponent(user.username)}`,
+        `https://woiendgame.online/api-reference/check_admin.php?user=${encodeURIComponent(user.username)}`,
         {
           method: "GET",
           headers: {
