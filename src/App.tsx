@@ -29,7 +29,7 @@ import BlogPost from "./pages/BlogPost";
 import DownloadPage from "./pages/Download";
 import Dashboard from "./pages/Dashboard";
 import SeasonHistory from "./pages/SeasonHistory";
-import GMPanel from "./pages/GMPanel";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -41,7 +41,7 @@ const AnimatedRoutes = () => {
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<PageTransition><Index /></PageTransition>} />
         <Route path="/dashboard" element={<PageTransition><ProtectedRoute><Dashboard /></ProtectedRoute></PageTransition>} />
-        <Route path="/gm-panel" element={<PageTransition><ProtectedRoute><GMPanel /></ProtectedRoute></PageTransition>} />
+        <Route path="/admin" element={<PageTransition><ProtectedRoute><AdminDashboard /></ProtectedRoute></PageTransition>} />
         <Route path="/seasons" element={<PageTransition><SeasonHistory /></PageTransition>} />
         <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
         <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />

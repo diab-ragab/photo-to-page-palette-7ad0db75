@@ -19,7 +19,7 @@ import {
   Coins, 
   Crown, 
   Vote, 
-  Shield, 
+  ShieldAlert, 
   Award,
   TrendingUp,
   Gift,
@@ -105,16 +105,16 @@ const Dashboard = () => {
             </p>
           </div>
           
-          {/* GM Panel Switch */}
+          {/* Admin Dashboard Switch */}
           {isGM && (
             <Button
-              onClick={() => navigate("/gm-panel")}
+              onClick={() => navigate("/admin")}
               variant="outline"
-              className="group gap-2 border-primary/30 hover:border-primary hover:bg-primary/10"
+              className="group gap-2 border-destructive/30 hover:border-destructive hover:bg-destructive/10"
             >
-              <Shield className="h-4 w-4 text-primary" />
-              <span>GM Panel</span>
-              <ArrowRightLeft className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <ShieldAlert className="h-4 w-4 text-destructive" />
+              <span>Admin Dashboard</span>
+              <ArrowRightLeft className="h-4 w-4 text-muted-foreground group-hover:text-destructive transition-colors" />
             </Button>
           )}
         </div>
