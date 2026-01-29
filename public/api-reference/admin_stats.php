@@ -157,52 +157,34 @@ try {
     // Table might not exist
 }
 
-// Total characters (adjust table name as needed)
+// Total characters from basetab_sg (exclude deleted)
 try {
-    $stmt = $pdo->query("SELECT COUNT(*) FROM characters");
+    $stmt = $pdo->query("SELECT COUNT(*) FROM basetab_sg WHERE IsDel = 0");
     $stats['total_characters'] = (int)$stmt->fetchColumn();
 } catch (Exception $e) {
-    // Try alternative table name
-    try {
-        $stmt = $pdo->query("SELECT COUNT(*) FROM character");
-        $stats['total_characters'] = (int)$stmt->fetchColumn();
-    } catch (Exception $e2) {
-        // Table doesn't exist
-    }
+    // Table doesn't exist
 }
 
-// Online players
+// Online players from memb_stat
 try {
-    $stmt = $pdo->query("SELECT COUNT(*) FROM online WHERE connected = 1");
+    $stmt = $pdo->query("SELECT COUNT(*) FROM memb_stat WHERE ConnectStat = 1");
     $stats['online_players'] = (int)$stmt->fetchColumn();
 } catch (Exception $e) {
+    // Fallback: recent activity in basetab_sg
     try {
-        $stmt = $pdo->query("SELECT COUNT(*) FROM online");
+        $stmt = $pdo->query("SELECT COUNT(*) FROM basetab_sg WHERE LastLogoutTime > DATE_SUB(NOW(), INTERVAL 5 MINUTE) AND IsDel = 0");
         $stats['online_players'] = (int)$stmt->fetchColumn();
     } catch (Exception $e2) {
         // Table doesn't exist
     }
 }
 
-// Total Zen in circulation
+// Total Zen from goldtab_sg (Gold column = Zen)
 try {
-    // Try user_currency sidecar table first
-    $stmt = $pdo->query("SELECT COALESCE(SUM(zen), 0) FROM user_currency");
+    $stmt = $pdo->query("SELECT COALESCE(SUM(Gold), 0) FROM goldtab_sg");
     $stats['total_zen'] = (int)$stmt->fetchColumn();
 } catch (Exception $e) {
-    // Try characters/warehouse tables
-    try {
-        $zen = 0;
-        // Character inventory zen
-        $stmt = $pdo->query("SELECT COALESCE(SUM(zen), 0) FROM characters");
-        $zen += (int)$stmt->fetchColumn();
-        // Warehouse zen
-        $stmt = $pdo->query("SELECT COALESCE(SUM(zen), 0) FROM warehouse");
-        $zen += (int)$stmt->fetchColumn();
-        $stats['total_zen'] = $zen;
-    } catch (Exception $e2) {
-        // Tables don't exist
-    }
+    // Table doesn't exist
 }
 
 // Total votes
