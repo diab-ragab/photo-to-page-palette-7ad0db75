@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown, LayoutDashboard, Shield, Loader2 } from "lucide-react";
+import { Menu, X, ShoppingBag, Newspaper, LogIn, UserPlus, User, KeyRound, LogOut, ChevronDown, LayoutDashboard, ShieldAlert, Loader2 } from "lucide-react";
 import { NotificationsPopover } from "@/components/NotificationsPopover";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -109,9 +109,9 @@ export const Navbar = () => {
                     <User className="h-4 w-4" />
                     {user?.username}
                     {isGM && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-primary/20 text-primary border border-primary/30">
-                        <Shield className="h-3 w-3" />
-                        GM
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-destructive/20 text-destructive border border-destructive/30">
+                        <ShieldAlert className="h-3 w-3" />
+                        Admin
                       </span>
                     )}
                     <ChevronDown className="h-3 w-3" />
@@ -132,11 +132,11 @@ export const Navbar = () => {
                     </DropdownMenuItem>
                   ) : isGM && (
                     <DropdownMenuItem 
-                      onClick={() => navigate('/gm-panel')}
-                      className="cursor-pointer"
+                      onClick={() => navigate('/admin')}
+                      className="cursor-pointer text-destructive"
                     >
-                      <Shield className="mr-2 h-4 w-4" />
-                      GM Panel
+                      <ShieldAlert className="mr-2 h-4 w-4" />
+                      Admin Dashboard
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem 
@@ -250,27 +250,27 @@ export const Navbar = () => {
                 <div className="flex items-center gap-2 py-2 text-sm font-medium text-foreground">
                   <User className="w-4 h-4" />
                   {user?.username}
-                  {isGM && (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-primary/20 text-primary border border-primary/30">
-                      <Shield className="h-3 w-3" />
-                      GM
-                    </span>
-                  )}
-                </div>
-                {gmLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Checking permissions...
+                    {isGM && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-destructive/20 text-destructive border border-destructive/30">
+                        <ShieldAlert className="h-3 w-3" />
+                        Admin
+                      </span>
+                    )}
                   </div>
-                ) : isGM && (
-                  <Link
-                    to="/gm-panel"
-                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <Shield className="w-4 h-4" />
-                    GM Panel
-                  </Link>
+                  {gmLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Checking permissions...
+                    </div>
+                  ) : isGM && (
+                    <Link
+                      to="/admin"
+                      className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors py-2"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <ShieldAlert className="w-4 h-4" />
+                      Admin Dashboard
+                    </Link>
                 )}
                 <Button 
                   variant="outline" 
