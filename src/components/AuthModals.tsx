@@ -137,15 +137,19 @@ try {
 
   const adminResponse = await fetch("https://woiendgame.online/api/check_admin.php", {
     method: "GET",
+    credentials: "include",
     headers: {
       "Accept": "application/json",
       "X-Session-Token": token,
+      "Authorization": `Bearer ${token}`,
     },
   });
 
   const adminText = await adminResponse.text();
   let adminData: any = {};
   try { adminData = JSON.parse(adminText); } catch {}
+
+  console.log("[Login] Admin check response:", adminData);
 
   const isAdmin = adminResponse.ok && (adminData.is_admin === true || adminData.is_gm === true);
 
@@ -155,7 +159,8 @@ try {
     setRememberMe(false);
     return;
   }
-} catch {
+} catch (err) {
+  console.error("[Login] Admin check error:", err);
   // if admin check fails, continue as normal user
 }
 
