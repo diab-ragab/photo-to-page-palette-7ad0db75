@@ -8,18 +8,18 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   isLoggedIn: boolean;
-  isGM: boolean;
-  gmLoading: boolean;
+  isAdmin: boolean;
+  adminLoading: boolean;
   rememberMe: boolean;
   login: (username: string, email: string, rememberMe?: boolean) => void;
   logout: () => void;
-  checkGMStatus: () => Promise<boolean>;
+  checkAdminStatus: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Security: Only store non-sensitive user data in localStorage
-// GM status is NEVER stored client-side - always fetched from server
+// Admin status is NEVER stored client-side - always fetched from server
 const STORAGE_KEY = "woi_user";
 const REMEMBER_ME_KEY = "woi_remember_me";
 
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!saved) return null;
       
       const parsed = JSON.parse(saved);
-      // Security: Only restore username and email, never trust stored isGM
+      // Security: Only restore username and email, never trust stored isAdmin
       if (parsed && typeof parsed.username === "string" && typeof parsed.email === "string") {
         return { username: parsed.username, email: parsed.email };
       }
@@ -42,8 +42,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   });
   
-  const [gmLoading, setGmLoading] = useState(false);
-  const [isGM, setIsGM] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => {
     try {
       return localStorage.getItem(REMEMBER_ME_KEY) === "true";
@@ -52,40 +52,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   });
 
-  const checkGMStatus = useCallback(async (): Promise<boolean> => {
+  const checkAdminStatus = useCallback(async (): Promise<boolean> => {
     if (!user?.username) {
-      setIsGM(false);
+      setIsAdmin(false);
       return false;
     }
 
-    setGmLoading(true);
+    setAdminLoading(true);
     try {
+      const sessionToken = localStorage.getItem("woi_session_token") || "";
+      
       const response = await fetch(
-        `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(user.username)}`,
+        `https://woiendgame.online/api/check_admin.php?user=${encodeURIComponent(user.username)}`,
         {
           method: "GET",
           headers: {
             "Accept": "application/json",
+            ...(sessionToken && { "X-Session-Token": sessionToken }),
           },
         }
       );
       
       if (!response.ok) {
-        throw new Error("GM check failed");
+        throw new Error("Admin check failed");
       }
       
       const data = await response.json();
       
-      // Security: GM status is stored in state only, never in localStorage
-      const gmStatus = !!data.is_gm;
-      setIsGM(gmStatus);
-      return gmStatus;
+      // Security: Admin status is stored in state only, never in localStorage
+      const adminStatus = !!(data.is_admin || data.is_gm);
+      setIsAdmin(adminStatus);
+      return adminStatus;
     } catch (error) {
-      // Security: Fail closed - if GM check fails, treat as non-GM
-      setIsGM(false);
+      // Security: Fail closed - if admin check fails, treat as non-admin
+      setIsAdmin(false);
       return false;
     } finally {
-      setGmLoading(false);
+      setAdminLoading(false);
     }
   }, [user?.username]);
 
@@ -93,7 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Security: Only store non-sensitive data
     const userData = { username, email };
     setUser(userData);
-    setIsGM(false); // Reset GM status, will be checked separately
+    setIsAdmin(false); // Reset admin status, will be checked separately
     setRememberMe(remember);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
     localStorage.setItem(REMEMBER_ME_KEY, String(remember));
@@ -101,31 +104,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(() => {
     setUser(null);
-    setIsGM(false);
+    setIsAdmin(false);
     setRememberMe(false);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(REMEMBER_ME_KEY);
+    localStorage.removeItem("woi_session_token");
   }, []);
 
-  // Check GM status when user is available
+  // Check admin status when user is available
   useEffect(() => {
     if (user?.username) {
-      checkGMStatus();
+      checkAdminStatus();
     } else {
-      setIsGM(false);
+      setIsAdmin(false);
     }
-  }, [user?.username, checkGMStatus]);
+  }, [user?.username, checkAdminStatus]);
 
   return (
     <AuthContext.Provider value={{ 
       user, 
       isLoggedIn: !!user, 
-      isGM,
-      gmLoading,
+      isAdmin,
+      adminLoading,
       rememberMe,
       login, 
       logout,
-      checkGMStatus
+      checkAdminStatus
     }}>
       {children}
     </AuthContext.Provider>
