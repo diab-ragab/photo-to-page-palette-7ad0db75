@@ -65,13 +65,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("[Auth] Checking admin status for:", user.username);
       
       const response = await fetch(
-        `https://woiendgame.online/api-reference/check_admin.php?user=${encodeURIComponent(user.username)}`,
+        `https://woiendgame.online/api/check_admin.php`,
         {
           method: "GET",
           credentials: "include",
           headers: {
             "Accept": "application/json",
-            ...(sessionToken && { "X-Session-Token": sessionToken }),
+            "X-Session-Token": sessionToken,
+            "Authorization": `Bearer ${sessionToken}`,
           },
         }
       );
