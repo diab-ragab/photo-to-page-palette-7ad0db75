@@ -1,89 +1,43 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { Loader2 } from "lucide-react";
 
-interface AdminRouteProps {
-  children: React.ReactNode;
-}
+type Props = { children: React.ReactNode };
 
-export const AdminRoute = ({ children }: AdminRouteProps) => {
-  const { isLoggedIn, isAdmin, adminLoading } = useAuth();
-  const [checking, setChecking] = useState(true);
+export function AdminRoute({ children }: Props) {
+  const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
-    const verifyAdmin = async () => {
-      // If not logged in, redirect immediately
-      if (!isLoggedIn) {
-        setAllowed(false);
-        setChecking(false);
-        return;
-      }
-
-      // Wait for admin loading to complete
-      if (adminLoading) {
-        return;
-      }
-
-      // Double-check with backend
+    const run = async () => {
       try {
         const token = localStorage.getItem("woi_session_token") || "";
-        
         if (!token) {
-          console.log("[AdminRoute] No session token found");
           setAllowed(false);
-          setChecking(false);
           return;
         }
 
         const res = await fetch("https://woiendgame.online/api/check_admin.php", {
           method: "GET",
-          credentials: "include",
           headers: {
             "Accept": "application/json",
             "X-Session-Token": token,
-            "Authorization": `Bearer ${token}`,
+            "Authorization": `Bearer ${token}`, // backup
           },
         });
 
         const data = await res.json().catch(() => ({}));
-        console.log("[AdminRoute] Admin check response:", res.status, data);
-        
-        const adminStatus = res.ok && (data.is_admin === true || data.is_gm === true);
-        setAllowed(adminStatus);
-      } catch (error) {
-        console.error("[AdminRoute] Admin check error:", error);
+        setAllowed(res.ok && (data.is_admin === true || data.is_gm === true));
+      } catch {
         setAllowed(false);
       } finally {
-        setChecking(false);
+        setLoading(false);
       }
     };
 
-    verifyAdmin();
-  }, [isLoggedIn, isAdmin, adminLoading]);
+    run();
+  }, []);
 
-  // Show loading spinner while checking
-  if (checking || adminLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Verifying admin access...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Not logged in - redirect to home
-  if (!isLoggedIn) {
-    return <Navigate to="/" replace />;
-  }
-
-  // Not admin - redirect to dashboard
-  if (!allowed) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
+  if (loading) return null; // أو Spinner
+  if (!allowed) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
-};
+}

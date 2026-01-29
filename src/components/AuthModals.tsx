@@ -131,31 +131,34 @@ export const AuthModals = ({
         
         login(validation.data.login, result.user?.email || "", rememberMe);
         
-        // Check if user is admin
-        try {
-          const adminResponse = await fetch(
-            `https://woiendgame.online/api/check_admin.php`,
-            {
-              method: "GET",
-              credentials: "include",
-              headers: {
-                "Accept": "application/json",
-                "X-Session-Token": result.sessionToken || "",
-                "Authorization": `Bearer ${result.sessionToken || ""}`,
-              },
-            }
-          );
-          const adminData = await adminResponse.json();
-          
-          if (adminData.is_admin || adminData.is_gm) {
-            setShowAdminChoice(true);
-            setLoginData({ login: "", passwd: "" });
-            setRememberMe(false);
-            return;
-          }
-        } catch (adminError) {
-          // Security: Don't expose admin check errors to console in production
-        }
+// Check admin using session token (single source of truth)
+try {
+  const token = result.sessionToken || localStorage.getItem("woi_session_token") || "";
+
+  const adminResponse = await fetch("https://woiendgame.online/api/check_admin.php", {
+    method: "GET",
+    headers: {
+      "Accept": "application/json",
+      "X-Session-Token": token,
+    },
+  });
+
+  const adminText = await adminResponse.text();
+  let adminData: any = {};
+  try { adminData = JSON.parse(adminText); } catch {}
+
+  const isAdmin = adminResponse.ok && (adminData.is_admin === true || adminData.is_gm === true);
+
+  if (isAdmin) {
+    setShowAdminChoice(true);
+    setLoginData({ login: "", passwd: "" });
+    setRememberMe(false);
+    return;
+  }
+} catch {
+  // if admin check fails, continue as normal user
+}
+
         
         toast({
           title: "Success",
