@@ -39,7 +39,7 @@ export const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/";
-  const { user, isLoggedIn, isGM, gmLoading, logout } = useAuth();
+  const { user, isLoggedIn, isAdmin, adminLoading, logout } = useAuth();
 
   const navLinks = [
     { label: t('nav.home'), href: "#hero" },
@@ -108,7 +108,7 @@ export const Navbar = () => {
                   <Button variant="outline" size="sm" className="gap-2">
                     <User className="h-4 w-4" />
                     {user?.username}
-                    {isGM && (
+                    {isAdmin && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-destructive/20 text-destructive border border-destructive/30">
                         <ShieldAlert className="h-3 w-3" />
                         Admin
@@ -125,12 +125,12 @@ export const Navbar = () => {
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     Dashboard
                   </DropdownMenuItem>
-                  {gmLoading ? (
+                  {adminLoading ? (
                     <DropdownMenuItem disabled className="cursor-default">
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Checking permissions...
                     </DropdownMenuItem>
-                  ) : isGM && (
+                  ) : isAdmin && (
                     <DropdownMenuItem 
                       onClick={() => navigate('/admin')}
                       className="cursor-pointer text-destructive"
@@ -250,19 +250,19 @@ export const Navbar = () => {
                 <div className="flex items-center gap-2 py-2 text-sm font-medium text-foreground">
                   <User className="w-4 h-4" />
                   {user?.username}
-                    {isGM && (
+                    {isAdmin && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-destructive/20 text-destructive border border-destructive/30">
                         <ShieldAlert className="h-3 w-3" />
                         Admin
                       </span>
                     )}
                   </div>
-                  {gmLoading ? (
+                  {adminLoading ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Checking permissions...
                     </div>
-                  ) : isGM && (
+                  ) : isAdmin && (
                     <Link
                       to="/admin"
                       className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors py-2"

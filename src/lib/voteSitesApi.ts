@@ -48,7 +48,7 @@ export const voteSitesApi = {
     }
   },
 
-  // Get all vote sites including inactive (for GM)
+  // Get all vote sites including inactive (for Admin)
   async getAllSites(): Promise<VoteSite[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/vote_sites.php?action=list_all`);
@@ -60,7 +60,7 @@ export const voteSitesApi = {
     }
   },
 
-  // Add new vote site (GM only)
+  // Add new vote site (Admin only)
   async addSite(site: VoteSiteFormData): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/vote_sites.php`, {
@@ -75,7 +75,7 @@ export const voteSitesApi = {
     }
   },
 
-  // Update vote site (GM only)
+  // Update vote site (Admin only)
   async updateSite(id: number, site: Partial<VoteSiteFormData>): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/vote_sites.php`, {
@@ -90,7 +90,7 @@ export const voteSitesApi = {
     }
   },
 
-  // Delete vote site (GM only)
+  // Delete vote site (Admin only)
   async deleteSite(id: number): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/vote_sites.php`, {
@@ -105,7 +105,7 @@ export const voteSitesApi = {
     }
   },
 
-  // Toggle site active status (GM only)
+  // Toggle site active status (Admin only)
   async toggleSite(id: number, is_active: boolean): Promise<boolean> {
     return this.updateSite(id, { is_active });
   },

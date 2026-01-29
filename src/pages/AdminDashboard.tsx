@@ -9,8 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { GamePassRewardsManager } from "@/components/gm/GamePassRewardsManager";
-import { VoteSitesManager } from "@/components/gm/VoteSitesManager";
+import { GamePassRewardsManager } from "@/components/admin/GamePassRewardsManager";
+import { VoteSitesManager } from "@/components/admin/VoteSitesManager";
 import { NotificationsManager } from "@/components/admin/NotificationsManager";
 import { UsersManager } from "@/components/admin/UsersManager";
 import { WebshopManager } from "@/components/admin/WebshopManager";
@@ -41,12 +41,12 @@ interface ServerStats {
 }
 
 export default function AdminDashboard() {
-  const { user, isLoggedIn, isGM } = useAuth();
+  const { user, isLoggedIn, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
   const [activeTab, setActiveTab] = useState("overview");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [serverStats, setServerStats] = useState<ServerStats>({
     totalUsers: 0,
@@ -67,22 +67,25 @@ export default function AdminDashboard() {
       }
 
       try {
+        const sessionToken = localStorage.getItem("woi_session_token") || "";
+        
         // Call PHP API to check admin role from user_roles table
         const response = await fetch(
-          "https://woiendgame.online/api/check_gm.php",
+          "https://woiendgame.online/api/check_admin.php",
           {
             method: "GET",
             credentials: "include",
             headers: {
               "Accept": "application/json",
+              ...(sessionToken && { "X-Session-Token": sessionToken }),
             },
           }
         );
         const data = await response.json();
         
         // Check if user has admin role
-        if (data.is_gm || data.roles?.includes("admin")) {
-          setIsAdmin(true);
+        if (data.is_admin || data.is_gm || data.roles?.includes("admin")) {
+          setIsAuthorized(true);
         } else {
           toast({
             title: "Access Denied",
@@ -109,13 +112,18 @@ export default function AdminDashboard() {
 
   // Fetch server stats
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAuthorized) return;
 
     const fetchStats = async () => {
       setStatsLoading(true);
       try {
+        const sessionToken = localStorage.getItem("woi_session_token") || "";
+        
         const response = await fetch("https://woiendgame.online/api/admin_stats.php", {
           credentials: "include",
+          headers: {
+            ...(sessionToken && { "X-Session-Token": sessionToken }),
+          },
         });
         const data = await response.json();
         
@@ -147,7 +155,7 @@ export default function AdminDashboard() {
     fetchStats();
     const interval = setInterval(fetchStats, 60000); // Refresh every minute
     return () => clearInterval(interval);
-  }, [isAdmin]);
+  }, [isAuthorized]);
 
   if (checkingAuth) {
     return (
@@ -157,7 +165,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAuthorized) {
     return null;
   }
 

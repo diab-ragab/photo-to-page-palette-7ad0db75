@@ -29,7 +29,7 @@ import {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, isLoggedIn, isGM, logout } = useAuth();
+  const { user, isLoggedIn, isAdmin, logout } = useAuth();
   const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites } = useVoteSystem();
   const [serverStats, setServerStats] = useState({
     players: 0,
@@ -106,7 +106,7 @@ const Dashboard = () => {
           </div>
           
           {/* Admin Dashboard Switch */}
-          {isGM && (
+          {isAdmin && (
             <Button
               onClick={() => navigate("/admin")}
               variant="outline"

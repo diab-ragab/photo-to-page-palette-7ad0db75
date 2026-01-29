@@ -69,7 +69,7 @@ export const AuthModals = ({
   const [changeData, setChangeData] = useState({ oldPasswd: "", newPasswd: "", confirmPasswd: "" });
   const [changeLoading, setChangeLoading] = useState(false);
 
-  const [showGMChoice, setShowGMChoice] = useState(false);
+  const [showAdminChoice, setShowAdminChoice] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,21 +130,21 @@ export const AuthModals = ({
         
         login(validation.data.login, result.user?.email || "", rememberMe);
         
-        // Check if user is GM (use the dedicated check_gm.php)
+        // Check if user is admin
         try {
-          const gmResponse = await fetch(
-            `https://woiendgame.online/api/check_gm.php?user=${encodeURIComponent(validation.data.login)}`
+          const adminResponse = await fetch(
+            `https://woiendgame.online/api/check_admin.php?user=${encodeURIComponent(validation.data.login)}`
           );
-          const gmData = await gmResponse.json();
+          const adminData = await adminResponse.json();
           
-          if (gmData.is_gm) {
-            setShowGMChoice(true);
+          if (adminData.is_admin || adminData.is_gm) {
+            setShowAdminChoice(true);
             setLoginData({ login: "", passwd: "" });
             setRememberMe(false);
             return;
           }
-        } catch (gmError) {
-          // Security: Don't expose GM check errors to console in production
+        } catch (adminError) {
+          // Security: Don't expose admin check errors to console in production
         }
         
         toast({
@@ -173,14 +173,14 @@ export const AuthModals = ({
     }
   };
 
-  const handleGMChoice = (goToGM: boolean) => {
-    setShowGMChoice(false);
+  const handleAdminChoice = (goToAdmin: boolean) => {
+    setShowAdminChoice(false);
     setLoginOpen(false);
     toast({
       title: "Success",
       description: "Login successful!"
     });
-    navigate(goToGM ? "/gm-panel" : "/dashboard");
+    navigate(goToAdmin ? "/admin" : "/dashboard");
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -420,13 +420,13 @@ export const AuthModals = ({
 
   return (
     <>
-      {/* GM Choice - Mobile Drawer / Desktop Dialog */}
+      {/* Admin Choice - Mobile Drawer / Desktop Dialog */}
       {isMobile ? (
-        <Drawer open={showGMChoice} onOpenChange={setShowGMChoice}>
+        <Drawer open={showAdminChoice} onOpenChange={setShowAdminChoice}>
           <DrawerContent>
             <DrawerHeader className="text-center">
               <DrawerTitle className="text-2xl font-display text-primary">
-                Welcome, GM!
+                Welcome, Admin!
               </DrawerTitle>
               <DrawerDescription className="text-muted-foreground">
                 Where would you like to go?
@@ -436,15 +436,15 @@ export const AuthModals = ({
             <div className="space-y-3 p-4 pb-8">
               <Button 
                 className="w-full" 
-                onClick={() => handleGMChoice(true)}
+                onClick={() => handleAdminChoice(true)}
               >
                 <Shield className="mr-2 h-4 w-4" />
-                Go to GM Panel
+                Go to Admin Dashboard
               </Button>
               <Button 
                 variant="outline" 
                 className="w-full" 
-                onClick={() => handleGMChoice(false)}
+                onClick={() => handleAdminChoice(false)}
               >
                 <User className="mr-2 h-4 w-4" />
                 Go to Dashboard
@@ -457,14 +457,14 @@ export const AuthModals = ({
       {/* Login Modal */}
       <Dialog open={loginOpen} onOpenChange={(open) => {
         setLoginOpen(open);
-        if (!open) setShowGMChoice(false);
+        if (!open) setShowAdminChoice(false);
       }}>
         <DialogContent className="sm:max-w-md bg-card border-primary/20">
-          {showGMChoice && !isMobile ? (
+          {showAdminChoice && !isMobile ? (
             <>
               <DialogHeader>
                 <DialogTitle className="text-2xl font-display text-primary text-center">
-                  Welcome, GM!
+                  Welcome, Admin!
                 </DialogTitle>
                 <DialogDescription className="text-center text-muted-foreground">
                   Where would you like to go?
@@ -474,15 +474,15 @@ export const AuthModals = ({
               <div className="space-y-3 mt-4">
                 <Button 
                   className="w-full" 
-                  onClick={() => handleGMChoice(true)}
+                  onClick={() => handleAdminChoice(true)}
                 >
                   <Shield className="mr-2 h-4 w-4" />
-                  Go to GM Panel
+                  Go to Admin Dashboard
                 </Button>
                 <Button 
                   variant="outline" 
                   className="w-full" 
-                  onClick={() => handleGMChoice(false)}
+                  onClick={() => handleAdminChoice(false)}
                 >
                   <User className="mr-2 h-4 w-4" />
                   Go to Dashboard
