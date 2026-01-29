@@ -62,10 +62,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const sessionToken = localStorage.getItem("woi_session_token") || "";
       
+      console.log("[Auth] Checking admin status for:", user.username);
+      
       const response = await fetch(
         `https://woiendgame.online/api-reference/check_admin.php?user=${encodeURIComponent(user.username)}`,
         {
           method: "GET",
+          credentials: "include",
           headers: {
             "Accept": "application/json",
             ...(sessionToken && { "X-Session-Token": sessionToken }),
@@ -73,18 +76,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       );
       
+      console.log("[Auth] Admin check response status:", response.status);
+      
       if (!response.ok) {
         throw new Error("Admin check failed");
       }
       
       const data = await response.json();
+      console.log("[Auth] Admin check response data:", data);
       
       // Security: Admin status is stored in state only, never in localStorage
       const adminStatus = !!(data.is_admin || data.is_gm);
+      console.log("[Auth] Admin status determined:", adminStatus);
       setIsAdmin(adminStatus);
       return adminStatus;
     } catch (error) {
       // Security: Fail closed - if admin check fails, treat as non-admin
+      console.error("[Auth] Admin check error:", error);
       setIsAdmin(false);
       return false;
     } finally {
