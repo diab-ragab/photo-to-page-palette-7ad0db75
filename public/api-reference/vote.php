@@ -1,12 +1,42 @@
 <?php
+/**
+ * vote.php - Voting system API
+ * MySQL 5.1 compatible (no DEFAULT CURRENT_TIMESTAMP)
+ * Uses vote_time column in vote_log
+ */
+
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL);
+
+define('VERSION', '2026-01-30-B');
+
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/db.php';
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
-$pdo = getDB();
+$RID = bin2hex(random_bytes(6));
 
-// Ensure vote_log table exists
+function jsonOut(array $data): void {
+    global $RID;
+    echo json_encode(array_merge($data, ['rid' => $RID, '_version' => VERSION]), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+function jsonFail(int $code, string $msg): void {
+    http_response_code($code);
+    jsonOut(['success' => false, 'message' => $msg]);
+}
+
+try {
+    $pdo = getDB();
+} catch (Throwable $e) {
+    error_log("RID={$RID} DB_FAIL=" . $e->getMessage());
+    jsonFail(503, 'Service temporarily unavailable');
+}
+
+// Ensure vote_log table exists (MySQL 5.1 safe - no DEFAULT CURRENT_TIMESTAMP)
 try {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS vote_log (
@@ -19,14 +49,18 @@ try {
             coins_earned INT NOT NULL DEFAULT 0,
             vip_earned INT NOT NULL DEFAULT 0,
             streak_bonus DECIMAL(3,2) DEFAULT 1.00,
-            voted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            vote_time DATETIME NOT NULL,
             INDEX idx_user_site (user_id, site_id),
             INDEX idx_username_site (username, site_id),
-            INDEX idx_voted_at (voted_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            INDEX idx_vote_time (vote_time)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
+} catch (Throwable $e) {
+    // Table may already exist
+}
 
-    // Ensure vote_streaks table exists
+// Ensure vote_streaks table exists
+try {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS vote_streaks (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -36,13 +70,13 @@ try {
             last_vote_date DATE DEFAULT NULL,
             streak_expires_at DATETIME DEFAULT NULL,
             total_bonus_earned INT NOT NULL DEFAULT 0,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
             INDEX idx_username (username),
             INDEX idx_current_streak (current_streak DESC)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
-} catch (Exception $e) {
-    // Tables may already exist
+} catch (Throwable $e) {
+    // Table may already exist
 }
 
 // Streak tier configuration
@@ -60,7 +94,6 @@ function getStreakTier(int $streak): array {
     }
 }
 
-// Get next tier info
 function getNextTier(int $streak): ?array {
     if ($streak < 3) {
         return ['days_needed' => 3 - $streak, 'tier' => 'rising', 'multiplier' => 1.25];
@@ -71,7 +104,7 @@ function getNextTier(int $streak): ?array {
     } elseif ($streak < 30) {
         return ['days_needed' => 30 - $streak, 'tier' => 'legend', 'multiplier' => 2.0];
     }
-    return null; // Already at max tier
+    return null;
 }
 
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
@@ -79,22 +112,14 @@ $username = trim($_POST['username'] ?? $_GET['username'] ?? '');
 
 switch ($action) {
     case 'get_vote_status':
-        if (empty($username)) {
-            echo json_encode(['success' => false, 'error' => 'Username required']);
-            exit;
+        if ($username === '') {
+            jsonOut(['success' => false, 'error' => 'Username required']);
         }
 
         // Get user info
         $stmt = $pdo->prepare("SELECT ID FROM users WHERE name = ? LIMIT 1");
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$user) {
-            // Try memb_info table (legacy)
-            $stmt = $pdo->prepare("SELECT memb___id as ID FROM memb_info WHERE memb___id = ? LIMIT 1");
-            $stmt->execute([$username]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        }
 
         // Get user currency
         $coins = 0;
@@ -102,105 +127,129 @@ switch ($action) {
         $totalVotes = 0;
 
         if ($user) {
-            // Get from user_currency table
-            $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE username = ? LIMIT 1");
-            $stmt->execute([$username]);
-            $currency = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($currency) {
-                $coins = (int)$currency['coins'];
-                $vipPoints = (int)$currency['vip_points'];
+            // Get from user_currency table (try both user_id and username)
+            try {
+                $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE user_id = ? LIMIT 1");
+                $stmt->execute([(int)$user['ID']]);
+                $currency = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($currency) {
+                    $coins = (int)$currency['coins'];
+                    $vipPoints = (int)$currency['vip_points'];
+                }
+            } catch (Throwable $e) {
+                // Try username column
+                try {
+                    $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE username = ? LIMIT 1");
+                    $stmt->execute([$username]);
+                    $currency = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($currency) {
+                        $coins = (int)$currency['coins'];
+                        $vipPoints = (int)$currency['vip_points'];
+                    }
+                } catch (Throwable $e2) {
+                    // Continue with zeros
+                }
             }
 
             // Get total votes count
-            $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM vote_log WHERE username = ?");
-            $stmt->execute([$username]);
-            $voteCount = $stmt->fetch(PDO::FETCH_ASSOC);
-            $totalVotes = (int)($voteCount['total'] ?? 0);
+            try {
+                $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM vote_log WHERE username = ?");
+                $stmt->execute([$username]);
+                $voteCount = $stmt->fetch(PDO::FETCH_ASSOC);
+                $totalVotes = (int)($voteCount['total'] ?? 0);
+            } catch (Throwable $e) {
+                // Continue with zero
+            }
         }
 
         // Get streak data
-        $stmt = $pdo->prepare("SELECT * FROM vote_streaks WHERE username = ? LIMIT 1");
-        $stmt->execute([$username]);
-        $streakData = $stmt->fetch(PDO::FETCH_ASSOC);
-
         $currentStreak = 0;
         $longestStreak = 0;
         $streakExpiresAt = null;
         $lastVoteDate = null;
 
-        if ($streakData) {
-            $currentStreak = (int)$streakData['current_streak'];
-            $longestStreak = (int)$streakData['longest_streak'];
-            $lastVoteDate = $streakData['last_vote_date'];
-            $streakExpiresAt = $streakData['streak_expires_at'];
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM vote_streaks WHERE username = ? LIMIT 1");
+            $stmt->execute([$username]);
+            $streakData = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Check if streak has expired (36-hour window: 12h cooldown + 24h grace)
-            if ($streakExpiresAt && strtotime($streakExpiresAt) < time()) {
-                // Streak expired, reset it
-                $currentStreak = 0;
-                $stmt = $pdo->prepare("UPDATE vote_streaks SET current_streak = 0, streak_expires_at = NULL WHERE username = ?");
-                $stmt->execute([$username]);
+            if ($streakData) {
+                $currentStreak = (int)$streakData['current_streak'];
+                $longestStreak = (int)$streakData['longest_streak'];
+                $lastVoteDate = $streakData['last_vote_date'];
+                $streakExpiresAt = $streakData['streak_expires_at'];
+
+                // Check if streak has expired
+                if ($streakExpiresAt && strtotime($streakExpiresAt) < time()) {
+                    $currentStreak = 0;
+                    $stmt = $pdo->prepare("UPDATE vote_streaks SET current_streak = 0, streak_expires_at = NULL, updated_at = NOW() WHERE username = ?");
+                    $stmt->execute([$username]);
+                }
             }
+        } catch (Throwable $e) {
+            // Continue with defaults
         }
 
         $tierInfo = getStreakTier($currentStreak);
         $nextTier = getNextTier($currentStreak);
 
         // Get all active vote sites
-        $stmt = $pdo->query("SELECT id, cooldown_hours FROM vote_sites WHERE is_active = 1");
-        $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $sites = [];
+        try {
+            $stmt = $pdo->query("SELECT id, cooldown_hours FROM vote_sites WHERE is_active = 1");
+            $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            // No sites
+        }
 
-        // Check vote status for each site
+        // Check vote status for each site - KEY FIX: use vote_time column
         $siteStatuses = [];
         foreach ($sites as $site) {
             $siteId = (int)$site['id'];
             $cooldownHours = (int)$site['cooldown_hours'];
 
-            // Get last vote time for this site
-            $stmt = $pdo->prepare("
-                SELECT voted_at 
-                FROM vote_log 
-                WHERE username = ? AND site_id = ? 
-                ORDER BY voted_at DESC 
-                LIMIT 1
-            ");
-            $stmt->execute([$username, $siteId]);
-            $lastVote = $stmt->fetch(PDO::FETCH_ASSOC);
+            // Get last vote time for this site (using vote_time column)
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT vote_time 
+                    FROM vote_log 
+                    WHERE username = ? AND site_id = ? 
+                    ORDER BY vote_time DESC 
+                    LIMIT 1
+                ");
+                $stmt->execute([$username, $siteId]);
+                $lastVote = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($lastVote) {
-                $lastVoteTime = strtotime($lastVote['voted_at']);
-                $nextVoteTime = $lastVoteTime + ($cooldownHours * 3600);
-                $now = time();
+                if ($lastVote && $lastVote['vote_time']) {
+                    $lastVoteTime = strtotime($lastVote['vote_time']);
+                    $nextVoteTime = $lastVoteTime + ($cooldownHours * 3600);
+                    $now = time();
 
-                if ($now < $nextVoteTime) {
-                    // Still in cooldown
-                    $siteStatuses[$siteId] = [
-                        'can_vote' => false,
-                        'last_vote_time' => date('c', $lastVoteTime),
-                        'next_vote_time' => date('c', $nextVoteTime),
-                        'time_remaining' => ($nextVoteTime - $now) * 1000
-                    ];
-                } else {
-                    // Cooldown expired, can vote
-                    $siteStatuses[$siteId] = [
-                        'can_vote' => true,
-                        'last_vote_time' => date('c', $lastVoteTime),
-                        'next_vote_time' => null,
-                        'time_remaining' => null
-                    ];
+                    if ($now < $nextVoteTime) {
+                        // Still in cooldown
+                        $siteStatuses[$siteId] = [
+                            'can_vote' => false,
+                            'last_vote_time' => date('c', $lastVoteTime),
+                            'next_vote_time' => date('c', $nextVoteTime),
+                            'time_remaining' => ($nextVoteTime - $now) * 1000
+                        ];
+                    } else {
+                        // Cooldown expired, can vote
+                        $siteStatuses[$siteId] = [
+                            'can_vote' => true,
+                            'last_vote_time' => date('c', $lastVoteTime),
+                            'next_vote_time' => null,
+                            'time_remaining' => null
+                        ];
+                    }
                 }
-            } else {
-                // Never voted on this site
-                $siteStatuses[$siteId] = [
-                    'can_vote' => true,
-                    'last_vote_time' => null,
-                    'next_vote_time' => null,
-                    'time_remaining' => null
-                ];
+                // If no lastVote, don't add to siteStatuses - frontend will treat as never voted
+            } catch (Throwable $e) {
+                // Skip this site
             }
         }
 
-        echo json_encode([
+        jsonOut([
             'success' => true,
             'coins' => $coins,
             'vip_points' => $vipPoints,
@@ -219,17 +268,15 @@ switch ($action) {
         break;
 
     case 'submit_vote':
-        if (empty($username)) {
-            echo json_encode(['success' => false, 'message' => 'Username required']);
-            exit;
+        if ($username === '') {
+            jsonOut(['success' => false, 'message' => 'Username required']);
         }
 
         $siteId = (int)($_POST['site_id'] ?? $_GET['site_id'] ?? 0);
         $fingerprint = trim($_POST['fingerprint'] ?? '');
 
         if (!$siteId) {
-            echo json_encode(['success' => false, 'message' => 'Site ID required']);
-            exit;
+            jsonOut(['success' => false, 'message' => 'Site ID required']);
         }
 
         // Get site info
@@ -238,24 +285,23 @@ switch ($action) {
         $site = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$site) {
-            echo json_encode(['success' => false, 'message' => 'Invalid vote site']);
-            exit;
+            jsonOut(['success' => false, 'message' => 'Invalid vote site']);
         }
 
-        // Check cooldown
+        // Check cooldown (using vote_time column)
         $cooldownHours = (int)$site['cooldown_hours'];
         $stmt = $pdo->prepare("
-            SELECT voted_at 
+            SELECT vote_time 
             FROM vote_log 
             WHERE username = ? AND site_id = ? 
-            ORDER BY voted_at DESC 
+            ORDER BY vote_time DESC 
             LIMIT 1
         ");
         $stmt->execute([$username, $siteId]);
         $lastVote = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($lastVote) {
-            $lastVoteTime = strtotime($lastVote['voted_at']);
+        if ($lastVote && $lastVote['vote_time']) {
+            $lastVoteTime = strtotime($lastVote['vote_time']);
             $nextVoteTime = $lastVoteTime + ($cooldownHours * 3600);
             
             if (time() < $nextVoteTime) {
@@ -263,12 +309,11 @@ switch ($action) {
                 $hours = floor($remaining / 3600);
                 $minutes = floor(($remaining % 3600) / 60);
                 
-                echo json_encode([
+                jsonOut([
                     'success' => false,
                     'message' => "You can vote again in {$hours}h {$minutes}m",
                     'next_vote_time' => date('c', $nextVoteTime)
                 ]);
-                exit;
             }
         }
 
@@ -280,35 +325,41 @@ switch ($action) {
 
         // Handle streak logic
         $today = date('Y-m-d');
-        $stmt = $pdo->prepare("SELECT * FROM vote_streaks WHERE username = ? LIMIT 1");
-        $stmt->execute([$username]);
-        $streakData = $stmt->fetch(PDO::FETCH_ASSOC);
-
         $currentStreak = 0;
         $longestStreak = 0;
         $streakIncreased = false;
 
-        if ($streakData) {
-            $currentStreak = (int)$streakData['current_streak'];
-            $longestStreak = (int)$streakData['longest_streak'];
-            $lastVoteDate = $streakData['last_vote_date'];
-            $streakExpiresAt = $streakData['streak_expires_at'];
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM vote_streaks WHERE username = ? LIMIT 1");
+            $stmt->execute([$username]);
+            $streakData = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Check if streak expired
-            if ($streakExpiresAt && strtotime($streakExpiresAt) < time()) {
-                $currentStreak = 0;
-            }
+            if ($streakData) {
+                $currentStreak = (int)$streakData['current_streak'];
+                $longestStreak = (int)$streakData['longest_streak'];
+                $lastVoteDate = $streakData['last_vote_date'];
+                $streakExpiresAt = $streakData['streak_expires_at'];
 
-            // Check if this is a new day's vote
-            if ($lastVoteDate !== $today) {
-                $currentStreak++;
-                $streakIncreased = true;
-                if ($currentStreak > $longestStreak) {
-                    $longestStreak = $currentStreak;
+                // Check if streak expired
+                if ($streakExpiresAt && strtotime($streakExpiresAt) < time()) {
+                    $currentStreak = 0;
                 }
+
+                // Check if this is a new day's vote
+                if ($lastVoteDate !== $today) {
+                    $currentStreak++;
+                    $streakIncreased = true;
+                    if ($currentStreak > $longestStreak) {
+                        $longestStreak = $currentStreak;
+                    }
+                }
+            } else {
+                // First vote ever
+                $currentStreak = 1;
+                $longestStreak = 1;
+                $streakIncreased = true;
             }
-        } else {
-            // First vote ever
+        } catch (Throwable $e) {
             $currentStreak = 1;
             $longestStreak = 1;
             $streakIncreased = true;
@@ -331,53 +382,92 @@ switch ($action) {
 
         $ipAddress = $_SERVER['REMOTE_ADDR'] ?? '';
 
-        // Record the vote
+        // Record the vote (using vote_time with NOW())
         $stmt = $pdo->prepare("
-            INSERT INTO vote_log (user_id, username, site_id, fingerprint, ip_address, coins_earned, vip_earned, streak_bonus)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO vote_log (user_id, username, site_id, fingerprint, ip_address, coins_earned, vip_earned, streak_bonus, vote_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([$userId, $username, $siteId, $fingerprint, $ipAddress, $coinsReward, $vipReward, $multiplier]);
 
-        // Update user currency
-        $stmt = $pdo->prepare("
-            INSERT INTO user_currency (username, coins, vip_points)
-            VALUES (?, ?, ?)
-            ON DUPLICATE KEY UPDATE 
-                coins = coins + VALUES(coins),
-                vip_points = vip_points + VALUES(vip_points)
-        ");
-        $stmt->execute([$username, $coinsReward, $vipReward]);
+        // Update user currency - try user_id first, then username
+        try {
+            // First, check if table uses user_id or username
+            $cols = $pdo->query("SHOW COLUMNS FROM user_currency")->fetchAll(PDO::FETCH_COLUMN);
+            
+            if (in_array('user_id', $cols, true) && $userId > 0) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO user_currency (user_id, coins, vip_points)
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE 
+                        coins = coins + VALUES(coins),
+                        vip_points = vip_points + VALUES(vip_points)
+                ");
+                $stmt->execute([$userId, $coinsReward, $vipReward]);
+            } elseif (in_array('username', $cols, true)) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO user_currency (username, coins, vip_points)
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE 
+                        coins = coins + VALUES(coins),
+                        vip_points = vip_points + VALUES(vip_points)
+                ");
+                $stmt->execute([$username, $coinsReward, $vipReward]);
+            }
+        } catch (Throwable $e) {
+            error_log("RID={$RID} USER_CURRENCY_UPDATE=" . $e->getMessage());
+        }
 
         // Update streak data
-        $stmt = $pdo->prepare("
-            INSERT INTO vote_streaks (username, current_streak, longest_streak, last_vote_date, streak_expires_at, total_bonus_earned)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE 
-                current_streak = VALUES(current_streak),
-                longest_streak = GREATEST(longest_streak, VALUES(longest_streak)),
-                last_vote_date = VALUES(last_vote_date),
-                streak_expires_at = VALUES(streak_expires_at),
-                total_bonus_earned = total_bonus_earned + ?
-        ");
-        $stmt->execute([$username, $currentStreak, $longestStreak, $today, $streakExpiresAt, $bonusCoins + $bonusVip, $bonusCoins + $bonusVip]);
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO vote_streaks (username, current_streak, longest_streak, last_vote_date, streak_expires_at, total_bonus_earned, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE 
+                    current_streak = VALUES(current_streak),
+                    longest_streak = GREATEST(longest_streak, VALUES(longest_streak)),
+                    last_vote_date = VALUES(last_vote_date),
+                    streak_expires_at = VALUES(streak_expires_at),
+                    total_bonus_earned = total_bonus_earned + ?,
+                    updated_at = NOW()
+            ");
+            $stmt->execute([$username, $currentStreak, $longestStreak, $today, $streakExpiresAt, $bonusCoins + $bonusVip, $bonusCoins + $bonusVip]);
+        } catch (Throwable $e) {
+            error_log("RID={$RID} STREAK_UPDATE=" . $e->getMessage());
+        }
 
         // Get new totals
-        $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE username = ? LIMIT 1");
-        $stmt->execute([$username]);
-        $newCurrency = $stmt->fetch(PDO::FETCH_ASSOC);
+        $newCoins = $coinsReward;
+        $newVip = $vipReward;
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM user_currency")->fetchAll(PDO::FETCH_COLUMN);
+            if (in_array('user_id', $cols, true) && $userId > 0) {
+                $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE user_id = ? LIMIT 1");
+                $stmt->execute([$userId]);
+            } else {
+                $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE username = ? LIMIT 1");
+                $stmt->execute([$username]);
+            }
+            $newCurrency = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($newCurrency) {
+                $newCoins = (int)$newCurrency['coins'];
+                $newVip = (int)$newCurrency['vip_points'];
+            }
+        } catch (Throwable $e) {
+            // Use reward values
+        }
 
         $nextVoteTime = time() + ($cooldownHours * 3600);
         $nextTier = getNextTier($currentStreak);
 
-        echo json_encode([
+        jsonOut([
             'success' => true,
             'message' => 'Vote recorded successfully!',
             'coins_earned' => $coinsReward,
             'vip_points_earned' => $vipReward,
             'bonus_coins' => $bonusCoins,
             'bonus_vip' => $bonusVip,
-            'new_coins_total' => (int)($newCurrency['coins'] ?? $coinsReward),
-            'new_vip_total' => (int)($newCurrency['vip_points'] ?? $vipReward),
+            'new_coins_total' => $newCoins,
+            'new_vip_total' => $newVip,
             'next_vote_time' => date('c', $nextVoteTime),
             'streak' => [
                 'current' => $currentStreak,
@@ -394,27 +484,33 @@ switch ($action) {
     case 'get_streak_leaderboard':
         $limit = min((int)($_GET['limit'] ?? 10), 50);
         
-        $stmt = $pdo->prepare("
-            SELECT username, current_streak, longest_streak, last_vote_date, total_bonus_earned
-            FROM vote_streaks 
-            WHERE current_streak > 0
-            ORDER BY current_streak DESC, longest_streak DESC
-            LIMIT ?
-        ");
-        $stmt->execute([$limit]);
-        $leaders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $pdo->prepare("
+                SELECT username, current_streak, longest_streak, last_vote_date, total_bonus_earned
+                FROM vote_streaks 
+                WHERE current_streak > 0
+                ORDER BY current_streak DESC, longest_streak DESC
+                LIMIT ?
+            ");
+            $stmt->execute([$limit]);
+            $leaders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Add tier info to each leader
-        foreach ($leaders as &$leader) {
-            $leader['tier'] = getStreakTier((int)$leader['current_streak']);
+            foreach ($leaders as &$leader) {
+                $leader['tier'] = getStreakTier((int)$leader['current_streak']);
+            }
+
+            jsonOut([
+                'success' => true,
+                'leaderboard' => $leaders
+            ]);
+        } catch (Throwable $e) {
+            jsonOut([
+                'success' => true,
+                'leaderboard' => []
+            ]);
         }
-
-        echo json_encode([
-            'success' => true,
-            'leaderboard' => $leaders
-        ]);
         break;
 
     default:
-        echo json_encode(['success' => false, 'error' => 'Invalid action']);
+        jsonOut(['success' => false, 'error' => 'Invalid action']);
 }
