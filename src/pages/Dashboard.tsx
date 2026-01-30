@@ -8,6 +8,7 @@ import { useVoteSystem } from "@/hooks/useVoteSystem";
 import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
 import { VoteSiteCard } from "@/components/VoteSiteCard";
+import { VoteStreakCard } from "@/components/VoteStreakCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -24,13 +25,14 @@ import {
   TrendingUp,
   Gift,
   ArrowRightLeft,
-  CheckCircle2
+  CheckCircle2,
+  Flame
 } from "lucide-react";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isLoggedIn, isAdmin, logout } = useAuth();
-  const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites } = useVoteSystem();
+  const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites, streakData } = useVoteSystem();
   const [serverStats, setServerStats] = useState({
     players: 0,
     accounts: 0,
@@ -198,21 +200,23 @@ const Dashboard = () => {
             </Card>
           </div>
 
-          {/* Server Status Card */}
-          <div className="group relative p-[1px] rounded-xl bg-gradient-to-br from-primary/50 via-transparent to-primary/50 hover:from-primary hover:to-blue-500 transition-all duration-500">
-            <Card className="relative bg-card rounded-xl overflow-hidden transition-all duration-300 group-hover:translate-y-[-2px] group-hover:shadow-lg group-hover:shadow-primary/20">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          {/* Vote Streak Card */}
+          <div className="group relative p-[1px] rounded-xl bg-gradient-to-br from-orange-500/50 via-transparent to-orange-500/50 hover:from-orange-500 hover:to-red-500 transition-all duration-500">
+            <Card className="relative bg-card rounded-xl overflow-hidden transition-all duration-300 group-hover:translate-y-[-2px] group-hover:shadow-lg group-hover:shadow-orange-500/20">
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <CardHeader className="relative flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Online Players
+                  Vote Streak
                 </CardTitle>
-                <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors duration-300">
-                  <TrendingUp className="h-5 w-5 text-primary group-hover:scale-110 transition-transform duration-300" />
+                <div className="p-2 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors duration-300">
+                  <Flame className="h-5 w-5 text-orange-500 group-hover:scale-110 transition-transform duration-300" />
                 </div>
               </CardHeader>
               <CardContent className="relative">
-                <div className="text-2xl font-bold text-foreground">{serverStats.players}</div>
-                <p className="text-xs text-muted-foreground mt-1">Uptime: {serverStats.uptime}</p>
+                <div className="text-2xl font-bold text-foreground">{streakData.current} 🔥</div>
+                <p className="text-xs mt-1" style={{ color: streakData.tier.color }}>
+                  {streakData.tier.name} • {streakData.multiplier}x bonus
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -285,8 +289,11 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Sidebar: Wallet, Rewards & Profile */}
+          {/* Sidebar: Wallet, Streak, Rewards & Profile */}
           <div className="space-y-6">
+            {/* Vote Streak Card */}
+            <VoteStreakCard streakData={streakData} />
+
             {/* User Wallet */}
             <UserWallet 
               coins={voteData.coins} 
