@@ -36,6 +36,7 @@ const Dashboard = () => {
     accounts: 0,
     uptime: ""
   });
+  const [userZen, setUserZen] = useState(0);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -63,6 +64,25 @@ const Dashboard = () => {
     const interval = setInterval(fetchServerStats, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch user's Zen from database
+  useEffect(() => {
+    const fetchUserCurrency = async () => {
+      if (!user?.username) return;
+      
+      try {
+        const response = await fetch(`https://woiendgame.online/api/user_currency.php?username=${encodeURIComponent(user.username)}`);
+        const data = await response.json();
+        if (data.success) {
+          setUserZen(data.zen || 0);
+        }
+      } catch {
+        // Silent fail
+      }
+    };
+
+    fetchUserCurrency();
+  }, [user?.username]);
 
   // Calculate VIP progress (example: 1000 points = VIP 1, 5000 = VIP 2, etc.)
   const getVipLevel = (points: number) => {
@@ -271,6 +291,7 @@ const Dashboard = () => {
             <UserWallet 
               coins={voteData.coins} 
               vipPoints={voteData.vipPoints}
+              zen={userZen}
             />
 
             {/* Vote Rewards Summary */}

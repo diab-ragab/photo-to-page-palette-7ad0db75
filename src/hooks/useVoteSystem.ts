@@ -76,22 +76,22 @@ export const useVoteSystem = () => {
 
         setVoteSites(mergedSites);
       } else {
-        // API failed, use demo data
+        // API failed - show sites but mark as unavailable until API works
         const sites = await voteSitesApi.getActiveSites();
         setVoteSites(sites.map(site => ({
           ...site,
-          canVote: true,
+          canVote: false,
           lastVoteTime: null,
           nextVoteTime: null,
           timeRemaining: null
         })));
       }
     } catch {
-      // Use demo data on error
+      // On error - show sites but mark as unavailable
       const sites = await voteSitesApi.getActiveSites();
       setVoteSites(sites.map(site => ({
         ...site,
-        canVote: true,
+        canVote: false,
         lastVoteTime: null,
         nextVoteTime: null,
         timeRemaining: null
@@ -155,27 +155,12 @@ export const useVoteSystem = () => {
         });
       }
     } catch {
-      // Demo mode: simulate successful vote
+      // On error - notify user
       toast({
-        title: "Vote Successful! (Demo)",
-        description: `You earned ${site.coins_reward} coins and ${site.vip_reward} VIP points!`
+        title: "Vote Failed",
+        description: "Could not connect to vote server. Please try again.",
+        variant: "destructive"
       });
-
-      setVoteData(prev => ({
-        coins: prev.coins + site.coins_reward,
-        vipPoints: prev.vipPoints + site.vip_reward,
-        totalVotes: prev.totalVotes + 1
-      }));
-
-      setVoteSites(prev => prev.map(s =>
-        s.id === siteId
-          ? {
-              ...s,
-              canVote: false,
-              lastVoteTime: new Date().toISOString()
-            }
-          : s
-      ));
     } finally {
       setLoading(false);
     }

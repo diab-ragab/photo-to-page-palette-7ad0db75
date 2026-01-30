@@ -256,8 +256,7 @@ export const GamePass = () => {
           if (data.currentDay) setCurrentDay(data.currentDay);
         }
       } catch {
-        // Silent fail - use mock data for demo
-        setClaimedDays([1, 2, 3, 4]);
+        // Silent fail - no claimed days to show
       }
     };
 
@@ -289,19 +288,13 @@ export const GamePass = () => {
           description: `You received: ${rewards[day - 1][isElite ? "eliteReward" : "freeReward"].name}`,
         });
       } else {
-        // Demo mode - still claim
-        setClaimedDays([...claimedDays, day]);
-        const reward = rewards[day - 1][isElite ? "eliteReward" : "freeReward"];
-        toast.success("Reward claimed!", {
-          description: `You received: ${reward.name}`,
+        toast.error("Failed to claim reward", {
+          description: data.message || "Please try again later.",
         });
       }
-    } catch (error) {
-      // Demo mode fallback
-      setClaimedDays([...claimedDays, day]);
-      const reward = rewards[day - 1][isElite ? "eliteReward" : "freeReward"];
-      toast.success("Reward claimed!", {
-        description: `You received: ${reward.name}`,
+    } catch {
+      toast.error("Failed to claim reward", {
+        description: "Could not connect to server. Please try again.",
       });
     } finally {
       setLoading(false);
