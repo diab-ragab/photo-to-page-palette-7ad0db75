@@ -209,7 +209,7 @@ if ($action === 'list') {
     $sql = "
         SELECT 
             u.ID as id,
-            u.name as username,
+            u.name,
             u.email,
             u.creatime as created_at,
             COALESCE(uc.coins, 0) as coins,
@@ -263,7 +263,7 @@ if ($action === 'get') {
     $stmt = $pdo->prepare("
         SELECT 
             u.ID as id,
-            u.name as username,
+            u.name,
             u.email,
             u.creatime as created_at,
             COALESCE(uc.coins, 0) as coins,
