@@ -68,26 +68,42 @@ export function UsersManager() {
       const token = localStorage.getItem("woi_session_token") || "";
       const response = await fetch("https://woiendgame.online/api/admin_users.php?action=list", {
         credentials: "include",
+        redirect: "error",
         headers: {
           "Accept": "application/json",
           "X-Session-Token": token,
           "Authorization": `Bearer ${token}`,
         },
       });
-      const data = await response.json();
+
+      const text = await response.text();
+      let data: any = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        const rid = data?.rid ? ` (RID: ${data.rid})` : "";
+        const msg = data?.message || `Server error (${response.status})`;
+        toast({ title: "Error", description: `${msg}${rid}`, variant: "destructive" });
+        setUsers([]);
+        return;
+      }
       
-      if (data.success && data.users) {
+      if (data?.success && Array.isArray(data.users)) {
         // Map API response to expected format
-        const mappedUsers = data.users.map((u: { id: number; name: string; email: string; created_at: string; is_banned: boolean; is_admin: boolean; coins: number; vip_points: number; zen: number }) => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          created_at: u.created_at,
-          is_banned: u.is_banned,
+        const mappedUsers = data.users.map((u: any) => ({
+          id: Number(u.id),
+          name: String(u.name ?? u.username ?? ""),
+          email: String(u.email ?? ""),
+          created_at: String(u.created_at ?? ""),
+          is_banned: Boolean(u.is_banned),
           role: u.is_admin ? "admin" : "user",
-          coins: u.coins,
-          vip_points: u.vip_points,
-          zen: u.zen,
+          coins: Number(u.coins ?? 0),
+          vip_points: Number(u.vip_points ?? 0),
+          zen: Number(u.zen ?? 0),
         }));
         setUsers(mappedUsers);
       } else {
