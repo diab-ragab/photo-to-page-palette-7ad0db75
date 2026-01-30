@@ -57,11 +57,11 @@ export const useVoteSystem = () => {
   // Fetch vote sites and their status
   const fetchVoteSitesStatus = useCallback(async () => {
     if (!isLoggedIn || !user?.username) {
-      // Still load sites for display, but without vote status
+      // For non-logged-in users, show sites but require login to vote
       const sites = await voteSitesApi.getActiveSites();
       setVoteSites(sites.map(site => ({
         ...site,
-        canVote: false,
+        canVote: false, // Can't vote without login
         lastVoteTime: null,
         nextVoteTime: null,
         timeRemaining: null
@@ -121,22 +121,22 @@ export const useVoteSystem = () => {
 
         setVoteSites(mergedSites);
       } else {
-        // API failed - show sites but mark as unavailable until API works
+        // API failed - still show sites as available (optimistic) for logged-in users
         const sites = await voteSitesApi.getActiveSites();
         setVoteSites(sites.map(site => ({
           ...site,
-          canVote: false,
+          canVote: true, // Allow voting, server will validate
           lastVoteTime: null,
           nextVoteTime: null,
           timeRemaining: null
         })));
       }
     } catch {
-      // On error - show sites but mark as unavailable
+      // On error - still show sites as available for logged-in users
       const sites = await voteSitesApi.getActiveSites();
       setVoteSites(sites.map(site => ({
         ...site,
-        canVote: false,
+        canVote: true, // Allow voting, server will validate
         lastVoteTime: null,
         nextVoteTime: null,
         timeRemaining: null
