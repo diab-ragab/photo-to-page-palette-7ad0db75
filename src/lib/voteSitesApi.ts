@@ -44,7 +44,16 @@ export interface VoteSiteFormData {
 export const voteSitesApi = {
   // Get all active vote sites (for users)
   async getActiveSites(): Promise<VoteSite[]> {
-    const response = await fetch(`${API_BASE_URL}/vote_sites.php?action=list`);
+    // Avoid stale cooldown_hours after admin edits by bypassing HTTP caches.
+    const response = await fetch(`${API_BASE_URL}/vote_sites.php?action=list&rid=${Date.now()}`,
+      {
+        cache: "no-store",
+        redirect: "error",
+        headers: {
+          Accept: "application/json",
+        },
+      }
+    );
     if (!response.ok) throw new Error("Failed to fetch vote sites");
     const data = await response.json();
     return data.sites || [];
@@ -52,7 +61,9 @@ export const voteSitesApi = {
 
   // Get all vote sites including inactive (for Admin)
   async getAllSites(): Promise<VoteSite[]> {
-    const response = await fetch(`${API_BASE_URL}/vote_sites.php?action=list_all`, {
+    const response = await fetch(`${API_BASE_URL}/vote_sites.php?action=list_all&rid=${Date.now()}`, {
+      cache: "no-store",
+      redirect: "error",
       credentials: "include",
       headers: getAuthHeaders(),
     });
