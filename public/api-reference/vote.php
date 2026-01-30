@@ -9,7 +9,7 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
-define('VERSION', '2026-01-30-C');
+define('VERSION', '2026-01-30-D');
 
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/db.php';
@@ -62,6 +62,17 @@ try {
 } catch (Exception $e) {
     error_log("RID={$RID} DB_FAIL=" . $e->getMessage());
     jsonFail(503, 'Service temporarily unavailable');
+}
+
+// Detect username column in legacy schemas: prefer 'name', fallback to 'login'
+$usernameColumn = 'name';
+try {
+    $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('name', $cols, true) && in_array('login', $cols, true)) {
+        $usernameColumn = 'login';
+    }
+} catch (Exception $e) {
+    // Keep default 'name'
 }
 
 // Ensure vote_log table exists (MySQL 5.1 safe - no DEFAULT CURRENT_TIMESTAMP)
@@ -155,10 +166,16 @@ switch ($action) {
             jsonOut(['success' => false, 'error' => 'Username required']);
         }
 
-        // Get user info
-        $stmt = $pdo->prepare("SELECT ID FROM users WHERE name = ? LIMIT 1");
-        $stmt->execute([$username]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        // Get user info (schema-safe)
+        $user = null;
+        try {
+            $stmt = $pdo->prepare("SELECT ID FROM users WHERE {$usernameColumn} = ? LIMIT 1");
+            $stmt->execute([$username]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("RID={$RID} USERS_LOOKUP_FAIL=" . $e->getMessage());
+            $user = null;
+        }
 
         // Get user currency
         $coins = 0;
@@ -365,11 +382,17 @@ switch ($action) {
             }
         }
 
-        // Get user ID
-        $stmt = $pdo->prepare("SELECT ID FROM users WHERE name = ? LIMIT 1");
-        $stmt->execute([$username]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        $userId = $user ? (int)$user['ID'] : 0;
+        // Get user ID (schema-safe)
+        $userId = 0;
+        try {
+            $stmt = $pdo->prepare("SELECT ID FROM users WHERE {$usernameColumn} = ? LIMIT 1");
+            $stmt->execute([$username]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            $userId = $user ? (int)$user['ID'] : 0;
+        } catch (Exception $e) {
+            error_log("RID={$RID} USERS_LOOKUP_FAIL=" . $e->getMessage());
+            $userId = 0;
+        }
 
         // Handle streak logic
         $today = date('Y-m-d');
