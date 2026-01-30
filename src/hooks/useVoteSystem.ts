@@ -107,25 +107,20 @@ export const useVoteSystem = () => {
         // Merge vote status with site data
         const sites = await voteSitesApi.getActiveSites();
         const siteStatuses = result.site_statuses || {};
-        
-        const mergedSites: VoteSiteStatus[] = sites.map(site => {
-          const status = siteStatuses[site.id];
-          // If no status exists for this site, user has never voted - allow voting
-          if (!status) {
-            return {
-              ...site,
-              canVote: true,
-              lastVoteTime: null,
-              nextVoteTime: null,
-              timeRemaining: null
-            };
-          }
+
+        const mergedSites: VoteSiteStatus[] = sites.map((site) => {
+          const status = siteStatuses[site.id] || null;
+
+          // Important: treat "no last_vote_time" as "never voted" (vote should be available)
+          const lastVoteTime = status?.last_vote_time || null;
+          const hasVotedBefore = !!lastVoteTime;
+
           return {
             ...site,
-            canVote: status.can_vote === true,
-            lastVoteTime: status.last_vote_time || null,
-            nextVoteTime: status.next_vote_time || null,
-            timeRemaining: status.time_remaining || null
+            canVote: hasVotedBefore ? status?.can_vote === true : true,
+            lastVoteTime,
+            nextVoteTime: status?.next_vote_time || null,
+            timeRemaining: status?.time_remaining || null,
           };
         });
 
