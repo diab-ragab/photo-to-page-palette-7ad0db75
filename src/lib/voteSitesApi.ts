@@ -1,5 +1,16 @@
 const API_BASE_URL = "https://woiendgame.online/api";
 
+// Helper to get auth headers
+function getAuthHeaders(): HeadersInit {
+  const sessionToken = localStorage.getItem("woi_session_token") || "";
+  return {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "X-Session-Token": sessionToken,
+    "Authorization": `Bearer ${sessionToken}`,
+  };
+}
+
 export interface VoteSite {
   id: number;
   name: string;
@@ -43,6 +54,7 @@ export const voteSitesApi = {
   async getAllSites(): Promise<VoteSite[]> {
     const response = await fetch(`${API_BASE_URL}/vote_sites.php?action=list_all`, {
       credentials: "include",
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error("Failed to fetch vote sites");
     const data = await response.json();
@@ -53,7 +65,7 @@ export const voteSitesApi = {
   async addSite(site: VoteSiteFormData): Promise<boolean> {
     const response = await fetch(`${API_BASE_URL}/vote_sites.php`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       credentials: "include",
       body: JSON.stringify({ action: "add", ...site }),
     });
@@ -65,7 +77,7 @@ export const voteSitesApi = {
   async updateSite(id: number, site: Partial<VoteSiteFormData>): Promise<boolean> {
     const response = await fetch(`${API_BASE_URL}/vote_sites.php`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       credentials: "include",
       body: JSON.stringify({ action: "update", id, ...site }),
     });
@@ -77,7 +89,7 @@ export const voteSitesApi = {
   async deleteSite(id: number): Promise<boolean> {
     const response = await fetch(`${API_BASE_URL}/vote_sites.php`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       credentials: "include",
       body: JSON.stringify({ action: "delete", id }),
     });
