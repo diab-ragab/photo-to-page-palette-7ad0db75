@@ -9,7 +9,7 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
-define('VERSION', '2026-01-30-D');
+define('VERSION', '2026-01-30-G');
 
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/db.php';
@@ -454,11 +454,16 @@ switch ($action) {
         $ipAddress = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
 
         // Record the vote (using vote_time with NOW())
-        $stmt = $pdo->prepare("
-            INSERT INTO vote_log (user_id, username, site_id, fingerprint, ip_address, coins_earned, vip_earned, streak_bonus, vote_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-        ");
-        $stmt->execute([$userId, $username, $siteId, $fingerprint, $ipAddress, $coinsReward, $vipReward, $multiplier]);
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO vote_log (user_id, username, site_id, fingerprint, ip_address, coins_earned, vip_earned, streak_bonus, vote_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([$userId, $username, $siteId, $fingerprint, $ipAddress, $coinsReward, $vipReward, $multiplier]);
+        } catch (Exception $e) {
+            error_log("RID={$RID} VOTE_LOG_INSERT_FAIL=" . $e->getMessage());
+            jsonFail(500, 'Failed to record vote', ['detail' => 'vote_log insert error']);
+        }
 
         // Update user currency - try user_id first, then username
         try {
