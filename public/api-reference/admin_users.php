@@ -131,11 +131,16 @@ function requireAdmin(PDO $pdo): int {
     
     $userId = (int)$session['user_id'];
     
-    $stmt = $pdo->prepare("SELECT 1 FROM user_roles WHERE user_id = ? AND role = 'admin' LIMIT 1");
-    $stmt->execute([$userId]);
-    
-    if (!$stmt->fetch()) {
-        json_fail(403, 'Admin access required');
+    try {
+        $stmt = $pdo->prepare("SELECT 1 FROM user_roles WHERE user_id = ? AND role = 'admin' LIMIT 1");
+        $stmt->execute([$userId]);
+
+        if (!$stmt->fetch()) {
+            json_fail(403, 'Admin access required');
+        }
+    } catch (Throwable $e) {
+        error_log("RID={$GLOBALS['RID']} requireAdmin_roles=" . $e->getMessage());
+        json_fail(503, 'Authorization system unavailable');
     }
     
     return $userId;
@@ -145,7 +150,7 @@ function requireAdmin(PDO $pdo): int {
 function ensureTables(PDO $pdo): array {
     $created = [];
     
-    // User currency sidecar table
+    // User currency sidecar table (MySQL 5.1 safe)
     try {
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_currency (
             user_id INT PRIMARY KEY,
@@ -154,7 +159,7 @@ function ensureTables(PDO $pdo): array {
             zen BIGINT DEFAULT 0,
             premium INT DEFAULT 0,
             total_votes INT DEFAULT 0,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            updated_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
         $created['user_currency'] = true;
     } catch (Throwable $e) {
@@ -162,13 +167,13 @@ function ensureTables(PDO $pdo): array {
         $created['user_currency'] = false;
     }
     
-    // User roles table
+    // User roles table (MySQL 5.1 safe)
     try {
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_roles (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
             role VARCHAR(50) NOT NULL,
-            granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            granted_at DATETIME NOT NULL,
             granted_by VARCHAR(50) NULL,
             UNIQUE KEY uq_user_role (user_id, role),
             KEY idx_user_id (user_id)
@@ -179,13 +184,13 @@ function ensureTables(PDO $pdo): array {
         $created['user_roles'] = false;
     }
     
-    // Ban tracking table
+    // Ban tracking table (MySQL 5.1 safe)
     try {
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_bans (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL UNIQUE,
             reason TEXT,
-            banned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            banned_at DATETIME NOT NULL,
             banned_by INT NULL,
             expires_at DATETIME NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
@@ -210,6 +215,29 @@ function sidecarTablesReady(PDO $pdo): bool {
     } catch (Throwable $e) {
         return false;
     }
+}
+
+// Users schema helpers (avoid assuming legacy columns exist)
+function getUsersColumns(PDO $pdo): array {
+    try {
+        $cols = [];
+        $stmt = $pdo->query("SHOW COLUMNS FROM users");
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!empty($row['Field'])) $cols[] = (string)$row['Field'];
+        }
+        return $cols;
+    } catch (Throwable $e) {
+        error_log("RID={$GLOBALS['RID']} users_columns=" . $e->getMessage());
+        return [];
+    }
+}
+
+function pickFirstExisting(array $columns, array $candidates): ?string {
+    $set = array_fill_keys($columns, true);
+    foreach ($candidates as $c) {
+        if (isset($set[$c])) return $c;
+    }
+    return null;
 }
 
 // Parse input
@@ -262,14 +290,14 @@ if (!$skipAuth) {
     $adminId = requireAdmin($pdo);
 }
 
-$sidecarReady = true;
+$sidecarReady = false;
 try {
     ensureTables($pdo);
 } catch (Throwable $e) {
     error_log("RID={$RID} ensureTables_failed=" . $e->getMessage());
-    // If CREATE is forbidden but tables already exist, allow continuing.
-    $sidecarReady = sidecarTablesReady($pdo);
 }
+// IMPORTANT: ensureTables() may partially fail; base readiness on actual table presence
+$sidecarReady = sidecarTablesReady($pdo);
 
 // ============ LIST USERS ============
 if ($action === 'list') {
@@ -277,13 +305,22 @@ if ($action === 'list') {
     $page = max(1, (int)($_GET['page'] ?? 1));
     $limit = min(100, max(10, (int)($_GET['limit'] ?? 20)));
     $offset = ($page - 1) * $limit;
+
+    $userCols = getUsersColumns($pdo);
+    $emailCol = pickFirstExisting($userCols, ['email', 'mail', 'Email', 'Mail']);
+    $createdCol = pickFirstExisting($userCols, ['creatime', 'created_at', 'CreateTime', 'regdate', 'register_time']);
     
     $where = '';
     $params = [];
     
     if ($search !== '') {
-        $where = "WHERE u.name LIKE ? OR u.email LIKE ?";
-        $params = ["%{$search}%", "%{$search}%"];
+        if ($emailCol) {
+            $where = "WHERE u.name LIKE ? OR u.`{$emailCol}` LIKE ?";
+            $params = ["%{$search}%", "%{$search}%"];
+        } else {
+            $where = "WHERE u.name LIKE ?";
+            $params = ["%{$search}%"];
+        }
     }
     
     // Count total
@@ -294,13 +331,16 @@ if ($action === 'list') {
     
     // Get users with currency and role info (fallback to users table only if sidecar tables missing)
     try {
+        $emailSelect = $emailCol ? "u.`{$emailCol}` as email" : "'' as email";
+        $createdSelect = $createdCol ? "u.`{$createdCol}` as created_at" : "'' as created_at";
+
         if ($sidecarReady) {
             $sql = "
                 SELECT 
                     u.ID as id,
                     u.name,
-                    u.email,
-                    u.creatime as created_at,
+                    {$emailSelect},
+                    {$createdSelect},
                     COALESCE(uc.coins, 0) as coins,
                     COALESCE(uc.vip_points, 0) as vip_points,
                     COALESCE(uc.zen, 0) as zen,
@@ -320,8 +360,8 @@ if ($action === 'list') {
                 SELECT 
                     u.ID as id,
                     u.name,
-                    u.email,
-                    u.creatime as created_at,
+                    {$emailSelect},
+                    {$createdSelect},
                     0 as coins,
                     0 as vip_points,
                     0 as zen,
@@ -373,13 +413,19 @@ if ($action === 'get') {
     }
     
     try {
+        $userCols = getUsersColumns($pdo);
+        $emailCol = pickFirstExisting($userCols, ['email', 'mail', 'Email', 'Mail']);
+        $createdCol = pickFirstExisting($userCols, ['creatime', 'created_at', 'CreateTime', 'regdate', 'register_time']);
+        $emailSelect = $emailCol ? "u.`{$emailCol}` as email" : "'' as email";
+        $createdSelect = $createdCol ? "u.`{$createdCol}` as created_at" : "'' as created_at";
+
         if ($sidecarReady) {
             $stmt = $pdo->prepare("
                 SELECT 
                     u.ID as id,
                     u.name,
-                    u.email,
-                    u.creatime as created_at,
+                    {$emailSelect},
+                    {$createdSelect},
                     COALESCE(uc.coins, 0) as coins,
                     COALESCE(uc.vip_points, 0) as vip_points,
                     COALESCE(uc.zen, 0) as zen,
@@ -394,8 +440,8 @@ if ($action === 'get') {
                 SELECT 
                     u.ID as id,
                     u.name,
-                    u.email,
-                    u.creatime as created_at,
+                    {$emailSelect},
+                    {$createdSelect},
                     0 as coins,
                     0 as vip_points,
                     0 as zen,
@@ -465,13 +511,14 @@ if ($action === 'update_currency' && $method === 'POST') {
     if ($sidecarReady) {
         try {
             $stmt = $pdo->prepare("
-                INSERT INTO user_currency (user_id, coins, vip_points, zen, premium)
-                VALUES (?, COALESCE(?, 0), COALESCE(?, 0), COALESCE(?, 0), COALESCE(?, 0))
+                INSERT INTO user_currency (user_id, coins, vip_points, zen, premium, updated_at)
+                VALUES (?, COALESCE(?, 0), COALESCE(?, 0), COALESCE(?, 0), COALESCE(?, 0), NOW())
                 ON DUPLICATE KEY UPDATE
                     coins = COALESCE(?, coins),
                     vip_points = COALESCE(?, vip_points),
                     zen = COALESCE(?, zen),
-                    premium = COALESCE(?, premium)
+                    premium = COALESCE(?, premium),
+                    updated_at = NOW()
             ");
             $stmt->execute([
                 $userId, $coins, $vipPoints, $zen, $premium,
@@ -532,7 +579,7 @@ if ($action === 'set_role' && $method === 'POST') {
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 user_id INT NOT NULL,
                 role VARCHAR(50) NOT NULL,
-                granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                granted_at DATETIME NOT NULL,
                 granted_by VARCHAR(50) NULL,
                 UNIQUE KEY uq_user_role (user_id, role),
                 KEY idx_user_id (user_id)
@@ -544,10 +591,10 @@ if ($action === 'set_role' && $method === 'POST') {
     
     if ($grant) {
         $stmt = $pdo->prepare("
-            INSERT IGNORE INTO user_roles (user_id, role, granted_by)
-            VALUES (?, ?, ?)
+            INSERT IGNORE INTO user_roles (user_id, role, granted_at, granted_by)
+            VALUES (?, ?, NOW(), ?)
         ");
-        $stmt->execute([$userId, $role, $adminId ?: 'system']);
+        $stmt->execute([$userId, $role, (string)($adminId ?: 'system')]);
         $message = "Role '{$role}' granted";
     } else {
         $stmt = $pdo->prepare("DELETE FROM user_roles WHERE user_id = ? AND role = ?");
@@ -580,7 +627,7 @@ if ($action === 'toggle_ban' && $method === 'POST') {
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 user_id INT NOT NULL UNIQUE,
                 reason TEXT,
-                banned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                banned_at DATETIME NOT NULL,
                 banned_by INT NULL,
                 expires_at DATETIME NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
@@ -591,8 +638,8 @@ if ($action === 'toggle_ban' && $method === 'POST') {
     
     if ($ban) {
         $stmt = $pdo->prepare("
-            INSERT INTO user_bans (user_id, reason, banned_by)
-            VALUES (?, ?, ?)
+            INSERT INTO user_bans (user_id, reason, banned_by, banned_at)
+            VALUES (?, ?, ?, NOW())
             ON DUPLICATE KEY UPDATE reason = ?, banned_by = ?, banned_at = NOW()
         ");
         $stmt->execute([$userId, $reason, $adminId, $reason, $adminId]);
