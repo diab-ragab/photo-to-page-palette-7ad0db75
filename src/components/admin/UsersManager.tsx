@@ -65,29 +65,39 @@ export function UsersManager() {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
+      const token = localStorage.getItem("woi_session_token") || "";
       const response = await fetch("https://woiendgame.online/api/admin_users.php?action=list", {
         credentials: "include",
+        headers: {
+          "Accept": "application/json",
+          "X-Session-Token": token,
+          "Authorization": `Bearer ${token}`,
+        },
       });
       const data = await response.json();
       
       if (data.success && data.users) {
-        setUsers(data.users);
+        // Map API response to expected format (username -> name)
+        const mappedUsers = data.users.map((u: { id: number; username: string; email: string; created_at: string; is_banned: boolean; is_admin: boolean; coins: number; vip_points: number; zen: number }) => ({
+          id: u.id,
+          name: u.username,
+          email: u.email,
+          created_at: u.created_at,
+          is_banned: u.is_banned,
+          role: u.is_admin ? "admin" : "user",
+          coins: u.coins,
+          vip_points: u.vip_points,
+          zen: u.zen,
+        }));
+        setUsers(mappedUsers);
       } else {
-        // Demo data
-        setUsers([
-          { id: 1, name: "Player1", email: "player1@example.com", created_at: "2024-01-15", is_banned: false, role: "user", coins: 500, vip_points: 1200, zen: 50000, total_votes: 45 },
-          { id: 2, name: "ProGamer", email: "pro@example.com", created_at: "2024-02-20", is_banned: false, role: "user", coins: 2500, vip_points: 8500, zen: 250000, total_votes: 180 },
-          { id: 3, name: "TestAdmin", email: "admin@example.com", created_at: "2024-01-01", is_banned: false, role: "admin", coins: 10000, vip_points: 50000, zen: 1000000, total_votes: 500 },
-          { id: 4, name: "BannedUser", email: "banned@example.com", created_at: "2024-03-10", is_banned: true, role: "user", coins: 0, vip_points: 0, zen: 0, total_votes: 5 },
-        ]);
+        toast({ title: "Error", description: data.message || "Failed to load users", variant: "destructive" });
+        setUsers([]);
       }
-    } catch {
-      // Demo data on error
-      setUsers([
-        { id: 1, name: "Player1", email: "player1@example.com", created_at: "2024-01-15", is_banned: false, role: "user", coins: 500, vip_points: 1200, zen: 50000, total_votes: 45 },
-        { id: 2, name: "ProGamer", email: "pro@example.com", created_at: "2024-02-20", is_banned: false, role: "user", coins: 2500, vip_points: 8500, zen: 250000, total_votes: 180 },
-        { id: 3, name: "TestAdmin", email: "admin@example.com", created_at: "2024-01-01", is_banned: false, role: "admin", coins: 10000, vip_points: 50000, zen: 1000000, total_votes: 500 },
-      ]);
+    } catch (err) {
+      console.error("Failed to fetch users:", err);
+      toast({ title: "Error", description: "Failed to connect to server", variant: "destructive" });
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }
@@ -113,41 +123,75 @@ export function UsersManager() {
 
     setIsUpdating(true);
     try {
-      const response = await fetch("https://woiendgame.online/api/admin_users.php?action=update", {
+      const token = localStorage.getItem("woi_session_token") || "";
+      
+      // Update currency
+      const currencyResponse = await fetch("https://woiendgame.online/api/admin_users.php?action=update_currency", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-Session-Token": token,
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify({
           user_id: selectedUser.id,
-          ...editData,
+          coins: editData.coins,
+          vip_points: editData.vip_points,
+          zen: editData.zen,
         }),
       });
 
-      const data = await response.json();
+      const currencyData = await currencyResponse.json();
 
-      if (data.success) {
+      // Update role if changed
+      const currentIsAdmin = selectedUser.role === "admin";
+      const newIsAdmin = editData.role === "admin";
+      
+      if (currentIsAdmin !== newIsAdmin) {
+        await fetch("https://woiendgame.online/api/admin_users.php?action=set_role", {
+          method: "POST",
+          credentials: "include",
+          headers: { 
+            "Content-Type": "application/json",
+            "X-Session-Token": token,
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            user_id: selectedUser.id,
+            role: "admin",
+            grant: newIsAdmin,
+          }),
+        });
+      }
+
+      // Update ban status if changed
+      if (selectedUser.is_banned !== editData.is_banned) {
+        await fetch("https://woiendgame.online/api/admin_users.php?action=toggle_ban", {
+          method: "POST",
+          credentials: "include",
+          headers: { 
+            "Content-Type": "application/json",
+            "X-Session-Token": token,
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            user_id: selectedUser.id,
+            ban: editData.is_banned,
+          }),
+        });
+      }
+
+      if (currencyData.success) {
         toast({ title: "Success", description: "User updated successfully!" });
         fetchUsers();
         handleCloseModal();
       } else {
-        // Demo mode
-        setUsers(users.map(u => 
-          u.id === selectedUser.id 
-            ? { ...u, ...editData }
-            : u
-        ));
-        toast({ title: "Success (Demo)", description: "User updated locally" });
-        handleCloseModal();
+        toast({ title: "Error", description: currencyData.message || "Failed to update user", variant: "destructive" });
       }
-    } catch {
-      // Demo mode
-      setUsers(users.map(u => 
-        u.id === selectedUser.id 
-          ? { ...u, ...editData }
-          : u
-      ));
-      toast({ title: "Success (Demo)", description: "User updated locally" });
-      handleCloseModal();
+    } catch (err) {
+      console.error("Failed to update user:", err);
+      toast({ title: "Error", description: "Failed to update user", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -155,11 +199,16 @@ export function UsersManager() {
 
   const handleToggleBan = async (userId: number, isBanned: boolean) => {
     try {
+      const token = localStorage.getItem("woi_session_token") || "";
       const response = await fetch("https://woiendgame.online/api/admin_users.php?action=toggle_ban", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, is_banned: isBanned }),
+        headers: { 
+          "Content-Type": "application/json",
+          "X-Session-Token": token,
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user_id: userId, ban: isBanned }),
       });
 
       const data = await response.json();
@@ -171,14 +220,11 @@ export function UsersManager() {
         });
         fetchUsers();
       } else {
-        // Demo mode
-        setUsers(users.map(u => u.id === userId ? { ...u, is_banned: isBanned } : u));
-        toast({ title: "Success (Demo)", description: `User ${isBanned ? "banned" : "unbanned"} locally` });
+        toast({ title: "Error", description: data.message || "Failed to update ban status", variant: "destructive" });
       }
-    } catch {
-      // Demo mode
-      setUsers(users.map(u => u.id === userId ? { ...u, is_banned: isBanned } : u));
-      toast({ title: "Success (Demo)", description: `User ${isBanned ? "banned" : "unbanned"} locally` });
+    } catch (err) {
+      console.error("Failed to toggle ban:", err);
+      toast({ title: "Error", description: "Failed to update ban status", variant: "destructive" });
     }
   };
 
