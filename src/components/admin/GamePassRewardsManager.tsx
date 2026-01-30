@@ -38,6 +38,17 @@ const rarityOptions = [
 
 const iconOptions = ["🪙", "💰", "⭐", "🌟", "🧪", "💧", "⚡", "📦", "🗡️", "🔥", "🛡️", "✨", "🥚", "🐉", "🎁", "💎", "👑", "🏆"];
 
+// Helper to get auth headers
+function getAuthHeaders(): HeadersInit {
+  const sessionToken = localStorage.getItem("woi_session_token") || "";
+  return {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "X-Session-Token": sessionToken,
+    "Authorization": `Bearer ${sessionToken}`,
+  };
+}
+
 const defaultReward: Omit<GamePassReward, "id"> = {
   day: 1,
   tier: "free",
@@ -100,7 +111,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify({
           ...editData,
@@ -130,7 +141,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     try {
       const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=delete_reward", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify({ id }),
       });

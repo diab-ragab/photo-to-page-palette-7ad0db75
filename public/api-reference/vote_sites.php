@@ -2,46 +2,79 @@
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/db.php';
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 header('Content-Type: application/json');
 
 $pdo = getDB();
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
-// Helper to check admin for write operations
+// Token-based auth helper (same as check_admin.php)
+function getSessionToken(): string {
+    $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (stripos($auth, 'Bearer ') === 0) return trim(substr($auth, 7));
+    
+    $hdr = $_SERVER['HTTP_X_SESSION_TOKEN'] ?? '';
+    if ($hdr) return trim($hdr);
+    
+    if (!empty($_GET['sessionToken'])) return trim((string)$_GET['sessionToken']);
+    if (!empty($_COOKIE['sessionToken'])) return trim((string)$_COOKIE['sessionToken']);
+    
+    return '';
+}
+
+// Helper to check admin for write operations using token-based auth
 function requireAdminForWrite() {
-    // Session already started above
-    if (empty($_SESSION['user_id'])) {
-        // Try to get username from session and look up user_id
-        if (!empty($_SESSION['username'])) {
-            global $pdo;
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
-            $stmt->execute([$_SESSION['username']]);
-            $user = $stmt->fetch();
-            if ($user) {
-                $_SESSION['user_id'] = $user['id'];
-            }
-        }
-        
-        if (empty($_SESSION['user_id'])) {
-            http_response_code(401);
-            echo json_encode(['success' => false, 'error' => 'Not authenticated']);
-            exit;
-        }
+    global $pdo;
+    
+    $sessionToken = getSessionToken();
+    if ($sessionToken === '') {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Not authenticated']);
+        exit;
     }
     
-    global $pdo;
-    $stmt = $pdo->prepare("SELECT 1 FROM user_roles WHERE user_id = ? AND role = 'admin' LIMIT 1");
-    $stmt->execute([$_SESSION['user_id']]);
-    if (!$stmt->fetch()) {
+    // Get user from session token
+    $stmt = $pdo->prepare("
+        SELECT us.user_id, u.name
+        FROM user_sessions us
+        JOIN users u ON u.ID = us.user_id
+        WHERE us.session_token = ? AND us.expires_at > NOW()
+        LIMIT 1
+    ");
+    $stmt->execute([$sessionToken]);
+    $session = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$session) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Session expired or invalid']);
+        exit;
+    }
+    
+    $userId = (int)$session['user_id'];
+    $username = (string)$session['name'];
+    
+    // Check admin role
+    $stmt = $pdo->prepare("SELECT role FROM user_roles WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $roles = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    
+    $isAdmin = in_array('admin', $roles, true) || in_array('gm', $roles, true);
+    
+    // Also check bootstrap admin from config
+    if (!$isAdmin) {
+        $cfg = function_exists('getConfig') ? (array)getConfig() : [];
+        $sec = $cfg['security'] ?? [];
+        $adminIds = is_array($sec['admin_user_ids'] ?? null) ? $sec['admin_user_ids'] : (is_array($cfg['admin_user_ids'] ?? null) ? $cfg['admin_user_ids'] : []);
+        $adminNames = is_array($sec['admin_usernames'] ?? null) ? $sec['admin_usernames'] : (is_array($cfg['admin_usernames'] ?? null) ? $cfg['admin_usernames'] : []);
+        $isAdmin = in_array($userId, $adminIds, true) || in_array($username, $adminNames, true);
+    }
+    
+    if (!$isAdmin) {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'Admin access required']);
         exit;
     }
+    
+    return $userId;
 }
 
 // Ensure vote_sites table exists
