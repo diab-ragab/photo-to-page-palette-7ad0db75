@@ -120,7 +120,7 @@ export const VoteSiteCard = ({ site, onVote, loading }: VoteSiteCardProps) => {
             <div className="flex items-center justify-center gap-2 py-2 px-3 bg-muted/50 rounded-lg">
               <Clock className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-mono font-medium text-muted-foreground">
-                {timeRemaining || "Ready soon..."}
+                {timeRemaining || "Loading..."}
               </span>
             </div>
           )}
