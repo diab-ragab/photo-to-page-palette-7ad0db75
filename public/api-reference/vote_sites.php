@@ -7,6 +7,16 @@ header('Content-Type: application/json');
 $pdo = getDB();
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
+// Read JSON body once (php://input is a stream and can be consumed only once)
+$__rawBody = file_get_contents('php://input');
+$__jsonInput = json_decode($__rawBody ?: '', true);
+if (!is_array($__jsonInput)) $__jsonInput = [];
+
+// Support clients sending { action: "..." } in JSON body
+if ($action === '' && isset($__jsonInput['action'])) {
+    $action = (string)$__jsonInput['action'];
+}
+
 // Token-based auth helper (same as check_admin.php)
 function getSessionToken(): string {
     $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
@@ -115,8 +125,8 @@ switch ($action) {
 
     case 'add':
         requireAdminForWrite();
-        
-        $input = json_decode(file_get_contents('php://input'), true);
+
+        $input = $__jsonInput;
         
         $name = trim($input['name'] ?? '');
         $url = trim($input['url'] ?? '');
@@ -143,8 +153,8 @@ switch ($action) {
 
     case 'update':
         requireAdminForWrite();
-        
-        $input = json_decode(file_get_contents('php://input'), true);
+
+        $input = $__jsonInput;
         $id = (int)($input['id'] ?? 0);
         
         if (!$id) {
@@ -203,8 +213,8 @@ switch ($action) {
 
     case 'delete':
         requireAdminForWrite();
-        
-        $input = json_decode(file_get_contents('php://input'), true);
+
+        $input = $__jsonInput;
         $id = (int)($input['id'] ?? 0);
         
         if (!$id) {
