@@ -2,6 +2,11 @@
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/db.php';
 
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 header('Content-Type: application/json');
 
 $pdo = getDB();
@@ -9,11 +14,24 @@ $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
 // Helper to check admin for write operations
 function requireAdminForWrite() {
-    session_start();
+    // Session already started above
     if (empty($_SESSION['user_id'])) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Not authenticated']);
-        exit;
+        // Try to get username from session and look up user_id
+        if (!empty($_SESSION['username'])) {
+            global $pdo;
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
+            $stmt->execute([$_SESSION['username']]);
+            $user = $stmt->fetch();
+            if ($user) {
+                $_SESSION['user_id'] = $user['id'];
+            }
+        }
+        
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Not authenticated']);
+            exit;
+        }
     }
     
     global $pdo;
