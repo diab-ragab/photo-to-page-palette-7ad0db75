@@ -224,7 +224,32 @@ if ($method === 'POST') {
     }
 }
 
-// Skip auth for demo if no session table
+// Ensure user_sessions table exists before auth check
+function ensureSessionsTable(PDO $pdo): void {
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS user_sessions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            session_token VARCHAR(255) NOT NULL,
+            csrf_token VARCHAR(64) NULL,
+            ip_address VARCHAR(45) NULL,
+            user_agent TEXT NULL,
+            created_at DATETIME NOT NULL,
+            expires_at DATETIME NOT NULL,
+            last_activity DATETIME NOT NULL,
+            UNIQUE KEY IX_user_sessions_token (session_token),
+            KEY IX_user_sessions_user (user_id),
+            KEY IX_user_sessions_expires (expires_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+    } catch (Throwable $e) {
+        error_log("RID={$GLOBALS['RID']} ensureSessionsTable=" . $e->getMessage());
+        // Non-fatal: may already exist or DB permissions issue
+    }
+}
+
+ensureSessionsTable($pdo);
+
+// Skip auth only if user_sessions table truly doesn't exist after creation attempt
 $skipAuth = false;
 try {
     $pdo->query("SELECT 1 FROM user_sessions LIMIT 1");
