@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { generateFingerprint } from '@/lib/fingerprint';
 import { useToast } from '@/hooks/use-toast';
 import { voteSitesApi, VoteSite, VoteSiteStatus } from '@/lib/voteSitesApi';
+import { fetchJsonOrThrow } from '@/lib/apiFetch';
 
 interface VoteData {
   coins: number;
@@ -77,12 +78,10 @@ export const useVoteSystem = () => {
       formData.append('username', user.username);
       formData.append('fingerprint', fingerprint);
 
-      const response = await fetch('https://woiendgame.online/api/vote.php', {
+      const result = await fetchJsonOrThrow<any>('https://woiendgame.online/api/vote.php', {
         method: 'POST',
-        body: formData
+        body: formData,
       });
-
-      const result = await response.json();
 
       if (result.success) {
         setVoteData({
@@ -136,7 +135,8 @@ export const useVoteSystem = () => {
           timeRemaining: null
         })));
       }
-    } catch {
+    } catch (err) {
+      console.error('[Vote] get_vote_status failed', err);
       // On error - still show sites as available for logged-in users
       const sites = await voteSitesApi.getActiveSites();
       setVoteSites(sites.map(site => ({
@@ -166,12 +166,10 @@ export const useVoteSystem = () => {
       formData.append('fingerprint', fingerprint);
       formData.append('site_id', siteId.toString());
 
-      const response = await fetch('https://woiendgame.online/api/vote.php', {
+      const result = await fetchJsonOrThrow<any>('https://woiendgame.online/api/vote.php', {
         method: 'POST',
-        body: formData
+        body: formData,
       });
-
-      const result = await response.json();
 
       if (result.success) {
         const bonusText = result.bonus_coins > 0 
@@ -233,7 +231,8 @@ export const useVoteSystem = () => {
           variant: "destructive"
         });
       }
-    } catch {
+    } catch (err) {
+      console.error('[Vote] submit_vote failed', err);
       toast({
         title: "Vote Failed",
         description: "Could not connect to vote server. Please try again.",
