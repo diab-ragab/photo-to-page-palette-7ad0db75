@@ -61,18 +61,19 @@ export const VoteSitesManager = () => {
 
   const fetchSites = async () => {
     setIsLoading(true);
-    const data = await voteSitesApi.getAllSites();
-    // Fallback to demo data if API fails
-    if (data.length === 0) {
-      setSites([
-        { id: 1, name: "TopG", url: "https://topg.org", image_url: null, coins_reward: 50, vip_reward: 25, cooldown_hours: 12, is_active: true, sort_order: 1 },
-        { id: 2, name: "Top 100 Arena", url: "https://top100arena.com", image_url: null, coins_reward: 50, vip_reward: 25, cooldown_hours: 12, is_active: true, sort_order: 2 },
-        { id: 3, name: "Arena Top 100", url: "https://arenatop100.com", image_url: null, coins_reward: 50, vip_reward: 25, cooldown_hours: 12, is_active: true, sort_order: 3 },
-      ]);
-    } else {
+    try {
+      const data = await voteSitesApi.getAllSites();
       setSites(data);
+    } catch (error) {
+      console.error("Failed to fetch vote sites:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load vote sites",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,28 +108,10 @@ export const VoteSitesManager = () => {
       });
       fetchSites();
     } else {
-      // Demo mode: add locally
-      setSites((prev) => [
-        ...prev,
-        {
-          ...newSite,
-          id: Date.now(),
-          image_url: newSite.image_url || null,
-          sort_order: prev.length + 1,
-        },
-      ]);
       toast({
-        title: "Success (Demo)",
-        description: "Vote site added locally",
-      });
-      setNewSite({
-        name: "",
-        url: "",
-        image_url: "",
-        coins_reward: 50,
-        vip_reward: 25,
-        cooldown_hours: 12,
-        is_active: true,
+        title: "Error",
+        description: "Failed to add vote site",
+        variant: "destructive",
       });
     }
 
@@ -145,11 +128,10 @@ export const VoteSitesManager = () => {
       });
       fetchSites();
     } else {
-      // Demo mode: remove locally
-      setSites((prev) => prev.filter((s) => s.id !== id));
       toast({
-        title: "Deleted (Demo)",
-        description: "Vote site removed locally",
+        title: "Error",
+        description: "Failed to delete vote site",
+        variant: "destructive",
       });
     }
   };
@@ -195,19 +177,11 @@ export const VoteSitesManager = () => {
       fetchSites();
       handleCloseEdit();
     } else {
-      // Demo mode: update locally
-      setSites((prev) =>
-        prev.map((s) =>
-          s.id === editingSite.id
-            ? { ...s, ...editData, image_url: editData.image_url || null }
-            : s
-        )
-      );
       toast({
-        title: "Success (Demo)",
-        description: "Vote site updated locally",
+        title: "Error",
+        description: "Failed to update vote site",
+        variant: "destructive",
       });
-      handleCloseEdit();
     }
 
     setIsUpdating(false);
@@ -216,11 +190,14 @@ export const VoteSitesManager = () => {
   const handleToggleActive = async (id: number, is_active: boolean) => {
     const success = await voteSitesApi.toggleSite(id, is_active);
 
-    if (!success) {
-      // Demo mode: toggle locally
-      setSites((prev) => prev.map((s) => (s.id === id ? { ...s, is_active } : s)));
-    } else {
+    if (success) {
       fetchSites();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to toggle site status",
+        variant: "destructive",
+      });
     }
   };
 
