@@ -10,6 +10,29 @@ interface VoteData {
   totalVotes: number;
 }
 
+interface StreakTier {
+  tier: string;
+  name: string;
+  multiplier: number;
+  color: string;
+}
+
+interface NextTier {
+  days_needed: number;
+  tier: string;
+  multiplier: number;
+}
+
+export interface StreakData {
+  current: number;
+  longest: number;
+  lastVoteDate: string | null;
+  expiresAt: string | null;
+  tier: StreakTier;
+  nextTier: NextTier | null;
+  multiplier: number;
+}
+
 export const useVoteSystem = () => {
   const { user, isLoggedIn } = useAuth();
   const { toast } = useToast();
@@ -21,6 +44,15 @@ export const useVoteSystem = () => {
   const [voteSites, setVoteSites] = useState<VoteSiteStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [sitesLoading, setSitesLoading] = useState(true);
+  const [streakData, setStreakData] = useState<StreakData>({
+    current: 0,
+    longest: 0,
+    lastVoteDate: null,
+    expiresAt: null,
+    tier: { tier: 'starter', name: 'Starter', multiplier: 1.0, color: '#6B7280' },
+    nextTier: { days_needed: 3, tier: 'rising', multiplier: 1.25 },
+    multiplier: 1.0
+  });
 
   // Fetch vote sites and their status
   const fetchVoteSitesStatus = useCallback(async () => {
@@ -58,6 +90,19 @@ export const useVoteSystem = () => {
           vipPoints: result.vip_points || 0,
           totalVotes: result.total_votes || 0
         });
+
+        // Update streak data
+        if (result.streak) {
+          setStreakData({
+            current: result.streak.current || 0,
+            longest: result.streak.longest || 0,
+            lastVoteDate: result.streak.last_vote_date || null,
+            expiresAt: result.streak.expires_at || null,
+            tier: result.streak.tier || { tier: 'starter', name: 'Starter', multiplier: 1.0, color: '#6B7280' },
+            nextTier: result.streak.next_tier || null,
+            multiplier: result.streak.multiplier || 1.0
+          });
+        }
 
         // Merge vote status with site data
         const sites = await voteSitesApi.getActiveSites();
@@ -124,17 +169,46 @@ export const useVoteSystem = () => {
       const result = await response.json();
 
       if (result.success) {
+        const bonusText = result.bonus_coins > 0 
+          ? ` (+${result.bonus_coins} bonus from ${result.streak?.tier?.name || 'streak'}!)` 
+          : '';
+        
         toast({
-          title: "Vote Successful!",
-          description: `You earned ${result.coins_earned || site.coins_reward} coins and ${result.vip_points_earned || site.vip_reward} VIP points!`
+          title: "Vote Successful! 🎉",
+          description: `You earned ${result.coins_earned} coins${bonusText} and ${result.vip_points_earned} VIP points!`
         });
 
         // Update vote data
         setVoteData(prev => ({
-          coins: result.new_coins_total ?? prev.coins + site.coins_reward,
-          vipPoints: result.new_vip_total ?? prev.vipPoints + site.vip_reward,
+          coins: result.new_coins_total ?? prev.coins + (result.coins_earned || site.coins_reward),
+          vipPoints: result.new_vip_total ?? prev.vipPoints + (result.vip_points_earned || site.vip_reward),
           totalVotes: prev.totalVotes + 1
         }));
+
+        // Update streak data
+        if (result.streak) {
+          setStreakData({
+            current: result.streak.current || 0,
+            longest: result.streak.longest || 0,
+            lastVoteDate: new Date().toISOString().split('T')[0],
+            expiresAt: result.streak.expires_at || null,
+            tier: result.streak.tier || streakData.tier,
+            nextTier: result.streak.next_tier || null,
+            multiplier: result.streak.multiplier || 1.0
+          });
+
+          // Show streak increase notification
+          if (result.streak.increased) {
+            setTimeout(() => {
+              toast({
+                title: `🔥 Streak: ${result.streak.current} days!`,
+                description: result.streak.next_tier 
+                  ? `${result.streak.next_tier.days_needed} more days to ${result.streak.next_tier.tier} tier (${result.streak.next_tier.multiplier}x bonus)!`
+                  : `You're at max tier! Enjoy ${result.streak.multiplier}x bonus!`
+              });
+            }, 1500);
+          }
+        }
 
         // Update site status
         setVoteSites(prev => prev.map(s =>
@@ -155,7 +229,6 @@ export const useVoteSystem = () => {
         });
       }
     } catch {
-      // On error - notify user
       toast({
         title: "Vote Failed",
         description: "Could not connect to vote server. Please try again.",
@@ -182,6 +255,7 @@ export const useVoteSystem = () => {
     submitVote,
     refreshVoteStatus: fetchVoteSitesStatus,
     availableVotes,
-    totalSites
+    totalSites,
+    streakData
   };
 };
