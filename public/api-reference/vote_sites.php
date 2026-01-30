@@ -1,9 +1,10 @@
 <?php
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json');
 
-$pdo = getDbConnection();
+$pdo = getDB();
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
 // Helper to check admin for write operations

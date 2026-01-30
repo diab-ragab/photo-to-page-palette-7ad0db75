@@ -2,7 +2,7 @@
 // api/db.php
 // Unified DB connection (PDO singleton)
 
-require_once __DIR__ . '/config.php';
+// Config is loaded via bootstrap.php - don't require config.php separately
 
 if (!function_exists('getDB')) {
   function getDB(): PDO {
