@@ -56,6 +56,7 @@ export const VoteSiteCard = ({ site, onVote, loading }: VoteSiteCardProps) => {
   };
 
   const canVoteNow = site.canVote && !timeRemaining;
+  const hasVotedRecently = !site.canVote && site.lastVoteTime !== null;
 
   return (
     <div
@@ -87,7 +88,7 @@ export const VoteSiteCard = ({ site, onVote, loading }: VoteSiteCardProps) => {
               )}
               <span className="font-semibold text-sm">{site.name}</span>
             </div>
-            {!canVoteNow && !timeRemaining && (
+            {hasVotedRecently && (
               <CheckCircle2 className="w-5 h-5 text-green-500" />
             )}
           </div>
