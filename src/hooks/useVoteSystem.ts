@@ -78,9 +78,13 @@ export const useVoteSystem = () => {
       formData.append('username', user.username);
       formData.append('fingerprint', fingerprint);
 
-      const result = await fetchJsonOrThrow<any>('https://woiendgame.online/api/vote.php', {
+      // Add cache-busting to avoid stale cooldown/status responses after reloads.
+      const result = await fetchJsonOrThrow<any>(
+        `https://woiendgame.online/api/vote.php?rid=${Date.now()}`,
+        {
         method: 'POST',
         body: formData,
+          cache: 'no-store',
       });
 
       if (result.success) {
@@ -166,9 +170,12 @@ export const useVoteSystem = () => {
       formData.append('fingerprint', fingerprint);
       formData.append('site_id', siteId.toString());
 
-      const result = await fetchJsonOrThrow<any>('https://woiendgame.online/api/vote.php', {
+      const result = await fetchJsonOrThrow<any>(
+        `https://woiendgame.online/api/vote.php?rid=${Date.now()}`,
+        {
         method: 'POST',
         body: formData,
+          cache: 'no-store',
       });
 
       if (result.success) {
