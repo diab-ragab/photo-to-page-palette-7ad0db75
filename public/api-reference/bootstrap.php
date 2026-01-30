@@ -1,46 +1,57 @@
 <?php
-// api/config.php
+// api/bootstrap.php
 // Unified app config + getConfig() + CORS handler
+// PHP 5.x compatible
 
-$APP_CONFIG = [
-  'db' => [
+$APP_CONFIG = array(
+  'db' => array(
     'host' => '192.168.1.88',
     'name' => 'shengui',
     'user' => 'root',
     'pass' => 'root',
     'charset' => 'utf8', // MySQL 5.1 safe (avoid utf8mb4)
-  ],
+  ),
 
-  'cors' => [
+  'cors' => array(
     // Exact allowed origins (NO trailing slash)
-    'allowed_origins' => [
+    'allowed_origins' => array(
       'https://woiendgame.online',
       'https://www.woiendgame.online',
       'https://woiendgame.lovable.app',
       'http://localhost:5173',
       'http://localhost:3000',
-    ],
+    ),
 
     // Allow lovable previews
-    'allowed_origin_regex' => [
+    'allowed_origin_regex' => array(
       '/^https:\/\/[a-z0-9-]+\.(lovable\.app|lovableproject\.com)$/i',
-    ],
+    ),
 
     'allowed_headers' => 'Content-Type, Authorization, X-Requested-With, Accept, X-Session-Token',
-    'default_methods' => ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+    'default_methods' => array('GET','POST','PUT','PATCH','DELETE','OPTIONS'),
     'max_age' => 86400,
-  ],
+  ),
 
-  'security' => [
+  'security' => array(
     // Bootstrap admin IDs (users.ID)
-    'admin_user_ids' => [24],
-    // Optional usernames:
-    // 'admin_usernames' => ['diab', 'admin'],
-  ],
-];
+    'admin_user_ids' => array(24),
+  ),
+);
+
+// Polyfill for older PHP versions
+if (!function_exists('http_response_code')) {
+    function http_response_code($code = null) {
+        static $current = 200;
+        if ($code !== null) {
+            $current = (int)$code;
+            header('X-PHP-Response-Code: ' . $current, true, $current);
+        }
+        return $current;
+    }
+}
 
 if (!function_exists('getConfig')) {
-  function getConfig(): array {
+  function getConfig() {
     global $APP_CONFIG;
     return $APP_CONFIG;
   }
@@ -51,15 +62,17 @@ if (!function_exists('getConfig')) {
  * Call early (before output). Handles OPTIONS and exits.
  */
 if (!function_exists('handleCors')) {
-  function handleCors(?array $methods = null): void {
+  function handleCors($methods = null) {
     $cfg  = getConfig();
-    $cors = $cfg['cors'] ?? [];
+    $cors = isset($cfg['cors']) ? $cfg['cors'] : array();
 
-    $methods = $methods ?: ($cors['default_methods'] ?? ['GET','POST','OPTIONS']);
+    if ($methods === null) {
+        $methods = isset($cors['default_methods']) ? $cors['default_methods'] : array('GET','POST','OPTIONS');
+    }
 
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    $allowedOrigins = $cors['allowed_origins'] ?? [];
-    $allowedRegex   = $cors['allowed_origin_regex'] ?? [];
+    $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+    $allowedOrigins = isset($cors['allowed_origins']) ? $cors['allowed_origins'] : array();
+    $allowedRegex   = isset($cors['allowed_origin_regex']) ? $cors['allowed_origin_regex'] : array();
 
     $isAllowed = false;
 
@@ -69,7 +82,8 @@ if (!function_exists('handleCors')) {
       } else {
         foreach ($allowedRegex as $rx) {
           if (is_string($rx) && @preg_match($rx, $origin)) {
-            if (preg_match($rx, $origin)) { $isAllowed = true; break; }
+            $isAllowed = true;
+            break;
           }
         }
       }
@@ -77,8 +91,10 @@ if (!function_exists('handleCors')) {
 
     // Preflight basics (always safe)
     header("Access-Control-Allow-Methods: " . implode(', ', $methods));
-    header("Access-Control-Allow-Headers: " . ($cors['allowed_headers'] ?? 'Content-Type, Authorization, Accept'));
-    header("Access-Control-Max-Age: " . (int)($cors['max_age'] ?? 86400));
+    $allowedHeaders = isset($cors['allowed_headers']) ? $cors['allowed_headers'] : 'Content-Type, Authorization, Accept';
+    header("Access-Control-Allow-Headers: " . $allowedHeaders);
+    $maxAge = isset($cors['max_age']) ? (int)$cors['max_age'] : 86400;
+    header("Access-Control-Max-Age: " . $maxAge);
 
     // Allow-Origin only if allowed
     if ($origin && $isAllowed) {
@@ -87,7 +103,8 @@ if (!function_exists('handleCors')) {
       header("Vary: Origin");
     }
 
-    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    $requestMethod = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '';
+    if ($requestMethod === 'OPTIONS') {
       if ($origin && !$isAllowed) {
         http_response_code(403);
         exit;
