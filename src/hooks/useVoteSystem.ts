@@ -109,10 +109,20 @@ export const useVoteSystem = () => {
         const siteStatuses = result.site_statuses || {};
         
         const mergedSites: VoteSiteStatus[] = sites.map(site => {
-          const status = siteStatuses[site.id] || {};
+          const status = siteStatuses[site.id];
+          // If no status exists for this site, user has never voted - allow voting
+          if (!status) {
+            return {
+              ...site,
+              canVote: true,
+              lastVoteTime: null,
+              nextVoteTime: null,
+              timeRemaining: null
+            };
+          }
           return {
             ...site,
-            canVote: status.can_vote ?? true,
+            canVote: status.can_vote === true,
             lastVoteTime: status.last_vote_time || null,
             nextVoteTime: status.next_vote_time || null,
             timeRemaining: status.time_remaining || null
