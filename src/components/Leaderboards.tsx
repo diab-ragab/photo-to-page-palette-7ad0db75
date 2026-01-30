@@ -10,32 +10,6 @@ interface LeaderboardPlayer {
   vipLevel?: number;
 }
 
-const mockTopVoters: LeaderboardPlayer[] = [
-  { rank: 1, username: "DragonSlayer", value: 847, vipLevel: 3 },
-  { rank: 2, username: "ShadowMage", value: 723, vipLevel: 3 },
-  { rank: 3, username: "NightBlade", value: 698, vipLevel: 2 },
-  { rank: 4, username: "StormKnight", value: 612, vipLevel: 2 },
-  { rank: 5, username: "PhoenixRider", value: 589, vipLevel: 2 },
-  { rank: 6, username: "IceWarlock", value: 534, vipLevel: 1 },
-  { rank: 7, username: "BlazeFury", value: 498, vipLevel: 1 },
-  { rank: 8, username: "DarkPaladin", value: 467, vipLevel: 1 },
-  { rank: 9, username: "ThunderBolt", value: 445, vipLevel: 1 },
-  { rank: 10, username: "MysticArcher", value: 423, vipLevel: 1 },
-];
-
-const mockVipRankings: LeaderboardPlayer[] = [
-  { rank: 1, username: "DragonSlayer", value: 21175, vipLevel: 3 },
-  { rank: 2, username: "ShadowMage", value: 18075, vipLevel: 3 },
-  { rank: 3, username: "NightBlade", value: 17450, vipLevel: 3 },
-  { rank: 4, username: "StormKnight", value: 15300, vipLevel: 3 },
-  { rank: 5, username: "PhoenixRider", value: 14725, vipLevel: 3 },
-  { rank: 6, username: "IceWarlock", value: 13350, vipLevel: 3 },
-  { rank: 7, username: "BlazeFury", value: 12450, vipLevel: 3 },
-  { rank: 8, username: "DarkPaladin", value: 11675, vipLevel: 3 },
-  { rank: 9, username: "ThunderBolt", value: 11125, vipLevel: 3 },
-  { rank: 10, username: "MysticArcher", value: 10575, vipLevel: 3 },
-];
-
 const getRankIcon = (rank: number) => {
   switch (rank) {
     case 1:
@@ -77,23 +51,24 @@ const getRankRowStyle = (rank: number) => {
 };
 
 export const Leaderboards = () => {
-  const [topVoters, setTopVoters] = useState<LeaderboardPlayer[]>(mockTopVoters);
-  const [vipRankings, setVipRankings] = useState<LeaderboardPlayer[]>(mockVipRankings);
-  const [loading, setLoading] = useState(false);
+  const [topVoters, setTopVoters] = useState<LeaderboardPlayer[]>([]);
+  const [vipRankings, setVipRankings] = useState<LeaderboardPlayer[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchLeaderboards = async () => {
       setLoading(true);
       try {
-        // Fetch from your PHP backend
         const response = await fetch("https://woiendgame.online/api/leaderboards.php");
         if (response.ok) {
           const data = await response.json();
-          if (data.topVoters) setTopVoters(data.topVoters);
-          if (data.vipRankings) setVipRankings(data.vipRankings);
+          if (data.success) {
+            setTopVoters(data.topVoters || []);
+            setVipRankings(data.vipRankings || []);
+          }
         }
       } catch {
-        // Silent fail - use mock leaderboard data
+        // Silent fail - show empty leaderboards
       } finally {
         setLoading(false);
       }
@@ -102,32 +77,42 @@ export const Leaderboards = () => {
     fetchLeaderboards();
   }, []);
 
-  const LeaderboardTable = ({ data, valueLabel }: { data: LeaderboardPlayer[]; valueLabel: string }) => (
-    <div className="space-y-1">
-      {data.map((player) => (
-        <div
-          key={player.rank}
-          className={`flex items-center justify-between p-3 rounded-lg transition-colors ${getRankRowStyle(player.rank)}`}
-        >
-          <div className="flex items-center gap-3">
-            {getRankIcon(player.rank)}
-            <div className="flex items-center gap-2">
-              <span className={`font-medium ${player.rank <= 3 ? "text-foreground" : "text-muted-foreground"}`}>
-                {player.username}
+  const LeaderboardTable = ({ data, valueLabel }: { data: LeaderboardPlayer[]; valueLabel: string }) => {
+    if (data.length === 0) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          No data available yet. Be the first!
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-1">
+        {data.map((player) => (
+          <div
+            key={player.rank}
+            className={`flex items-center justify-between p-3 rounded-lg transition-colors ${getRankRowStyle(player.rank)}`}
+          >
+            <div className="flex items-center gap-3">
+              {getRankIcon(player.rank)}
+              <div className="flex items-center gap-2">
+                <span className={`font-medium ${player.rank <= 3 ? "text-foreground" : "text-muted-foreground"}`}>
+                  {player.username}
+                </span>
+                {getVipBadge(player.vipLevel)}
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`font-bold ${player.rank <= 3 ? "text-primary" : "text-muted-foreground"}`}>
+                {player.value.toLocaleString()}
               </span>
-              {getVipBadge(player.vipLevel)}
+              <span className="text-xs text-muted-foreground ml-1">{valueLabel}</span>
             </div>
           </div>
-          <div className="text-right">
-            <span className={`font-bold ${player.rank <= 3 ? "text-primary" : "text-muted-foreground"}`}>
-              {player.value.toLocaleString()}
-            </span>
-            <span className="text-xs text-muted-foreground ml-1">{valueLabel}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+        ))}
+      </div>
+    );
+  };
 
   return (
     <Card className="bg-card border-primary/20">
