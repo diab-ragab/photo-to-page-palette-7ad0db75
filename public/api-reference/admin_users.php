@@ -36,6 +36,24 @@ function json_fail(int $code, string $msg): void {
     exit;
 }
 
+// Convert unexpected fatals/exceptions into JSON (prevents empty 500 responses)
+set_exception_handler(function ($e): void {
+    $msg = $e instanceof Throwable ? $e->getMessage() : 'unknown';
+    error_log("RID={$GLOBALS['RID']} UNCAUGHT=" . $msg);
+    json_fail(500, 'Internal server error');
+});
+
+register_shutdown_function(function (): void {
+    $err = error_get_last();
+    if (!$err) return;
+
+    $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR];
+    if (in_array($err['type'] ?? 0, $fatalTypes, true)) {
+        error_log("RID={$GLOBALS['RID']} FATAL=" . ($err['message'] ?? 'unknown'));
+        json_fail(500, 'Internal server error');
+    }
+});
+
 // Security headers
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -157,6 +175,20 @@ function ensureTables(PDO $pdo): void {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 }
 
+function sidecarTablesReady(PDO $pdo): bool {
+    try {
+        $tables = ['user_currency', 'user_roles', 'user_bans'];
+        foreach ($tables as $t) {
+            $stmt = $pdo->prepare('SHOW TABLES LIKE ?');
+            $stmt->execute([$t]);
+            if (!$stmt->fetchColumn()) return false;
+        }
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 // Parse input
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
@@ -182,7 +214,14 @@ if (!$skipAuth) {
     $adminId = requireAdmin($pdo);
 }
 
-ensureTables($pdo);
+$sidecarReady = true;
+try {
+    ensureTables($pdo);
+} catch (Throwable $e) {
+    error_log("RID={$RID} ensureTables_failed=" . $e->getMessage());
+    // If CREATE is forbidden but tables already exist, allow continuing.
+    $sidecarReady = sidecarTablesReady($pdo);
+}
 
 // ============ LIST USERS ============
 if ($action === 'list') {
@@ -205,31 +244,56 @@ if ($action === 'list') {
     $stmt->execute($params);
     $total = (int)$stmt->fetchColumn();
     
-    // Get users with currency and role info
-    $sql = "
-        SELECT 
-            u.ID as id,
-            u.name,
-            u.email,
-            u.creatime as created_at,
-            COALESCE(uc.coins, 0) as coins,
-            COALESCE(uc.vip_points, 0) as vip_points,
-            COALESCE(uc.zen, 0) as zen,
-            COALESCE(uc.premium, 0) as premium,
-            CASE WHEN ub.id IS NOT NULL THEN 1 ELSE 0 END as is_banned,
-            CASE WHEN ur.id IS NOT NULL THEN 1 ELSE 0 END as is_admin
-        FROM users u
-        LEFT JOIN user_currency uc ON uc.user_id = u.ID
-        LEFT JOIN user_bans ub ON ub.user_id = u.ID
-        LEFT JOIN user_roles ur ON ur.user_id = u.ID AND ur.role = 'admin'
-        {$where}
-        ORDER BY u.ID DESC
-        LIMIT {$limit} OFFSET {$offset}
-    ";
-    
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Get users with currency and role info (fallback to users table only if sidecar tables missing)
+    try {
+        if ($sidecarReady) {
+            $sql = "
+                SELECT 
+                    u.ID as id,
+                    u.name,
+                    u.email,
+                    u.creatime as created_at,
+                    COALESCE(uc.coins, 0) as coins,
+                    COALESCE(uc.vip_points, 0) as vip_points,
+                    COALESCE(uc.zen, 0) as zen,
+                    COALESCE(uc.premium, 0) as premium,
+                    CASE WHEN ub.id IS NOT NULL THEN 1 ELSE 0 END as is_banned,
+                    CASE WHEN ur.id IS NOT NULL THEN 1 ELSE 0 END as is_admin
+                FROM users u
+                LEFT JOIN user_currency uc ON uc.user_id = u.ID
+                LEFT JOIN user_bans ub ON ub.user_id = u.ID
+                LEFT JOIN user_roles ur ON ur.user_id = u.ID AND ur.role = 'admin'
+                {$where}
+                ORDER BY u.ID DESC
+                LIMIT {$limit} OFFSET {$offset}
+            ";
+        } else {
+            $sql = "
+                SELECT 
+                    u.ID as id,
+                    u.name,
+                    u.email,
+                    u.creatime as created_at,
+                    0 as coins,
+                    0 as vip_points,
+                    0 as zen,
+                    0 as premium,
+                    0 as is_banned,
+                    0 as is_admin
+                FROM users u
+                {$where}
+                ORDER BY u.ID DESC
+                LIMIT {$limit} OFFSET {$offset}
+            ";
+        }
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log("RID={$RID} list_failed=" . $e->getMessage());
+        json_fail(500, 'Failed to load users');
+    }
     
     // Convert types
     foreach ($users as &$user) {
@@ -260,37 +324,64 @@ if ($action === 'get') {
         json_fail(400, 'Invalid user ID');
     }
     
-    $stmt = $pdo->prepare("
-        SELECT 
-            u.ID as id,
-            u.name,
-            u.email,
-            u.creatime as created_at,
-            COALESCE(uc.coins, 0) as coins,
-            COALESCE(uc.vip_points, 0) as vip_points,
-            COALESCE(uc.zen, 0) as zen,
-            COALESCE(uc.premium, 0) as premium
-        FROM users u
-        LEFT JOIN user_currency uc ON uc.user_id = u.ID
-        WHERE u.ID = ?
-        LIMIT 1
-    ");
-    $stmt->execute([$userId]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    try {
+        if ($sidecarReady) {
+            $stmt = $pdo->prepare("
+                SELECT 
+                    u.ID as id,
+                    u.name,
+                    u.email,
+                    u.creatime as created_at,
+                    COALESCE(uc.coins, 0) as coins,
+                    COALESCE(uc.vip_points, 0) as vip_points,
+                    COALESCE(uc.zen, 0) as zen,
+                    COALESCE(uc.premium, 0) as premium
+                FROM users u
+                LEFT JOIN user_currency uc ON uc.user_id = u.ID
+                WHERE u.ID = ?
+                LIMIT 1
+            ");
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT 
+                    u.ID as id,
+                    u.name,
+                    u.email,
+                    u.creatime as created_at,
+                    0 as coins,
+                    0 as vip_points,
+                    0 as zen,
+                    0 as premium
+                FROM users u
+                WHERE u.ID = ?
+                LIMIT 1
+            ");
+        }
+
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log("RID={$RID} get_failed=" . $e->getMessage());
+        json_fail(500, 'Failed to load user');
+    }
     
     if (!$user) {
         json_fail(404, 'User not found');
     }
     
-    // Get roles
-    $stmt = $pdo->prepare("SELECT role FROM user_roles WHERE user_id = ?");
-    $stmt->execute([$userId]);
-    $roles = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    
-    // Check ban status
-    $stmt = $pdo->prepare("SELECT reason, banned_at, expires_at FROM user_bans WHERE user_id = ?");
-    $stmt->execute([$userId]);
-    $ban = $stmt->fetch(PDO::FETCH_ASSOC);
+    $roles = [];
+    $ban = false;
+    if ($sidecarReady) {
+        // Get roles
+        $stmt = $pdo->prepare("SELECT role FROM user_roles WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $roles = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        // Check ban status
+        $stmt = $pdo->prepare("SELECT reason, banned_at, expires_at FROM user_bans WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $ban = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
     
     $user['roles'] = $roles;
     $user['is_admin'] = in_array('admin', $roles);
@@ -302,6 +393,9 @@ if ($action === 'get') {
 
 // ============ UPDATE CURRENCY ============
 if ($action === 'update_currency' && $method === 'POST') {
+    if (!$sidecarReady) {
+        json_fail(500, 'Admin sidecar tables are not initialized');
+    }
     $userId = (int)($input['user_id'] ?? 0);
     
     if ($userId <= 0) {
@@ -340,6 +434,9 @@ if ($action === 'update_currency' && $method === 'POST') {
 
 // ============ SET ROLE ============
 if ($action === 'set_role' && $method === 'POST') {
+    if (!$sidecarReady) {
+        json_fail(500, 'Admin sidecar tables are not initialized');
+    }
     $userId = (int)($input['user_id'] ?? 0);
     $role = trim($input['role'] ?? 'admin');
     $grant = (bool)($input['grant'] ?? true);
@@ -371,6 +468,9 @@ if ($action === 'set_role' && $method === 'POST') {
 
 // ============ TOGGLE BAN ============
 if ($action === 'toggle_ban' && $method === 'POST') {
+    if (!$sidecarReady) {
+        json_fail(500, 'Admin sidecar tables are not initialized');
+    }
     $userId = (int)($input['user_id'] ?? 0);
     $ban = (bool)($input['ban'] ?? true);
     $reason = trim($input['reason'] ?? '');
