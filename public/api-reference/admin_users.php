@@ -141,38 +141,61 @@ function requireAdmin(PDO $pdo): int {
     return $userId;
 }
 
-// Ensure sidecar tables exist
-function ensureTables(PDO $pdo): void {
+// Ensure sidecar tables exist - create each separately to handle partial failures
+function ensureTables(PDO $pdo): array {
+    $created = [];
+    
     // User currency sidecar table
-    $pdo->exec("CREATE TABLE IF NOT EXISTS user_currency (
-        user_id INT PRIMARY KEY,
-        coins INT DEFAULT 0,
-        vip_points INT DEFAULT 0,
-        zen BIGINT DEFAULT 0,
-        premium INT DEFAULT 0,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS user_currency (
+            user_id INT PRIMARY KEY,
+            coins INT DEFAULT 0,
+            vip_points INT DEFAULT 0,
+            zen BIGINT DEFAULT 0,
+            premium INT DEFAULT 0,
+            total_votes INT DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+        $created['user_currency'] = true;
+    } catch (Throwable $e) {
+        error_log("ensureTables: user_currency failed: " . $e->getMessage());
+        $created['user_currency'] = false;
+    }
     
     // User roles table
-    $pdo->exec("CREATE TABLE IF NOT EXISTS user_roles (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        role VARCHAR(50) NOT NULL,
-        granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        granted_by VARCHAR(50) NULL,
-        UNIQUE KEY uq_user_role (user_id, role),
-        KEY idx_user_id (user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS user_roles (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            role VARCHAR(50) NOT NULL,
+            granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            granted_by VARCHAR(50) NULL,
+            UNIQUE KEY uq_user_role (user_id, role),
+            KEY idx_user_id (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+        $created['user_roles'] = true;
+    } catch (Throwable $e) {
+        error_log("ensureTables: user_roles failed: " . $e->getMessage());
+        $created['user_roles'] = false;
+    }
     
     // Ban tracking table
-    $pdo->exec("CREATE TABLE IF NOT EXISTS user_bans (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL UNIQUE,
-        reason TEXT,
-        banned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        banned_by INT NULL,
-        expires_at DATETIME NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS user_bans (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL UNIQUE,
+            reason TEXT,
+            banned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            banned_by INT NULL,
+            expires_at DATETIME NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+        $created['user_bans'] = true;
+    } catch (Throwable $e) {
+        error_log("ensureTables: user_bans failed: " . $e->getMessage());
+        $created['user_bans'] = false;
+    }
+    
+    return $created;
 }
 
 function sidecarTablesReady(PDO $pdo): bool {
@@ -393,9 +416,6 @@ if ($action === 'get') {
 
 // ============ UPDATE CURRENCY ============
 if ($action === 'update_currency' && $method === 'POST') {
-    if (!$sidecarReady) {
-        json_fail(500, 'Admin sidecar tables are not initialized');
-    }
     $userId = (int)($input['user_id'] ?? 0);
     
     if ($userId <= 0) {
@@ -414,29 +434,59 @@ if ($action === 'update_currency' && $method === 'POST') {
     $zen = isset($input['zen']) ? (int)$input['zen'] : null;
     $premium = isset($input['premium']) ? (int)$input['premium'] : null;
     
-    // Upsert currency
-    $stmt = $pdo->prepare("
-        INSERT INTO user_currency (user_id, coins, vip_points, zen, premium)
-        VALUES (?, COALESCE(?, 0), COALESCE(?, 0), COALESCE(?, 0), COALESCE(?, 0))
-        ON DUPLICATE KEY UPDATE
-            coins = COALESCE(?, coins),
-            vip_points = COALESCE(?, vip_points),
-            zen = COALESCE(?, zen),
-            premium = COALESCE(?, premium)
-    ");
-    $stmt->execute([
-        $userId, $coins, $vipPoints, $zen, $premium,
-        $coins, $vipPoints, $zen, $premium
-    ]);
+    $messages = [];
     
-    json_response(['success' => true, 'message' => 'Currency updated']);
+    // Update user_currency table if available
+    if ($sidecarReady) {
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO user_currency (user_id, coins, vip_points, zen, premium)
+                VALUES (?, COALESCE(?, 0), COALESCE(?, 0), COALESCE(?, 0), COALESCE(?, 0))
+                ON DUPLICATE KEY UPDATE
+                    coins = COALESCE(?, coins),
+                    vip_points = COALESCE(?, vip_points),
+                    zen = COALESCE(?, zen),
+                    premium = COALESCE(?, premium)
+            ");
+            $stmt->execute([
+                $userId, $coins, $vipPoints, $zen, $premium,
+                $coins, $vipPoints, $zen, $premium
+            ]);
+            $messages[] = 'Currency updated';
+        } catch (Throwable $e) {
+            error_log("RID={$RID} update_currency_failed=" . $e->getMessage());
+        }
+    }
+    
+    // Also update goldtab_sg for Zen (the legacy game table)
+    if ($zen !== null) {
+        try {
+            // Check if record exists
+            $stmt = $pdo->prepare("SELECT AccountID FROM goldtab_sg WHERE AccountID = ? LIMIT 1");
+            $stmt->execute([$userId]);
+            if ($stmt->fetch()) {
+                $stmt = $pdo->prepare("UPDATE goldtab_sg SET Gold = ? WHERE AccountID = ?");
+                $stmt->execute([$zen, $userId]);
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO goldtab_sg (AccountID, Gold) VALUES (?, ?)");
+                $stmt->execute([$userId, $zen]);
+            }
+            $messages[] = 'Zen/Gold synced';
+        } catch (Throwable $e) {
+            error_log("RID={$RID} goldtab_update_failed=" . $e->getMessage());
+            // Non-fatal: goldtab_sg may not exist
+        }
+    }
+    
+    if (empty($messages)) {
+        json_fail(500, 'Failed to update currency - tables may not be initialized');
+    }
+    
+    json_response(['success' => true, 'message' => implode(', ', $messages)]);
 }
 
 // ============ SET ROLE ============
 if ($action === 'set_role' && $method === 'POST') {
-    if (!$sidecarReady) {
-        json_fail(500, 'Admin sidecar tables are not initialized');
-    }
     $userId = (int)($input['user_id'] ?? 0);
     $role = trim($input['role'] ?? 'admin');
     $grant = (bool)($input['grant'] ?? true);
@@ -448,6 +498,23 @@ if ($action === 'set_role' && $method === 'POST') {
     // Prevent self-demotion
     if ($userId === $adminId && $role === 'admin' && !$grant) {
         json_fail(400, 'Cannot remove your own admin role');
+    }
+    
+    // Try to create user_roles table if it doesn't exist
+    if (!$sidecarReady) {
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS user_roles (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                role VARCHAR(50) NOT NULL,
+                granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                granted_by VARCHAR(50) NULL,
+                UNIQUE KEY uq_user_role (user_id, role),
+                KEY idx_user_id (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+        } catch (Throwable $e) {
+            json_fail(500, 'Cannot create roles table - contact server admin');
+        }
     }
     
     if ($grant) {
@@ -468,9 +535,6 @@ if ($action === 'set_role' && $method === 'POST') {
 
 // ============ TOGGLE BAN ============
 if ($action === 'toggle_ban' && $method === 'POST') {
-    if (!$sidecarReady) {
-        json_fail(500, 'Admin sidecar tables are not initialized');
-    }
     $userId = (int)($input['user_id'] ?? 0);
     $ban = (bool)($input['ban'] ?? true);
     $reason = trim($input['reason'] ?? '');
@@ -484,6 +548,22 @@ if ($action === 'toggle_ban' && $method === 'POST') {
         json_fail(400, 'Cannot ban yourself');
     }
     
+    // Try to create user_bans table if it doesn't exist
+    if (!$sidecarReady) {
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS user_bans (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL UNIQUE,
+                reason TEXT,
+                banned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                banned_by INT NULL,
+                expires_at DATETIME NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+        } catch (Throwable $e) {
+            json_fail(500, 'Cannot create bans table - contact server admin');
+        }
+    }
+    
     if ($ban) {
         $stmt = $pdo->prepare("
             INSERT INTO user_bans (user_id, reason, banned_by)
@@ -493,7 +573,11 @@ if ($action === 'toggle_ban' && $method === 'POST') {
         $stmt->execute([$userId, $reason, $adminId, $reason, $adminId]);
         
         // Also invalidate all user sessions
-        $pdo->prepare("DELETE FROM user_sessions WHERE user_id = ?")->execute([$userId]);
+        try {
+            $pdo->prepare("DELETE FROM user_sessions WHERE user_id = ?")->execute([$userId]);
+        } catch (Throwable $e) {
+            // Non-fatal
+        }
         
         $message = 'User banned';
     } else {
