@@ -77,10 +77,10 @@ export function UsersManager() {
       const data = await response.json();
       
       if (data.success && data.users) {
-        // Map API response to expected format (username -> name)
-        const mappedUsers = data.users.map((u: { id: number; username: string; email: string; created_at: string; is_banned: boolean; is_admin: boolean; coins: number; vip_points: number; zen: number }) => ({
+        // Map API response to expected format
+        const mappedUsers = data.users.map((u: { id: number; name: string; email: string; created_at: string; is_banned: boolean; is_admin: boolean; coins: number; vip_points: number; zen: number }) => ({
           id: u.id,
-          name: u.username,
+          name: u.name,
           email: u.email,
           created_at: u.created_at,
           is_banned: u.is_banned,
