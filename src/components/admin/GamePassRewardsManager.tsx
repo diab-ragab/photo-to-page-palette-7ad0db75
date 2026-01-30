@@ -74,16 +74,13 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       const data = await response.json();
       if (data.success && data.rewards) {
         setRewards(data.rewards);
+      } else {
+        setRewards([]);
       }
-    } catch {
-      // Silent fail - use demo data
-      // Demo data
-      setRewards([
-        { id: 1, day: 1, tier: "free", item_id: 0, item_name: "10 Coins", quantity: 1, coins: 10, zen: 0, exp: 0, rarity: "common", icon: "🪙" },
-        { id: 2, day: 1, tier: "elite", item_id: 0, item_name: "100 Coins", quantity: 1, coins: 100, zen: 0, exp: 0, rarity: "rare", icon: "💰" },
-        { id: 3, day: 2, tier: "free", item_id: 1001, item_name: "Health Potion", quantity: 5, coins: 0, zen: 0, exp: 0, rarity: "common", icon: "🧪" },
-        { id: 4, day: 2, tier: "elite", item_id: 2001, item_name: "Epic Chest", quantity: 1, coins: 0, zen: 0, exp: 0, rarity: "epic", icon: "📦" },
-      ]);
+    } catch (error) {
+      console.error("Failed to fetch rewards:", error);
+      toast({ title: "Error", description: "Failed to load rewards", variant: "destructive" });
+      setRewards([]);
     } finally {
       setIsLoading(false);
     }
@@ -104,6 +101,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           ...editData,
           id: selectedReward?.id,
@@ -118,24 +116,11 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
         fetchRewards();
         handleCloseModal();
       } else {
-        // Demo mode - still update locally
-        if (selectedReward) {
-          setRewards(rewards.map(r => r.id === selectedReward.id ? { ...editData, id: selectedReward.id } : r));
-        } else {
-          setRewards([...rewards, { ...editData, id: Date.now() }]);
-        }
-        toast({ title: "Success", description: selectedReward ? "Reward updated!" : "Reward added!" });
-        handleCloseModal();
+        toast({ title: "Error", description: data.error || "Failed to save reward", variant: "destructive" });
       }
     } catch (error) {
-      // Demo mode fallback
-      if (selectedReward) {
-        setRewards(rewards.map(r => r.id === selectedReward.id ? { ...editData, id: selectedReward.id } : r));
-      } else {
-        setRewards([...rewards, { ...editData, id: Date.now() }]);
-      }
-      toast({ title: "Success", description: selectedReward ? "Reward updated!" : "Reward added!" });
-      handleCloseModal();
+      console.error("Save reward error:", error);
+      toast({ title: "Error", description: "Failed to save reward", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -146,6 +131,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=delete_reward", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ id }),
       });
 
@@ -154,12 +140,11 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
         toast({ title: "Deleted", description: "Reward removed." });
         fetchRewards();
       } else {
-        setRewards(rewards.filter(r => r.id !== id));
-        toast({ title: "Deleted", description: "Reward removed." });
+        toast({ title: "Error", description: data.error || "Failed to delete reward", variant: "destructive" });
       }
     } catch (error) {
-      setRewards(rewards.filter(r => r.id !== id));
-      toast({ title: "Deleted", description: "Reward removed." });
+      console.error("Delete reward error:", error);
+      toast({ title: "Error", description: "Failed to delete reward", variant: "destructive" });
     }
   };
 
