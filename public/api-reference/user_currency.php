@@ -13,22 +13,50 @@ require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-define('VERSION', '2026-01-30-A');
+// Polyfill for older PHP versions
+if (!function_exists('http_response_code')) {
+    function http_response_code($code = null) {
+        static $current = 200;
+        if ($code !== null) {
+            $current = (int)$code;
+            header('X-PHP-Response-Code: ' . $current, true, $current);
+        }
+        return $current;
+    }
+}
 
-$rid = bin2hex(random_bytes(6));
+define('VERSION', '2026-01-30-B');
 
-function jsonOut(array $data): void {
+// PHP 5.x safe RID generator
+function _rid() {
+    if (function_exists('random_bytes')) {
+        return bin2hex(random_bytes(6));
+    }
+    if (function_exists('openssl_random_pseudo_bytes')) {
+        return bin2hex(openssl_random_pseudo_bytes(6));
+    }
+    return substr(md5(uniqid('', true)), 0, 12);
+}
+
+$rid = _rid();
+
+function jsonOut($data) {
     global $rid;
-    echo json_encode(array_merge($data, ['rid' => $rid, '_version' => VERSION]), JSON_UNESCAPED_UNICODE);
+    $flags = 0;
+    if (defined('JSON_UNESCAPED_UNICODE')) { $flags = JSON_UNESCAPED_UNICODE; }
+    echo json_encode(array_merge($data, array('rid' => $rid, '_version' => VERSION)), $flags);
     exit;
 }
 
-function jsonFail(int $code, string $msg): void {
+function jsonFail($code, $msg) {
     http_response_code($code);
     jsonOut(['success' => false, 'message' => $msg]);
 }
 
-$username = trim($_GET['username'] ?? '');
+$username = '';
+if (isset($_GET['username'])) {
+    $username = trim($_GET['username']);
+}
 
 if ($username === '') {
     jsonFail(400, 'Username required');
@@ -36,7 +64,7 @@ if ($username === '') {
 
 try {
     $pdo = getDB();
-} catch (Throwable $e) {
+} catch (Exception $e) {
     error_log("RID={$rid} DB_CONNECT_FAIL=" . $e->getMessage());
     jsonFail(503, 'Service temporarily unavailable');
 }
@@ -48,7 +76,7 @@ try {
     if (!in_array('name', $cols, true) && in_array('login', $cols, true)) {
         $usernameColumn = 'login';
     }
-} catch (Throwable $e) {
+} catch (Exception $e) {
     // Fallback to 'name'
 }
 
@@ -83,11 +111,11 @@ try {
         $currency = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($currency) {
-            $coins = (int)($currency['coins'] ?? 0);
-            $vipPoints = (int)($currency['vip_points'] ?? 0);
-            $totalVotes = (int)($currency['total_votes'] ?? 0);
+            $coins = (int)(isset($currency['coins']) ? $currency['coins'] : 0);
+            $vipPoints = (int)(isset($currency['vip_points']) ? $currency['vip_points'] : 0);
+            $totalVotes = (int)(isset($currency['total_votes']) ? $currency['total_votes'] : 0);
         }
-    } catch (Throwable $e) {
+    } catch (Exception $e) {
         // Try with username column instead
         try {
             $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE username = ? LIMIT 1");
@@ -95,10 +123,10 @@ try {
             $currency = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($currency) {
-                $coins = (int)($currency['coins'] ?? 0);
-                $vipPoints = (int)($currency['vip_points'] ?? 0);
+                $coins = (int)(isset($currency['coins']) ? $currency['coins'] : 0);
+                $vipPoints = (int)(isset($currency['vip_points']) ? $currency['vip_points'] : 0);
             }
-        } catch (Throwable $e2) {
+        } catch (Exception $e2) {
             // Table might not exist - continue with zeros
         }
     }
@@ -109,7 +137,7 @@ try {
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM vote_log WHERE username = ?");
             $stmt->execute([$username]);
             $totalVotes = (int)$stmt->fetchColumn();
-        } catch (Throwable $e) {
+        } catch (Exception $e) {
             // Table might not exist
         }
     }
@@ -124,7 +152,7 @@ try {
         if ($gold) {
             $zen = (int)$gold['Gold'];
         }
-    } catch (Throwable $e) {
+    } catch (Exception $e) {
         // Table might not exist
     }
 
@@ -136,7 +164,7 @@ try {
         'total_votes' => $totalVotes
     ]);
 
-} catch (Throwable $e) {
+} catch (Exception $e) {
     error_log("RID={$rid} USER_CURRENCY_ERROR=" . $e->getMessage());
     jsonFail(500, 'Database error');
 }

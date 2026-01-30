@@ -9,29 +9,57 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
-define('VERSION', '2026-01-30-B');
+define('VERSION', '2026-01-30-C');
 
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-$RID = bin2hex(random_bytes(6));
+// Polyfill for older PHP versions
+if (!function_exists('http_response_code')) {
+    function http_response_code($code = null) {
+        static $current = 200;
+        if ($code !== null) {
+            $current = (int)$code;
+            header('X-PHP-Response-Code: ' . $current, true, $current);
+        }
+        return $current;
+    }
+}
 
-function jsonOut(array $data): void {
+// PHP 5.x safe RID generator
+function _rid() {
+    if (function_exists('random_bytes')) {
+        return bin2hex(random_bytes(6));
+    }
+    if (function_exists('openssl_random_pseudo_bytes')) {
+        return bin2hex(openssl_random_pseudo_bytes(6));
+    }
+    return substr(md5(uniqid('', true)), 0, 12);
+}
+
+$RID = _rid();
+
+function jsonOut($data) {
     global $RID;
-    echo json_encode(array_merge($data, ['rid' => $RID, '_version' => VERSION]), JSON_UNESCAPED_UNICODE);
+    // JSON_UNESCAPED_UNICODE exists since PHP 5.4; fall back safely.
+    $flags = 0;
+    if (defined('JSON_UNESCAPED_UNICODE')) {
+        $flags = JSON_UNESCAPED_UNICODE;
+    }
+    echo json_encode(array_merge($data, array('rid' => $RID, '_version' => VERSION)), $flags);
     exit;
 }
 
-function jsonFail(int $code, string $msg): void {
+function jsonFail($code, $msg) {
     http_response_code($code);
     jsonOut(['success' => false, 'message' => $msg]);
 }
 
 try {
     $pdo = getDB();
-} catch (Throwable $e) {
+} catch (Exception $e) {
     error_log("RID={$RID} DB_FAIL=" . $e->getMessage());
     jsonFail(503, 'Service temporarily unavailable');
 }
@@ -55,7 +83,7 @@ try {
             INDEX idx_vote_time (vote_time)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
-} catch (Throwable $e) {
+} catch (Exception $e) {
     // Table may already exist
 }
 
@@ -75,12 +103,12 @@ try {
             INDEX idx_current_streak (current_streak DESC)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
-} catch (Throwable $e) {
+} catch (Exception $e) {
     // Table may already exist
 }
 
 // Streak tier configuration
-function getStreakTier(int $streak): array {
+function getStreakTier($streak) {
     if ($streak >= 30) {
         return ['tier' => 'legend', 'name' => 'Legend', 'multiplier' => 2.0, 'color' => '#FFD700'];
     } elseif ($streak >= 14) {
@@ -94,7 +122,7 @@ function getStreakTier(int $streak): array {
     }
 }
 
-function getNextTier(int $streak): ?array {
+function getNextTier($streak) {
     if ($streak < 3) {
         return ['days_needed' => 3 - $streak, 'tier' => 'rising', 'multiplier' => 1.25];
     } elseif ($streak < 7) {
@@ -107,8 +135,19 @@ function getNextTier(int $streak): ?array {
     return null;
 }
 
-$action = $_POST['action'] ?? $_GET['action'] ?? '';
-$username = trim($_POST['username'] ?? $_GET['username'] ?? '');
+$action = '';
+if (isset($_POST['action'])) {
+    $action = $_POST['action'];
+} elseif (isset($_GET['action'])) {
+    $action = $_GET['action'];
+}
+
+$username = '';
+if (isset($_POST['username'])) {
+    $username = trim($_POST['username']);
+} elseif (isset($_GET['username'])) {
+    $username = trim($_GET['username']);
+}
 
 switch ($action) {
     case 'get_vote_status':
@@ -136,7 +175,7 @@ switch ($action) {
                     $coins = (int)$currency['coins'];
                     $vipPoints = (int)$currency['vip_points'];
                 }
-            } catch (Throwable $e) {
+            } catch (Exception $e) {
                 // Try username column
                 try {
                     $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE username = ? LIMIT 1");
@@ -146,7 +185,7 @@ switch ($action) {
                         $coins = (int)$currency['coins'];
                         $vipPoints = (int)$currency['vip_points'];
                     }
-                } catch (Throwable $e2) {
+                } catch (Exception $e2) {
                     // Continue with zeros
                 }
             }
@@ -156,8 +195,8 @@ switch ($action) {
                 $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM vote_log WHERE username = ?");
                 $stmt->execute([$username]);
                 $voteCount = $stmt->fetch(PDO::FETCH_ASSOC);
-                $totalVotes = (int)($voteCount['total'] ?? 0);
-            } catch (Throwable $e) {
+                $totalVotes = (int)(isset($voteCount['total']) ? $voteCount['total'] : 0);
+            } catch (Exception $e) {
                 // Continue with zero
             }
         }
@@ -186,7 +225,7 @@ switch ($action) {
                     $stmt->execute([$username]);
                 }
             }
-        } catch (Throwable $e) {
+        } catch (Exception $e) {
             // Continue with defaults
         }
 
@@ -198,7 +237,7 @@ switch ($action) {
         try {
             $stmt = $pdo->query("SELECT id, cooldown_hours FROM vote_sites WHERE is_active = 1");
             $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Throwable $e) {
+        } catch (Exception $e) {
             // No sites
         }
 
@@ -244,7 +283,7 @@ switch ($action) {
                     }
                 }
                 // If no lastVote, don't add to siteStatuses - frontend will treat as never voted
-            } catch (Throwable $e) {
+            } catch (Exception $e) {
                 // Skip this site
             }
         }
@@ -272,8 +311,17 @@ switch ($action) {
             jsonOut(['success' => false, 'message' => 'Username required']);
         }
 
-        $siteId = (int)($_POST['site_id'] ?? $_GET['site_id'] ?? 0);
-        $fingerprint = trim($_POST['fingerprint'] ?? '');
+        $siteId = 0;
+        if (isset($_POST['site_id'])) {
+            $siteId = (int)$_POST['site_id'];
+        } elseif (isset($_GET['site_id'])) {
+            $siteId = (int)$_GET['site_id'];
+        }
+
+        $fingerprint = '';
+        if (isset($_POST['fingerprint'])) {
+            $fingerprint = trim($_POST['fingerprint']);
+        }
 
         if (!$siteId) {
             jsonOut(['success' => false, 'message' => 'Site ID required']);
@@ -359,7 +407,7 @@ switch ($action) {
                 $longestStreak = 1;
                 $streakIncreased = true;
             }
-        } catch (Throwable $e) {
+        } catch (Exception $e) {
             $currentStreak = 1;
             $longestStreak = 1;
             $streakIncreased = true;
@@ -380,7 +428,7 @@ switch ($action) {
         $bonusCoins = $coinsReward - $baseCoins;
         $bonusVip = $vipReward - $baseVip;
 
-        $ipAddress = $_SERVER['REMOTE_ADDR'] ?? '';
+        $ipAddress = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
 
         // Record the vote (using vote_time with NOW())
         $stmt = $pdo->prepare("
@@ -413,7 +461,7 @@ switch ($action) {
                 ");
                 $stmt->execute([$username, $coinsReward, $vipReward]);
             }
-        } catch (Throwable $e) {
+        } catch (Exception $e) {
             error_log("RID={$RID} USER_CURRENCY_UPDATE=" . $e->getMessage());
         }
 
@@ -431,7 +479,7 @@ switch ($action) {
                     updated_at = NOW()
             ");
             $stmt->execute([$username, $currentStreak, $longestStreak, $today, $streakExpiresAt, $bonusCoins + $bonusVip, $bonusCoins + $bonusVip]);
-        } catch (Throwable $e) {
+        } catch (Exception $e) {
             error_log("RID={$RID} STREAK_UPDATE=" . $e->getMessage());
         }
 
@@ -452,7 +500,7 @@ switch ($action) {
                 $newCoins = (int)$newCurrency['coins'];
                 $newVip = (int)$newCurrency['vip_points'];
             }
-        } catch (Throwable $e) {
+        } catch (Exception $e) {
             // Use reward values
         }
 
@@ -482,7 +530,11 @@ switch ($action) {
         break;
 
     case 'get_streak_leaderboard':
-        $limit = min((int)($_GET['limit'] ?? 10), 50);
+        $limit = 10;
+        if (isset($_GET['limit'])) {
+            $limit = (int)$_GET['limit'];
+        }
+        $limit = min($limit, 50);
         
         try {
             $stmt = $pdo->prepare("
@@ -503,7 +555,7 @@ switch ($action) {
                 'success' => true,
                 'leaderboard' => $leaders
             ]);
-        } catch (Throwable $e) {
+        } catch (Exception $e) {
             jsonOut([
                 'success' => true,
                 'leaderboard' => []
