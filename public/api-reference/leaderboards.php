@@ -115,10 +115,39 @@ try {
         // Table doesn't exist
     }
 
+    // Top Characters by Level - from basetab_sg
+    $topCharacters = [];
+    try {
+        $stmt = $pdo->query("
+            SELECT 
+                Name as username,
+                Level as value,
+                Profession as class
+            FROM basetab_sg
+            WHERE IsDel = 0
+            ORDER BY Level DESC, Exp DESC
+            LIMIT 10
+        ");
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $rank = 1;
+        foreach ($rows as $row) {
+            $topCharacters[] = [
+                'rank' => $rank++,
+                'username' => $row['username'],
+                'value' => (int)$row['value'],
+                'class' => (int)$row['class']
+            ];
+        }
+    } catch (Exception $e) {
+        // Table doesn't exist
+    }
+
     echo json_encode([
         'success' => true,
         'topVoters' => $topVoters,
         'vipRankings' => $vipRankings,
+        'topCharacters' => $topCharacters,
         'rid' => $rid
     ]);
 

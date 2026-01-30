@@ -1,14 +1,27 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Vote, Crown, Medal } from "lucide-react";
+import { Trophy, Vote, Crown, Medal, Swords } from "lucide-react";
 
 interface LeaderboardPlayer {
   rank: number;
   username: string;
   value: number;
   vipLevel?: number;
+  class?: number;
 }
+
+const CLASS_NAMES: Record<number, string> = {
+  0: "Warrior",
+  1: "Mage",
+  2: "Archer",
+  3: "Assassin",
+  4: "Summoner",
+  5: "Paladin",
+  6: "Necromancer",
+  7: "Berserker",
+  8: "Monk",
+};
 
 const getRankIcon = (rank: number) => {
   switch (rank) {
@@ -53,6 +66,7 @@ const getRankRowStyle = (rank: number) => {
 export const Leaderboards = () => {
   const [topVoters, setTopVoters] = useState<LeaderboardPlayer[]>([]);
   const [vipRankings, setVipRankings] = useState<LeaderboardPlayer[]>([]);
+  const [topCharacters, setTopCharacters] = useState<LeaderboardPlayer[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,6 +79,7 @@ export const Leaderboards = () => {
           if (data.success) {
             setTopVoters(data.topVoters || []);
             setVipRankings(data.vipRankings || []);
+            setTopCharacters(data.topCharacters || []);
           }
         }
       } catch {
@@ -77,7 +92,7 @@ export const Leaderboards = () => {
     fetchLeaderboards();
   }, []);
 
-  const LeaderboardTable = ({ data, valueLabel }: { data: LeaderboardPlayer[]; valueLabel: string }) => {
+  const LeaderboardTable = ({ data, valueLabel, showClass }: { data: LeaderboardPlayer[]; valueLabel: string; showClass?: boolean }) => {
     if (data.length === 0) {
       return (
         <div className="text-center py-8 text-muted-foreground">
@@ -95,11 +110,16 @@ export const Leaderboards = () => {
           >
             <div className="flex items-center gap-3">
               {getRankIcon(player.rank)}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col">
                 <span className={`font-medium ${player.rank <= 3 ? "text-foreground" : "text-muted-foreground"}`}>
                   {player.username}
                 </span>
-                {getVipBadge(player.vipLevel)}
+                {showClass && player.class !== undefined && (
+                  <span className="text-xs text-muted-foreground">
+                    {CLASS_NAMES[player.class] || `Class ${player.class}`}
+                  </span>
+                )}
+                {!showClass && getVipBadge(player.vipLevel)}
               </div>
             </div>
             <div className="text-right">
@@ -123,17 +143,29 @@ export const Leaderboards = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="voters" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
+        <Tabs defaultValue="characters" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsTrigger value="characters" className="flex items-center gap-2">
+              <Swords className="h-4 w-4" />
+              Top Levels
+            </TabsTrigger>
             <TabsTrigger value="voters" className="flex items-center gap-2">
               <Vote className="h-4 w-4" />
               Top Voters
             </TabsTrigger>
             <TabsTrigger value="vip" className="flex items-center gap-2">
               <Crown className="h-4 w-4" />
-              VIP Rankings
+              VIP
             </TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="characters" className="mt-0">
+            {loading ? (
+              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            ) : (
+              <LeaderboardTable data={topCharacters} valueLabel="Lv" showClass />
+            )}
+          </TabsContent>
           
           <TabsContent value="voters" className="mt-0">
             {loading ? (
