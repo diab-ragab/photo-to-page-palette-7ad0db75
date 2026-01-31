@@ -31,6 +31,7 @@ import DownloadPage from "./pages/Download";
 import Dashboard from "./pages/Dashboard";
 import SeasonHistory from "./pages/SeasonHistory";
 import AdminDashboard from "./pages/AdminDashboard";
+import ClassPage from "./pages/ClassPage";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const AnimatedRoutes = () => {
         <Route path="/blog" element={<PageTransition><Blog /></PageTransition>} />
         <Route path="/blog/:slug" element={<PageTransition><BlogPost /></PageTransition>} />
         <Route path="/download" element={<PageTransition><DownloadPage /></PageTransition>} />
+        <Route path="/class/:slug" element={<PageTransition><ClassPage /></PageTransition>} />
         <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
       </Routes>
     </AnimatePresence>
