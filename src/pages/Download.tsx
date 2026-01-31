@@ -85,8 +85,24 @@ const DownloadPage = () => {
   return (
     <>
       <SEO
-        title="Download Game Client | WOI Endgame"
-        description="Download the WOI Endgame client for Windows, macOS, or Android. Check system requirements and follow our easy installation guide."
+        title="Download"
+        description="Download WOI Endgame game client free for Windows. Check system requirements, installation guide, and start playing the best World of Illusions private server."
+        keywords="WOI Endgame download, game client, World of Illusions download, private server client, free MMORPG download, Windows game"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "WOI Endgame Game Client",
+          operatingSystem: "Windows 10, Windows 11",
+          applicationCategory: "GameApplication",
+          offers: {
+            "@type": "Offer",
+            price: "0",
+            priceCurrency: "USD"
+          },
+          downloadUrl: "https://woiendgame.com/download",
+          softwareVersion: "2.5.1",
+          fileSize: "4.2 GB"
+        }}
       />
       <Navbar />
       

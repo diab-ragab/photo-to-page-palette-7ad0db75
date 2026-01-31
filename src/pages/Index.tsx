@@ -30,8 +30,8 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SEO 
-        description="Experience the ultimate World of Illusions private server. Join WOI Endgame for 9 exclusive classes, custom content, active community, and regular updates."
-        keywords="WOI Endgame, World of Illusions, private server, MMORPG, gaming, RPG, fantasy game, online game, Paladin, Necromancer, Warlock"
+        description="Join WOI Endgame, the best World of Illusions private server. 9 unique classes including Paladin, Necromancer & Warlock. Custom dungeons, x10 EXP rates. Free to play!"
+        keywords="WOI Endgame, World of Illusions private server, best WOI server, MMORPG 2026, Paladin class, Necromancer, Warlock, Berserker, Assassin, Ranger, Magus, Monk, Heretic, custom dungeons, free MMO"
         structuredData={structuredData}
       />
       <Navbar />
