@@ -2,29 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Sword, Shield, Zap, Heart, Star, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-
-interface Skill {
-  name: string;
-  description: string;
-  icon: string;
-}
-
-interface ClassStats {
-  strength: number;
-  defense: number;
-  magic: number;
-  speed: number;
-  health: number;
-}
-
-export interface ClassData {
-  name: string;
-  image: string;
-  description: string;
-  lore: string;
-  skills: Skill[];
-  stats: ClassStats;
-}
+import { ClassData } from "@/lib/classData";
 
 interface ClassDetailModalProps {
   classData: ClassData | null;
