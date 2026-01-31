@@ -20,9 +20,9 @@ interface SEOProps {
 
 const defaultMeta = {
   siteName: "WOI Endgame",
-  title: "WOI Endgame | Private World of Illusions Server",
-  description: "Experience the ultimate World of Illusions private server. Join WOI Endgame for exclusive classes, custom content, and an active community.",
-  keywords: "WOI, World of Illusions, private server, MMORPG, gaming, RPG, online game, fantasy game",
+  title: "WOI Endgame | #1 World of Illusions Private Server",
+  description: "Join WOI Endgame, the best World of Illusions private server. 9 unique classes, custom dungeons, active community, x10 EXP rates. Free to play!",
+  keywords: "WOI Endgame, World of Illusions private server, WOI private server, MMORPG, free MMO, Paladin, Necromancer, Warlock, Berserker, Assassin, Ranger, Magus, Monk, Heretic, custom dungeons, PvP",
   ogImage: "/og-image.jpg",
   twitterCard: "summary_large_image" as const,
   locale: "en_US",
