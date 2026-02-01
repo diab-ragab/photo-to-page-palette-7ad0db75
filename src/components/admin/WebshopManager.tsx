@@ -70,6 +70,195 @@ const defaultProduct: ProductFormData = {
   stock: -1,
 };
 
+interface ProductFormContentProps {
+  editData: ProductFormData;
+  setEditData: React.Dispatch<React.SetStateAction<ProductFormData>>;
+  categories: WebshopCategory[];
+  isSubmitting: boolean;
+  selectedProduct: WebshopProduct | null;
+  onSave: () => void;
+  onClose: () => void;
+}
+
+const ProductFormContent = ({
+  editData,
+  setEditData,
+  categories,
+  isSubmitting,
+  selectedProduct,
+  onSave,
+  onClose,
+}: ProductFormContentProps) => (
+  <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
+    <div className="grid grid-cols-2 gap-4">
+      <div className="col-span-2">
+        <label className="text-sm font-medium mb-2 block">Product Name</label>
+        <Input
+          value={editData.name}
+          onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
+          placeholder="e.g., Phoenix Wing"
+        />
+      </div>
+    </div>
+
+    <div>
+      <label className="text-sm font-medium mb-2 block">Description</label>
+      <Textarea
+        value={editData.description}
+        onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
+        placeholder="Product description..."
+        rows={2}
+      />
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <label className="text-sm font-medium mb-2 block flex items-center gap-1">
+          <Euro className="h-3 w-3" /> Price (EUR)
+        </label>
+        <Input
+          type="number"
+          step="0.01"
+          min={0}
+          value={editData.price_real}
+          onChange={(e) => setEditData(prev => ({ ...prev, price_real: parseFloat(e.target.value) || 0 }))}
+        />
+      </div>
+      <div>
+        <label className="text-sm font-medium mb-2 block flex items-center gap-1">
+          <Tag className="h-3 w-3" /> Category
+        </label>
+        <Select 
+          value={String(editData.category_id)} 
+          onValueChange={(v) => setEditData(prev => ({ ...prev, category_id: parseInt(v) }))}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map(cat => (
+              <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-3 gap-4">
+      <div>
+        <label className="text-sm font-medium mb-2 block">Zen Price</label>
+        <Input
+          type="number"
+          min={0}
+          value={editData.price_zen}
+          onChange={(e) => setEditData(prev => ({ ...prev, price_zen: parseInt(e.target.value) || 0 }))}
+        />
+      </div>
+      <div>
+        <label className="text-sm font-medium mb-2 block">Coins Price</label>
+        <Input
+          type="number"
+          min={0}
+          value={editData.price_coins}
+          onChange={(e) => setEditData(prev => ({ ...prev, price_coins: parseInt(e.target.value) || 0 }))}
+        />
+      </div>
+      <div>
+        <label className="text-sm font-medium mb-2 block">VIP Price</label>
+        <Input
+          type="number"
+          min={0}
+          value={editData.price_vip}
+          onChange={(e) => setEditData(prev => ({ ...prev, price_vip: parseInt(e.target.value) || 0 }))}
+        />
+      </div>
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <label className="text-sm font-medium mb-2 block">Item ID (in-game)</label>
+        <Input
+          type="number"
+          min={0}
+          value={editData.item_id}
+          onChange={(e) => setEditData(prev => ({ ...prev, item_id: parseInt(e.target.value) || 0 }))}
+        />
+      </div>
+      <div>
+        <label className="text-sm font-medium mb-2 block">Quantity</label>
+        <Input
+          type="number"
+          min={1}
+          value={editData.item_quantity}
+          onChange={(e) => setEditData(prev => ({ ...prev, item_quantity: parseInt(e.target.value) || 1 }))}
+        />
+      </div>
+    </div>
+
+    <div>
+      <label className="text-sm font-medium mb-2 block">Stock (-1 = unlimited)</label>
+      <Input
+        type="number"
+        min={-1}
+        value={editData.stock}
+        onChange={(e) => setEditData(prev => ({ ...prev, stock: parseInt(e.target.value) }))}
+      />
+    </div>
+
+    <div>
+      <label className="text-sm font-medium mb-2 block flex items-center gap-1">
+        <ImageIcon className="h-3 w-3" /> Image URL (or emoji)
+      </label>
+      <Input
+        value={editData.image_url}
+        onChange={(e) => setEditData(prev => ({ ...prev, image_url: e.target.value }))}
+        placeholder="https://... or 🎁"
+      />
+    </div>
+
+    <div>
+      <label className="text-sm font-medium mb-2 block flex items-center gap-1">
+        <LinkIcon className="h-3 w-3" /> Stripe Payment Link
+      </label>
+      <Input
+        value={editData.stripe_payment_link}
+        onChange={(e) => setEditData(prev => ({ ...prev, stripe_payment_link: e.target.value }))}
+        placeholder="https://buy.stripe.com/..."
+      />
+      <p className="text-xs text-muted-foreground mt-1">
+        Create payment links at dashboard.stripe.com → Payment Links
+      </p>
+    </div>
+
+    <div className="flex items-center justify-between p-3 rounded-lg border">
+      <span className="text-sm font-medium">Active</span>
+      <Switch
+        checked={editData.is_active}
+        onCheckedChange={(checked) => setEditData(prev => ({ ...prev, is_active: checked }))}
+      />
+    </div>
+
+    <div className="flex items-center justify-between p-3 rounded-lg border">
+      <span className="text-sm font-medium">Featured</span>
+      <Switch
+        checked={editData.is_featured}
+        onCheckedChange={(checked) => setEditData(prev => ({ ...prev, is_featured: checked }))}
+      />
+    </div>
+
+    <div className="flex gap-2 pt-2">
+      <Button onClick={onSave} disabled={isSubmitting} className="flex-1">
+        <Save className="mr-2 h-4 w-4" />
+        {isSubmitting ? "Saving..." : selectedProduct ? "Update Product" : "Add Product"}
+      </Button>
+      <Button variant="outline" onClick={onClose}>
+        <X className="mr-2 h-4 w-4" />
+        Cancel
+      </Button>
+    </div>
+  </div>
+);
+
 export function WebshopManager() {
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -222,176 +411,6 @@ export function WebshopManager() {
     filterCategory === "all" || p.category_id === parseInt(filterCategory)
   );
 
-  const ProductFormContent = () => (
-    <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <label className="text-sm font-medium mb-2 block">Product Name</label>
-          <Input
-            value={editData.name}
-            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-            placeholder="e.g., Phoenix Wing"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="text-sm font-medium mb-2 block">Description</label>
-        <Textarea
-          value={editData.description}
-          onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-          placeholder="Product description..."
-          rows={2}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-            <Euro className="h-3 w-3" /> Price (EUR)
-          </label>
-          <Input
-            type="number"
-            step="0.01"
-            min={0}
-            value={editData.price_real}
-            onChange={(e) => setEditData({ ...editData, price_real: parseFloat(e.target.value) || 0 })}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-            <Tag className="h-3 w-3" /> Category
-          </label>
-          <Select 
-            value={String(editData.category_id)} 
-            onValueChange={(v) => setEditData({ ...editData, category_id: parseInt(v) })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map(cat => (
-                <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <label className="text-sm font-medium mb-2 block">Zen Price</label>
-          <Input
-            type="number"
-            min={0}
-            value={editData.price_zen}
-            onChange={(e) => setEditData({ ...editData, price_zen: parseInt(e.target.value) || 0 })}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium mb-2 block">Coins Price</label>
-          <Input
-            type="number"
-            min={0}
-            value={editData.price_coins}
-            onChange={(e) => setEditData({ ...editData, price_coins: parseInt(e.target.value) || 0 })}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium mb-2 block">VIP Price</label>
-          <Input
-            type="number"
-            min={0}
-            value={editData.price_vip}
-            onChange={(e) => setEditData({ ...editData, price_vip: parseInt(e.target.value) || 0 })}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium mb-2 block">Item ID (in-game)</label>
-          <Input
-            type="number"
-            min={0}
-            value={editData.item_id}
-            onChange={(e) => setEditData({ ...editData, item_id: parseInt(e.target.value) || 0 })}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium mb-2 block">Quantity</label>
-          <Input
-            type="number"
-            min={1}
-            value={editData.item_quantity}
-            onChange={(e) => setEditData({ ...editData, item_quantity: parseInt(e.target.value) || 1 })}
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="text-sm font-medium mb-2 block">Stock (-1 = unlimited)</label>
-        <Input
-          type="number"
-          min={-1}
-          value={editData.stock}
-          onChange={(e) => setEditData({ ...editData, stock: parseInt(e.target.value) })}
-        />
-      </div>
-
-      <div>
-        <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-          <ImageIcon className="h-3 w-3" /> Image URL (or emoji)
-        </label>
-        <Input
-          value={editData.image_url}
-          onChange={(e) => setEditData({ ...editData, image_url: e.target.value })}
-          placeholder="https://... or 🎁"
-        />
-      </div>
-
-      <div>
-        <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-          <LinkIcon className="h-3 w-3" /> Stripe Payment Link
-        </label>
-        <Input
-          value={editData.stripe_payment_link}
-          onChange={(e) => setEditData({ ...editData, stripe_payment_link: e.target.value })}
-          placeholder="https://buy.stripe.com/..."
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          Create payment links at dashboard.stripe.com → Payment Links
-        </p>
-      </div>
-
-      <div className="flex items-center justify-between p-3 rounded-lg border">
-        <span className="text-sm font-medium">Active</span>
-        <Switch
-          checked={editData.is_active}
-          onCheckedChange={(checked) => setEditData({ ...editData, is_active: checked })}
-        />
-      </div>
-
-      <div className="flex items-center justify-between p-3 rounded-lg border">
-        <span className="text-sm font-medium">Featured</span>
-        <Switch
-          checked={editData.is_featured}
-          onCheckedChange={(checked) => setEditData({ ...editData, is_featured: checked })}
-        />
-      </div>
-
-      <div className="flex gap-2 pt-2">
-        <Button onClick={handleSave} disabled={isSubmitting} className="flex-1">
-          <Save className="mr-2 h-4 w-4" />
-          {isSubmitting ? "Saving..." : selectedProduct ? "Update Product" : "Add Product"}
-        </Button>
-        <Button variant="outline" onClick={handleCloseModal}>
-          <X className="mr-2 h-4 w-4" />
-          Cancel
-        </Button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -575,7 +594,15 @@ export function WebshopManager() {
               </DrawerDescription>
             </DrawerHeader>
             <div className="p-4">
-              <ProductFormContent />
+              <ProductFormContent 
+                editData={editData}
+                setEditData={setEditData}
+                categories={categories}
+                isSubmitting={isSubmitting}
+                selectedProduct={selectedProduct}
+                onSave={handleSave}
+                onClose={handleCloseModal}
+              />
             </div>
           </DrawerContent>
         </Drawer>
@@ -588,7 +615,15 @@ export function WebshopManager() {
                 {selectedProduct ? "Update product details" : "Create a new product"}
               </DialogDescription>
             </DialogHeader>
-            <ProductFormContent />
+            <ProductFormContent 
+              editData={editData}
+              setEditData={setEditData}
+              categories={categories}
+              isSubmitting={isSubmitting}
+              selectedProduct={selectedProduct}
+              onSave={handleSave}
+              onClose={handleCloseModal}
+            />
           </DialogContent>
         </Dialog>
       )}
