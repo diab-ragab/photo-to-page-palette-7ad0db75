@@ -1,22 +1,21 @@
 <?php
 /**
- * Daily Zen Reward API - Cloudflare Safe + CSRF + Device Token
- * PHP 5.x compatible (avoid array cookie options)
+ * Daily Zen Reward API - 24h Cooldown from last claim
+ * PHP 5.x compatible
  */
 
 require_once __DIR__ . '/bootstrap.php';
-// Note: getDB() is defined in bootstrap.php
 
 header('Content-Type: application/json; charset=utf-8');
 
-define('DAILY_ZEN_REWARD', 500000);
+define('DAILY_ZEN_REWARD', 100000);
+define('COOLDOWN_SECONDS', 24 * 60 * 60); // 24 hours
 
-// IMPORTANT: move this to config/env if possible
 define('SERVER_SECRET_SALT', 'wOi3ndG4m3_z3N_s4Lt_X9kP2mQ7vL5nR8tY1wZ6');
 
 // Cookie
 define('DEVICE_TOKEN_NAME', 'woi_device_token');
-define('DEVICE_TOKEN_EXPIRY', 180 * 24 * 60 * 60); // 180 days
+define('DEVICE_TOKEN_EXPIRY', 180 * 24 * 60 * 60);
 
 // Limits
 define('MAX_FAILED_ATTEMPTS_PER_IP_PER_HOUR', 10);
@@ -29,9 +28,7 @@ $ALLOWED_ORIGINS = array(
   'https://woiendgame.lovable.app'
 );
 
-if (session_id() === '') {
-  @session_start();
-}
+if (session_id() === '') { @session_start(); }
 
 function jsonOut($arr, $code = 200) {
   http_response_code($code);
@@ -39,10 +36,6 @@ function jsonOut($arr, $code = 200) {
   exit;
 }
 
-/**
- * Require Cloudflare-proxied request (basic)
- * Prevent direct-to-origin bypass (not perfect, but helpful).
- */
 function requireCloudflare() {
   if (empty($_SERVER['HTTP_CF_RAY'])) {
     jsonOut(array('success' => false, 'error' => 'Direct access blocked'), 403);
@@ -61,15 +54,11 @@ function getClientIP() {
 
 function getIPSubnet($ip) {
   $parts = explode('.', $ip);
-  if (count($parts) === 4) {
-    return $parts[0].'.'.$parts[1].'.'.$parts[2].'.0/24';
-  }
+  if (count($parts) === 4) return $parts[0].'.'.$parts[1].'.'.$parts[2].'.0/24';
   return $ip;
 }
 
-function sha256($s) {
-  return hash('sha256', $s);
-}
+function sha256($s) { return hash('sha256', $s); }
 
 function generateDeviceToken() {
   if (function_exists('random_bytes')) return bin2hex(random_bytes(32));
@@ -84,7 +73,6 @@ function setDeviceCookie($token) {
   $maxAge = DEVICE_TOKEN_EXPIRY;
   $expires = time() + $maxAge;
 
-  // Reliable Set-Cookie header with SameSite for old PHP
   $cookie = DEVICE_TOKEN_NAME . '=' . rawurlencode($token)
     . '; Path=/'
     . '; Max-Age=' . $maxAge
@@ -106,13 +94,8 @@ function getOrCreateDeviceToken() {
   return $t;
 }
 
-function hashDeviceToken($token) {
-  return sha256($token . '|' . SERVER_SECRET_SALT);
-}
-
-function hashFingerprint($fingerprint) {
-  return sha256($fingerprint . '|' . SERVER_SECRET_SALT);
-}
+function hashDeviceToken($token) { return sha256($token . '|' . SERVER_SECRET_SALT); }
+function hashFingerprint($fingerprint) { return sha256($fingerprint . '|' . SERVER_SECRET_SALT); }
 
 function getCsrfToken() {
   if (empty($_SESSION['csrf_token'])) {
@@ -136,21 +119,6 @@ function checkOrigin($allowedOrigins) {
   }
 }
 
-if (isset($_GET['debug']) && $_GET['debug'] === '1') {
-  echo json_encode(array(
-    'has_x_session' => !empty($_SERVER['HTTP_X_SESSION_TOKEN']),
-    'has_auth'      => !empty($_SERVER['HTTP_AUTHORIZATION']),
-    'x_session_len' => !empty($_SERVER['HTTP_X_SESSION_TOKEN']) ? strlen($_SERVER['HTTP_X_SESSION_TOKEN']) : 0,
-    'auth_prefix'   => !empty($_SERVER['HTTP_AUTHORIZATION']) ? substr($_SERVER['HTTP_AUTHORIZATION'], 0, 20) : '',
-    'cf_ray'        => !empty($_SERVER['HTTP_CF_RAY']),
-  ));
-  exit;
-}
-
-/**
- * Your existing token session validation (as you wrote)
- * Returns: array(account_id, username) or null
- */
 function validateSession($pdo) {
   $sessionToken = '';
 
@@ -190,9 +158,7 @@ function logSecurity($pdo, $accountId, $deviceHash, $ip, $type, $details) {
       VALUES (?, ?, ?, ?, ?, NOW())
     ");
     $stmt->execute(array($accountId, $deviceHash, $ip, $type, $details));
-  } catch (Exception $e) {
-    // ignore logging failures
-  }
+  } catch (Exception $e) {}
 }
 
 function isRateLimited($pdo, $ip) {
@@ -212,17 +178,10 @@ function isRateLimited($pdo, $ip) {
   }
 }
 
-function secondsUntilReset() {
-  $now = time();
-  $midnight = strtotime('tomorrow midnight');
-  return max(0, $midnight - $now);
-}
-
 /**
- * Ensure required tables exist
+ * Ensure tables exist with claimed_at DATETIME
  */
 function ensureTablesExist($pdo) {
-  // Main claims table
   $pdo->exec("
     CREATE TABLE IF NOT EXISTS daily_zen_claims (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -231,21 +190,16 @@ function ensureTablesExist($pdo) {
       fingerprint_hash VARCHAR(64) NOT NULL,
       ip_address VARCHAR(45) NOT NULL,
       ip_subnet VARCHAR(20) NOT NULL,
-      claim_date DATE NOT NULL,
       reward_amount INT NOT NULL DEFAULT 0,
       risk_score INT DEFAULT 0,
       created_at DATETIME NOT NULL,
-      INDEX idx_device_date (device_token_hash, claim_date),
-      INDEX idx_account_date (account_id, claim_date),
-      INDEX idx_fingerprint_date (fingerprint_hash, claim_date),
-      INDEX idx_subnet_date (ip_subnet, claim_date),
-      UNIQUE KEY unique_device_claim (device_token_hash, claim_date),
-      UNIQUE KEY unique_account_claim (account_id, claim_date),
-      UNIQUE KEY unique_fingerprint_claim (fingerprint_hash, claim_date)
+      claimed_at DATETIME NOT NULL,
+      INDEX idx_account_time (account_id, claimed_at),
+      INDEX idx_device_time (device_token_hash, claimed_at),
+      INDEX idx_ip_time (ip_address, claimed_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8
   ");
 
-  // Security event log
   $pdo->exec("
     CREATE TABLE IF NOT EXISTS daily_zen_security_log (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -262,7 +216,33 @@ function ensureTablesExist($pdo) {
 }
 
 /**
- * Send Zen via procedure usecash (your existing logic)
+ * Get seconds until next claim based on LAST claimed_at for THIS account only
+ * Returns 0 if can claim now
+ */
+function secondsUntilNextClaim($pdo, $accountId) {
+  $stmt = $pdo->prepare("
+    SELECT claimed_at
+    FROM daily_zen_claims
+    WHERE account_id = ?
+    ORDER BY claimed_at DESC
+    LIMIT 1
+  ");
+  $stmt->execute(array($accountId));
+  $row = $stmt->fetch();
+
+  if (!$row || empty($row['claimed_at'])) {
+    return 0; // Never claimed, can claim now
+  }
+
+  $lastClaim = strtotime($row['claimed_at']);
+  $nextClaim = $lastClaim + COOLDOWN_SECONDS;
+  $remaining = $nextClaim - time();
+
+  return ($remaining > 0) ? $remaining : 0;
+}
+
+/**
+ * Send Zen via procedure usecash
  */
 function sendZenReward($mysqli, $username, $amount) {
   $stmt = $mysqli->prepare("SELECT ID FROM users WHERE name = ? LIMIT 1");
@@ -274,7 +254,12 @@ function sendZenReward($mysqli, $username, $amount) {
 
   if (!$userid) return array('success'=>false,'error'=>'Account not found');
 
-  $zoneid = 1; $sn = -1; $aid = 1; $point = 0; $cash = (int)$amount; $status = 0;
+  $zoneid = 1;
+  $sn     = 0;
+  $aid    = 1;
+  $point  = 0;
+  $cash   = (int)$amount;
+  $status = 1;
 
   $stmt = $mysqli->prepare("CALL usecash(?, ?, ?, ?, ?, ?, ?, @p_error)");
   $stmt->bind_param("iiiiiii", $userid, $zoneid, $sn, $aid, $point, $cash, $status);
@@ -304,6 +289,7 @@ $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET'
 try {
   $pdo = getDB();
   ensureTablesExist($pdo);
+
   $ip = getClientIP();
   $subnet = getIPSubnet($ip);
 
@@ -316,32 +302,22 @@ try {
         'can_claim'=>false,
         'has_claimed'=>false,
         'reward_amount'=>0,
-        'seconds_until_reset'=>0,
-        'reset_time'=>''
+        'seconds_until_next_claim'=>0
       ), 401);
     }
 
     $deviceToken = getOrCreateDeviceToken();
     $deviceHash = hashDeviceToken($deviceToken);
 
-    $stmt = $pdo->prepare("SELECT id FROM daily_zen_claims WHERE device_token_hash = ? AND claim_date = CURDATE() LIMIT 1");
-    $stmt->execute(array($deviceHash));
-    $deviceClaimed = (bool)$stmt->fetch();
-
-    $stmt = $pdo->prepare("SELECT id FROM daily_zen_claims WHERE account_id = ? AND claim_date = CURDATE() LIMIT 1");
-    $stmt->execute(array($user['account_id']));
-    $accountClaimed = (bool)$stmt->fetch();
-
-    $has = ($deviceClaimed || $accountClaimed);
-    $midnight = strtotime('tomorrow midnight');
+    // Calculate remaining time from last claim for THIS account
+    $remain = secondsUntilNextClaim($pdo, $user['account_id']);
 
     jsonOut(array(
       'success'=>true,
-      'can_claim'=>!$has,
-      'has_claimed'=>$has,
+      'can_claim'=>($remain === 0),
+      'has_claimed'=>($remain > 0),
       'reward_amount'=>DAILY_ZEN_REWARD,
-      'seconds_until_reset'=>secondsUntilReset(),
-      'reset_time'=>date('Y-m-d H:i:s', $midnight),
+      'seconds_until_next_claim'=>$remain,
       'csrf_token'=>getCsrfToken()
     ));
   }
@@ -351,7 +327,6 @@ try {
       jsonOut(array('success'=>false,'error'=>'Too many attempts. Try later.'), 429);
     }
 
-    // Origin + Session + CSRF
     checkOrigin($ALLOWED_ORIGINS);
 
     $user = validateSession($pdo);
@@ -362,16 +337,30 @@ try {
 
     verifyCsrf();
 
+    $deviceToken = getOrCreateDeviceToken();
+    $deviceHash  = hashDeviceToken($deviceToken);
+
+    // Check 24h cooldown for THIS account
+    $remain = secondsUntilNextClaim($pdo, $user['account_id']);
+    if ($remain > 0) {
+      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'cooldown_active');
+      jsonOut(array(
+        'success'=>false,
+        'error'=>'You can claim again after 24 hours.',
+        'seconds_until_next_claim'=>$remain
+      ), 429);
+    }
+
     $raw = file_get_contents('php://input');
     $input = json_decode($raw, true);
     if (!is_array($input)) {
-      logSecurity($pdo, $user['account_id'], null, $ip, 'failed_claim', 'bad_json');
+      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'bad_json');
       jsonOut(array('success'=>false,'error'=>'Invalid request'), 400);
     }
 
     $fingerprint = isset($input['fingerprint']) ? trim($input['fingerprint']) : '';
     if (!$fingerprint || strlen($fingerprint) < 32) {
-      logSecurity($pdo, $user['account_id'], null, $ip, 'failed_claim', 'missing_fingerprint');
+      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'missing_fingerprint');
       jsonOut(array('success'=>false,'error'=>'Invalid request'), 400);
     }
     $fingerprintHash = hashFingerprint($fingerprint);
@@ -379,38 +368,36 @@ try {
     $signals = isset($input['signals']) && is_array($input['signals']) ? $input['signals'] : array();
     $risk = isset($signals['risk']) ? (int)$signals['risk'] : 0;
 
-    // Hard block only if clearly automation/headless (reduce false positives)
     $isHeadless = !empty($signals['headless']);
     if ($isHeadless && $risk >= MAX_RISK_SCORE_BLOCK) {
-      logSecurity($pdo, $user['account_id'], null, $ip, 'blocked', 'headless_high_risk');
+      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'blocked', 'headless_high_risk');
       jsonOut(array('success'=>false,'error'=>'Automated browser detected. Use a normal browser.'), 403);
     }
 
-    $deviceToken = getOrCreateDeviceToken();
-    $deviceHash  = hashDeviceToken($deviceToken);
+    // Send Zen first
+    $cfg = getConfig();
+    $db  = $cfg['db'];
 
-    // Quick deny if already claimed (rely on UNIQUE for race too)
-    $stmt = $pdo->prepare("SELECT id FROM daily_zen_claims WHERE device_token_hash = ? AND claim_date = CURDATE() LIMIT 1");
-    $stmt->execute(array($deviceHash));
-    if ($stmt->fetch()) {
-      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'device_already_claimed');
-      jsonOut(array('success'=>false,'error'=>'Already claimed today from this device.'), 409);
+    $mysqli = new mysqli($db['host'], $db['user'], $db['pass'], $db['name']);
+    if ($mysqli->connect_errno) {
+      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'mysqli_connect_failed');
+      jsonOut(array('success'=>false,'error'=>'DB connection failed'), 500);
     }
 
-    $stmt = $pdo->prepare("SELECT id FROM daily_zen_claims WHERE account_id = ? AND claim_date = CURDATE() LIMIT 1");
-    $stmt->execute(array($user['account_id']));
-    if ($stmt->fetch()) {
-      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'account_already_claimed');
-      jsonOut(array('success'=>false,'error'=>'Already claimed today on this account.'), 409);
+    $res = sendZenReward($mysqli, $user['username'], DAILY_ZEN_REWARD);
+    $mysqli->close();
+
+    if (empty($res['success'])) {
+      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'send_failed');
+      jsonOut(array('success'=>false,'error'=>$res['error']), 500);
     }
 
-    // Process atomic
-    $pdo->beginTransaction();
+    // Log claim with claimed_at = NOW()
     try {
       $stmt = $pdo->prepare("
         INSERT INTO daily_zen_claims
-          (account_id, device_token_hash, fingerprint_hash, ip_address, ip_subnet, claim_date, reward_amount, risk_score, created_at)
-        VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, NOW())
+          (account_id, device_token_hash, fingerprint_hash, ip_address, ip_subnet, reward_amount, risk_score, created_at, claimed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       ");
       $stmt->execute(array(
         $user['account_id'],
@@ -421,43 +408,19 @@ try {
         DAILY_ZEN_REWARD,
         $risk
       ));
-
-      // Send Zen
-      $cfg = getConfig();
-      $db  = $cfg['db'];
-
-      $mysqli = new mysqli($db['host'], $db['user'], $db['pass'], $db['name']);
-      if ($mysqli->connect_errno) throw new Exception('mysqli_connect_failed');
-
-      $res = sendZenReward($mysqli, $user['username'], DAILY_ZEN_REWARD);
-      $mysqli->close();
-
-      if (empty($res['success'])) throw new Exception(isset($res['error']) ? $res['error'] : 'send_failed');
-
-      $pdo->commit();
-
-      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'successful_claim', 'reward:'.DAILY_ZEN_REWARD);
-
-      jsonOut(array(
-        'success'=>true,
-        'message'=>'Daily Zen claimed successfully!',
-        'reward_amount'=>DAILY_ZEN_REWARD,
-        'seconds_until_reset'=>secondsUntilReset()
-      ));
-
     } catch (Exception $e) {
-      $pdo->rollBack();
-
-      // Duplicate unique => already claimed
-      if (stripos($e->getMessage(), 'Duplicate') !== false) {
-        logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'duplicate');
-        jsonOut(array('success'=>false,'error'=>'Already claimed today.'), 409);
-      }
-
-      error_log('[DailyZen] claim_failed: '.$e->getMessage());
-      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'server_error');
-      jsonOut(array('success'=>false,'error'=>'Failed to send Zen. Please try again.'), 500);
+      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'log_after_send_failed');
     }
+
+    logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'successful_claim', 'reward:'.DAILY_ZEN_REWARD);
+
+    // Return actual remaining time (24h from now)
+    jsonOut(array(
+      'success'=>true,
+      'message'=>'Daily Zen claimed successfully!',
+      'reward_amount'=>DAILY_ZEN_REWARD,
+      'seconds_until_next_claim'=>COOLDOWN_SECONDS
+    ));
   }
 
   jsonOut(array('success'=>false,'error'=>'Method not allowed'), 405);
