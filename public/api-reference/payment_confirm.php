@@ -110,6 +110,7 @@ if (!empty($sessionId) && strpos($sessionId, 'cs_') === 0) {
                 $orderId = (int)$webshopOrder['id'];
                 error_log("RID={$RID} FOUND_ORDER_BY_SESSION session={$sessionId} order={$orderId}");
             }
+        }
     }
 }
 
