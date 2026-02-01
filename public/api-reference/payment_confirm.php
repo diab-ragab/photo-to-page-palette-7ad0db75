@@ -3,8 +3,14 @@
  * payment_confirm.php - Confirm Stripe Payment and fulfill order
  * 
  * POST /api/payment_confirm.php
- * Body: { paymentIntentId: string, orderId?: number }
+ * Body: { paymentIntentId: string, sessionId?: string, orderId?: number }
  * Returns: { success: true, status: string }
+ * 
+ * Item ID rules for fulfillment:
+ *   item_id > 0  => real game item
+ *   item_id = -1 => Zen (currency)
+ *   item_id = -2 => Coins (currency)
+ *   item_id = -3 => EXP (experience)
  */
 
 require_once __DIR__ . '/bootstrap.php';
@@ -266,6 +272,13 @@ json_response(array(
 
 // ============ FULFILLMENT FUNCTIONS ============
 
+/**
+ * Fulfill order based on item_id rules:
+ *   item_id > 0  => real game item (send via mail with itemId)
+ *   item_id = -1 => Zen (send via zen field, no item)
+ *   item_id = -2 => Coins (send via coins field, no item)
+ *   item_id = -3 => EXP (send via exp field, no item)
+ */
 function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
     // Get product details
     $stmt = $pdo->prepare("SELECT * FROM webshop_products WHERE id = ? LIMIT 1");
@@ -287,7 +300,6 @@ function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
     
     if ($roleId <= 0) {
         error_log("RID={$RID} FULFILL_ERROR no_character user={$userId}");
-        // Fallback: store in pending_deliveries for manual processing
         storePendingDelivery($pdo, $orderId, $userId, $itemId, $totalGrant, $RID);
         return false;
     }
@@ -295,64 +307,47 @@ function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
     // Create mailer instance
     $mailer = new GameMailer($pdo);
     
-    // Determine reward type based on item_id convention
+    // Determine reward type based on item_id rules
     $coins = 0;
     $zen = 0;
+    $exp = 0;
+    $mailItemId = 0;
+    $mailQty = 0;
     
-    switch ($itemId) {
-        case 1: // Zen
-            $zen = $totalGrant;
-            $itemId = 0; // No physical item
-            $totalGrant = 0;
-            break;
-        case 2: // Coins
-            $coins = $totalGrant;
-            $itemId = 0;
-            $totalGrant = 0;
-            break;
-        case 3: // VIP Points - still track in user_currency but also send mail
-            updateUserCurrency($pdo, $userId, 'vip_points', $totalGrant, $RID);
-            $itemId = 0;
-            $totalGrant = 0;
-            break;
+    if ($itemId > 0) {
+        // Real game item
+        $mailItemId = $itemId;
+        $mailQty = $totalGrant;
+        error_log("RID={$RID} FULFILL_ITEM user={$userId} itemId={$itemId} qty={$totalGrant}");
+    } else if ($itemId == -1) {
+        // Zen currency
+        $zen = $totalGrant;
+        error_log("RID={$RID} FULFILL_ZEN user={$userId} amount={$totalGrant}");
+    } else if ($itemId == -2) {
+        // Coins currency
+        $coins = $totalGrant;
+        error_log("RID={$RID} FULFILL_COINS user={$userId} amount={$totalGrant}");
+    } else if ($itemId == -3) {
+        // EXP
+        $exp = $totalGrant;
+        error_log("RID={$RID} FULFILL_EXP user={$userId} amount={$totalGrant}");
+    } else {
+        // item_id = 0 or unknown - no delivery
+        error_log("RID={$RID} FULFILL_SKIP user={$userId} item_id={$itemId} (no action)");
+        return true;
     }
     
     // Send via in-game mail
-    $result = $mailer->sendOrderReward($roleId, $productName, $itemId, $totalGrant, $coins, $zen);
+    $result = $mailer->sendOrderReward($roleId, $productName, $mailItemId, $mailQty, $coins, $zen, $exp);
     
     if ($result['success']) {
         error_log("RID={$RID} MAIL_SENT user={$userId} role={$roleId} product={$productName} mail_id={$result['insert_id']}");
     } else {
         error_log("RID={$RID} MAIL_FAILED user={$userId} role={$roleId} error={$result['message']}");
-        // Store in pending for retry
         storePendingDelivery($pdo, $orderId, $userId, $itemId, $totalGrant, $RID);
     }
     
     return $result['success'];
-}
-
-function updateUserCurrency($pdo, $userId, $field, $amount, $RID) {
-    // Ensure user_currency table exists
-    $pdo->exec("CREATE TABLE IF NOT EXISTS user_currency (
-        user_id INT PRIMARY KEY,
-        coins INT DEFAULT 0,
-        zen INT DEFAULT 0,
-        vip_points INT DEFAULT 0,
-        updated_at DATETIME,
-        KEY idx_user (user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
-    
-    // Insert user if not exists
-    $stmt = $pdo->prepare("INSERT IGNORE INTO user_currency (user_id, coins, zen, vip_points, updated_at) VALUES (?, 0, 0, 0, NOW())");
-    $stmt->execute(array($userId));
-    
-    // Update specific currency
-    $allowedFields = array('coins', 'zen', 'vip_points');
-    if (in_array($field, $allowedFields)) {
-        $stmt = $pdo->prepare("UPDATE user_currency SET {$field} = {$field} + ?, updated_at = NOW() WHERE user_id = ?");
-        $stmt->execute(array($amount, $userId));
-        error_log("RID={$RID} CURRENCY_GRANTED user={$userId} {$field}={$amount}");
-    }
 }
 
 function storePendingDelivery($pdo, $orderId, $userId, $itemId, $quantity, $RID) {
