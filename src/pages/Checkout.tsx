@@ -19,8 +19,8 @@ import {
 
 const API_BASE = "https://woiendgame.online/api";
 
-// Stripe publishable key - this should be your pk_test_ or pk_live_ key
-const STRIPE_PUBLISHABLE_KEY = "pk_test_your_publishable_key_here";
+// Stripe publishable key
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51SvjV4HvRV9niQ975rw0QIWnHdvsaaoDtxxBK36IJzclBitZNciDGBaEm0XFpGcASwkDGbI9K6gm9P1b99jnclPQ004ZJqa4h1";
 
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
