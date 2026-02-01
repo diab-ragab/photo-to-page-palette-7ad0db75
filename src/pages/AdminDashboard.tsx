@@ -14,6 +14,7 @@ import { VoteSitesManager } from "@/components/admin/VoteSitesManager";
 import { NotificationsManager } from "@/components/admin/NotificationsManager";
 import { UsersManager } from "@/components/admin/UsersManager";
 import { WebshopManager } from "@/components/admin/WebshopManager";
+import { OrdersManager } from "@/components/admin/OrdersManager";
 import { ServerStatsCard } from "@/components/admin/ServerStatsCard";
 import { 
   Shield, 
@@ -28,7 +29,8 @@ import {
   Coins,
   Gem,
   UserCheck,
-  Swords
+  Swords,
+  Receipt
 } from "lucide-react";
 
 interface ServerStats {
@@ -254,7 +256,7 @@ export default function AdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 mb-6 h-auto gap-1">
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-7 mb-6 h-auto gap-1">
             <TabsTrigger value="overview" className="gap-2 py-2">
               <Server className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -262,6 +264,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="users" className="gap-2 py-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Users</span>
+            </TabsTrigger>
+            <TabsTrigger value="orders" className="gap-2 py-2">
+              <Receipt className="h-4 w-4" />
+              <span className="hidden sm:inline">Orders</span>
             </TabsTrigger>
             <TabsTrigger value="votes" className="gap-2 py-2">
               <Vote className="h-4 w-4" />
@@ -381,6 +387,11 @@ export default function AdminDashboard() {
           {/* Users Tab */}
           <TabsContent value="users">
             <UsersManager />
+          </TabsContent>
+
+          {/* Orders Tab */}
+          <TabsContent value="orders">
+            <OrdersManager />
           </TabsContent>
 
           {/* Votes Tab */}
