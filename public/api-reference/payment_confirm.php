@@ -264,6 +264,8 @@ json_response(array(
 
 // ============ FULFILLMENT FUNCTIONS ============
 
+require_once __DIR__ . '/mail_delivery.php';
+
 function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
     // Get product details
     $stmt = $pdo->prepare("SELECT * FROM webshop_products WHERE id = ? LIMIT 1");
@@ -275,11 +277,61 @@ function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
         return false;
     }
     
-    // Check what type of item this is and grant accordingly
+    $productName = isset($product['name']) ? $product['name'] : 'Shop Item';
     $itemId = isset($product['item_id']) ? (int)$product['item_id'] : 0;
     $itemQuantity = isset($product['item_quantity']) ? (int)$product['item_quantity'] : 1;
     $totalGrant = $itemQuantity * $quantity;
     
+    // Get user's character role ID
+    $roleId = getUserRoleId($pdo, $userId);
+    
+    if ($roleId <= 0) {
+        error_log("RID={$RID} FULFILL_ERROR no_character user={$userId}");
+        // Fallback: store in pending_deliveries for manual processing
+        storePendingDelivery($pdo, $orderId, $userId, $itemId, $totalGrant, $RID);
+        return false;
+    }
+    
+    // Create mailer instance
+    $mailer = new GameMailer($pdo);
+    
+    // Determine reward type based on item_id convention
+    $coins = 0;
+    $zen = 0;
+    
+    switch ($itemId) {
+        case 1: // Zen
+            $zen = $totalGrant;
+            $itemId = 0; // No physical item
+            $totalGrant = 0;
+            break;
+        case 2: // Coins
+            $coins = $totalGrant;
+            $itemId = 0;
+            $totalGrant = 0;
+            break;
+        case 3: // VIP Points - still track in user_currency but also send mail
+            updateUserCurrency($pdo, $userId, 'vip_points', $totalGrant, $RID);
+            $itemId = 0;
+            $totalGrant = 0;
+            break;
+    }
+    
+    // Send via in-game mail
+    $result = $mailer->sendOrderReward($roleId, $productName, $itemId, $totalGrant, $coins, $zen);
+    
+    if ($result['success']) {
+        error_log("RID={$RID} MAIL_SENT user={$userId} role={$roleId} product={$productName} mail_id={$result['insert_id']}");
+    } else {
+        error_log("RID={$RID} MAIL_FAILED user={$userId} role={$roleId} error={$result['message']}");
+        // Store in pending for retry
+        storePendingDelivery($pdo, $orderId, $userId, $itemId, $totalGrant, $RID);
+    }
+    
+    return $result['success'];
+}
+
+function updateUserCurrency($pdo, $userId, $field, $amount, $RID) {
     // Ensure user_currency table exists
     $pdo->exec("CREATE TABLE IF NOT EXISTS user_currency (
         user_id INT PRIMARY KEY,
@@ -294,48 +346,30 @@ function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
     $stmt = $pdo->prepare("INSERT IGNORE INTO user_currency (user_id, coins, zen, vip_points, updated_at) VALUES (?, 0, 0, 0, NOW())");
     $stmt->execute(array($userId));
     
-    // Grant based on item_id
-    switch ($itemId) {
-        case 1: // Zen
-            $stmt = $pdo->prepare("UPDATE user_currency SET zen = zen + ?, updated_at = NOW() WHERE user_id = ?");
-            $stmt->execute(array($totalGrant, $userId));
-            error_log("RID={$RID} GRANTED_ZEN user={$userId} amount={$totalGrant}");
-            break;
-            
-        case 2: // Coins
-            $stmt = $pdo->prepare("UPDATE user_currency SET coins = coins + ?, updated_at = NOW() WHERE user_id = ?");
-            $stmt->execute(array($totalGrant, $userId));
-            error_log("RID={$RID} GRANTED_COINS user={$userId} amount={$totalGrant}");
-            break;
-            
-        case 3: // VIP Points
-            $stmt = $pdo->prepare("UPDATE user_currency SET vip_points = vip_points + ?, updated_at = NOW() WHERE user_id = ?");
-            $stmt->execute(array($totalGrant, $userId));
-            error_log("RID={$RID} GRANTED_VIP user={$userId} amount={$totalGrant}");
-            break;
-            
-        default:
-            // Generic item - log for manual processing
-            error_log("RID={$RID} ITEM_GRANT_PENDING user={$userId} item={$itemId} qty={$totalGrant} order={$orderId}");
-            
-            // Create pending delivery record
-            $pdo->exec("CREATE TABLE IF NOT EXISTS pending_deliveries (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                order_id INT NOT NULL,
-                user_id INT NOT NULL,
-                item_id INT NOT NULL,
-                quantity INT NOT NULL,
-                status VARCHAR(20) DEFAULT 'pending',
-                created_at DATETIME,
-                delivered_at DATETIME,
-                KEY idx_user (user_id),
-                KEY idx_status (status)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
-            
-            $stmt = $pdo->prepare("INSERT INTO pending_deliveries (order_id, user_id, item_id, quantity, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())");
-            $stmt->execute(array($orderId, $userId, $itemId, $totalGrant));
-            break;
+    // Update specific currency
+    $allowedFields = array('coins', 'zen', 'vip_points');
+    if (in_array($field, $allowedFields)) {
+        $stmt = $pdo->prepare("UPDATE user_currency SET {$field} = {$field} + ?, updated_at = NOW() WHERE user_id = ?");
+        $stmt->execute(array($amount, $userId));
+        error_log("RID={$RID} CURRENCY_GRANTED user={$userId} {$field}={$amount}");
     }
+}
+
+function storePendingDelivery($pdo, $orderId, $userId, $itemId, $quantity, $RID) {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS pending_deliveries (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT NOT NULL,
+        user_id INT NOT NULL,
+        item_id INT NOT NULL,
+        quantity INT NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at DATETIME,
+        delivered_at DATETIME,
+        KEY idx_user (user_id),
+        KEY idx_status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
     
-    return true;
+    $stmt = $pdo->prepare("INSERT INTO pending_deliveries (order_id, user_id, item_id, quantity, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())");
+    $stmt->execute(array($orderId, $userId, $itemId, $quantity));
+    error_log("RID={$RID} PENDING_DELIVERY_CREATED user={$userId} item={$itemId} qty={$quantity}");
 }

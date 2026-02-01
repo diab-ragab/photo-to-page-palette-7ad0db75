@@ -1,0 +1,278 @@
+<?php
+/**
+ * gamepass.php - Game Pass status and reward claiming API
+ * 
+ * GET  ?action=status - Get current game pass status for user
+ * POST ?action=claim  - Claim a daily reward
+ */
+
+require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/mail_delivery.php';
+
+header('Content-Type: application/json; charset=utf-8');
+
+$pdo = getDB();
+$action = isset($_GET['action']) ? $_GET['action'] : (isset($_POST['action']) ? $_POST['action'] : '');
+
+// Token-based auth helper
+function getSessionToken() {
+    $auth = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : '';
+    if (stripos($auth, 'Bearer ') === 0) return trim(substr($auth, 7));
+    
+    $hdr = isset($_SERVER['HTTP_X_SESSION_TOKEN']) ? $_SERVER['HTTP_X_SESSION_TOKEN'] : '';
+    if ($hdr) return trim($hdr);
+    
+    if (!empty($_GET['sessionToken'])) return trim((string)$_GET['sessionToken']);
+    if (!empty($_COOKIE['sessionToken'])) return trim((string)$_COOKIE['sessionToken']);
+    
+    return '';
+}
+
+function getCurrentUser() {
+    global $pdo;
+    
+    $sessionToken = getSessionToken();
+    if ($sessionToken === '') {
+        return null;
+    }
+    
+    $stmt = $pdo->prepare("
+        SELECT us.user_id, u.name
+        FROM user_sessions us
+        JOIN users u ON u.ID = us.user_id
+        WHERE us.session_token = ? AND us.expires_at > NOW()
+        LIMIT 1
+    ");
+    $stmt->execute(array($sessionToken));
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+function jsonResponse($data, $code = 200) {
+    http_response_code($code);
+    echo json_encode($data);
+    exit;
+}
+
+// Ensure tables exist
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS user_gamepass (
+            user_id INT PRIMARY KEY,
+            is_premium TINYINT(1) NOT NULL DEFAULT 0,
+            started_at DATETIME,
+            expires_at DATETIME,
+            KEY idx_premium (is_premium)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+    ");
+    
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS user_gamepass_claims (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            day INT NOT NULL,
+            tier VARCHAR(10) NOT NULL,
+            claimed_at DATETIME,
+            cycle_start DATE NOT NULL,
+            UNIQUE KEY unique_claim (user_id, day, tier, cycle_start),
+            KEY idx_user (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+    ");
+} catch (Exception $e) {
+    // Tables may exist
+}
+
+// Calculate current cycle (30-day cycles starting from a fixed date)
+function getCycleInfo() {
+    $cycleLength = 30;
+    $epochStart = strtotime('2025-01-01'); // Fixed start date for cycles
+    $now = time();
+    
+    $daysSinceEpoch = floor(($now - $epochStart) / 86400);
+    $currentCycle = floor($daysSinceEpoch / $cycleLength);
+    $dayInCycle = ($daysSinceEpoch % $cycleLength) + 1; // 1-30
+    
+    $cycleStartDate = date('Y-m-d', $epochStart + ($currentCycle * $cycleLength * 86400));
+    
+    return array(
+        'current_day' => $dayInCycle,
+        'cycle_start' => $cycleStartDate,
+        'days_remaining' => $cycleLength - $dayInCycle
+    );
+}
+
+switch ($action) {
+    case 'status':
+        $user = getCurrentUser();
+        if (!$user) {
+            jsonResponse(array('success' => false, 'error' => 'Not authenticated'), 401);
+        }
+        
+        $userId = (int)$user['user_id'];
+        $cycle = getCycleInfo();
+        
+        // Get premium status
+        $stmt = $pdo->prepare("SELECT is_premium, expires_at FROM user_gamepass WHERE user_id = ?");
+        $stmt->execute(array($userId));
+        $gp = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $isPremium = false;
+        if ($gp) {
+            $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
+            $isPremium = (int)$gp['is_premium'] === 1 && ($expiresAt === null || strtotime($expiresAt) > time());
+        }
+        
+        // Get claimed days for this cycle
+        $stmt = $pdo->prepare("
+            SELECT day, tier FROM user_gamepass_claims 
+            WHERE user_id = ? AND cycle_start = ?
+        ");
+        $stmt->execute(array($userId, $cycle['cycle_start']));
+        $claims = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $claimedDays = array('free' => array(), 'elite' => array());
+        foreach ($claims as $c) {
+            $tier = $c['tier'];
+            if (isset($claimedDays[$tier])) {
+                $claimedDays[$tier][] = (int)$c['day'];
+            }
+        }
+        
+        // Get rewards config
+        $stmt = $pdo->query("SELECT * FROM gamepass_rewards ORDER BY day ASC, tier ASC");
+        $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($rewards as &$r) {
+            $r['id'] = (int)$r['id'];
+            $r['day'] = (int)$r['day'];
+            $r['item_id'] = (int)$r['item_id'];
+            $r['quantity'] = (int)$r['quantity'];
+            $r['coins'] = (int)$r['coins'];
+            $r['zen'] = (int)$r['zen'];
+            $r['exp'] = (int)$r['exp'];
+        }
+        
+        jsonResponse(array(
+            'success' => true,
+            'is_premium' => $isPremium,
+            'current_day' => $cycle['current_day'],
+            'cycle_start' => $cycle['cycle_start'],
+            'days_remaining' => $cycle['days_remaining'],
+            'claimed_days' => $claimedDays,
+            'rewards' => $rewards
+        ));
+        break;
+        
+    case 'claim':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            jsonResponse(array('success' => false, 'error' => 'Method not allowed'), 405);
+        }
+        
+        $user = getCurrentUser();
+        if (!$user) {
+            jsonResponse(array('success' => false, 'error' => 'Not authenticated'), 401);
+        }
+        
+        $userId = (int)$user['user_id'];
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        $day = isset($input['day']) ? (int)$input['day'] : 0;
+        $tier = isset($input['tier']) && in_array($input['tier'], array('free', 'elite')) ? $input['tier'] : 'free';
+        
+        if ($day < 1 || $day > 30) {
+            jsonResponse(array('success' => false, 'error' => 'Invalid day'), 400);
+        }
+        
+        $cycle = getCycleInfo();
+        
+        // Check if can claim this day (must be current day or earlier)
+        if ($day > $cycle['current_day']) {
+            jsonResponse(array('success' => false, 'error' => 'Cannot claim future days'), 400);
+        }
+        
+        // Check elite tier eligibility
+        if ($tier === 'elite') {
+            $stmt = $pdo->prepare("SELECT is_premium, expires_at FROM user_gamepass WHERE user_id = ?");
+            $stmt->execute(array($userId));
+            $gp = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            $isPremium = false;
+            if ($gp) {
+                $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
+                $isPremium = (int)$gp['is_premium'] === 1 && ($expiresAt === null || strtotime($expiresAt) > time());
+            }
+            
+            if (!$isPremium) {
+                jsonResponse(array('success' => false, 'error' => 'Elite tier requires premium Game Pass'), 403);
+            }
+        }
+        
+        // Check if already claimed
+        $stmt = $pdo->prepare("
+            SELECT id FROM user_gamepass_claims 
+            WHERE user_id = ? AND day = ? AND tier = ? AND cycle_start = ?
+        ");
+        $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start']));
+        if ($stmt->fetch()) {
+            jsonResponse(array('success' => false, 'error' => 'Already claimed this reward'), 400);
+        }
+        
+        // Get reward config
+        $stmt = $pdo->prepare("SELECT * FROM gamepass_rewards WHERE day = ? AND tier = ?");
+        $stmt->execute(array($day, $tier));
+        $reward = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$reward) {
+            jsonResponse(array('success' => false, 'error' => 'No reward configured for this day'), 404);
+        }
+        
+        // Get user's character role ID
+        $roleId = getUserRoleId($pdo, $userId);
+        
+        if ($roleId <= 0) {
+            jsonResponse(array('success' => false, 'error' => 'No active character found. Please create a character first.'), 400);
+        }
+        
+        // Send reward via in-game mail
+        $mailer = new GameMailer($pdo);
+        $result = $mailer->sendGamePassReward(
+            $roleId,
+            $day,
+            $tier,
+            (int)$reward['item_id'],
+            (int)$reward['quantity'],
+            (int)$reward['coins'],
+            (int)$reward['zen'],
+            (int)$reward['exp']
+        );
+        
+        if (!$result['success']) {
+            error_log("GAMEPASS_CLAIM_FAILED user={$userId} day={$day} tier={$tier} error={$result['message']}");
+            jsonResponse(array('success' => false, 'error' => 'Failed to deliver reward. Please try again.'), 500);
+        }
+        
+        // Record the claim
+        $stmt = $pdo->prepare("
+            INSERT INTO user_gamepass_claims (user_id, day, tier, claimed_at, cycle_start)
+            VALUES (?, ?, ?, NOW(), ?)
+        ");
+        $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start']));
+        
+        error_log("GAMEPASS_CLAIMED user={$userId} role={$roleId} day={$day} tier={$tier} reward={$reward['item_name']}");
+        
+        jsonResponse(array(
+            'success' => true,
+            'message' => 'Reward claimed! Check your in-game mailbox.',
+            'reward' => array(
+                'name' => $reward['item_name'],
+                'quantity' => (int)$reward['quantity'],
+                'coins' => (int)$reward['coins'],
+                'zen' => (int)$reward['zen'],
+                'exp' => (int)$reward['exp']
+            )
+        ));
+        break;
+        
+    default:
+        jsonResponse(array('success' => false, 'error' => 'Invalid action'), 400);
+}
