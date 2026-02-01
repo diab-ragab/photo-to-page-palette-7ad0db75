@@ -27,17 +27,30 @@ interface ClaimResult {
   error?: string;
 }
 
+// Store CSRF token from status check
+let csrfToken = '';
+
+export function setCsrfToken(token: string) {
+  csrfToken = token;
+}
+
 /**
  * Get authentication headers for API requests
  */
-function getAuthHeaders(): Record<string, string> {
+function getAuthHeaders(includeCsrf = false): Record<string, string> {
   const sessionToken = localStorage.getItem('woi_session_token') || '';
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'X-Session-Token': sessionToken,
     'Authorization': `Bearer ${sessionToken}`,
   };
+  
+  if (includeCsrf && csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+  
+  return headers;
 }
 
 /**
@@ -67,6 +80,12 @@ export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
     });
     
     const data = await response.json();
+    
+    // Store CSRF token for subsequent POST requests
+    if (data.csrf_token) {
+      setCsrfToken(data.csrf_token);
+    }
+    
     return data;
   } catch (error) {
     console.error('[DailyZen] Status check failed:', error);
@@ -92,7 +111,7 @@ export async function claimDailyZen(): Promise<ClaimResult> {
     
     const response = await fetch(`${API_BASE}/daily_zen.php`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(true), // Include CSRF token
       credentials: 'include',
       body: JSON.stringify({
         fingerprint: fingerprintData.hash,
