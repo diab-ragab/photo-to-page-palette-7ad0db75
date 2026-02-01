@@ -33,6 +33,21 @@ import {
   Receipt
 } from "lucide-react";
 
+interface LastOrder {
+  id: number;
+  user_id: number;
+  username: string;
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  total_real: number;
+  total_coins: number;
+  total_zen: number;
+  total_vip: number;
+  status: string;
+  created_at: string;
+}
+
 interface ServerStats {
   totalUsers: number;
   totalCharacters: number;
@@ -40,6 +55,7 @@ interface ServerStats {
   onlinePlayers: number;
   totalVotes: number;
   totalPurchases: number;
+  lastOrder: LastOrder | null;
 }
 
 export default function AdminDashboard() {
@@ -57,6 +73,7 @@ export default function AdminDashboard() {
     onlinePlayers: 0,
     totalVotes: 0,
     totalPurchases: 0,
+    lastOrder: null,
   });
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -137,6 +154,7 @@ export default function AdminDashboard() {
             onlinePlayers: data.online_players || 0,
             totalVotes: data.total_votes || 0,
             totalPurchases: data.total_purchases || 0,
+            lastOrder: data.last_order || null,
           });
         }
       } catch {
@@ -148,6 +166,7 @@ export default function AdminDashboard() {
           onlinePlayers: 48,
           totalVotes: 8540,
           totalPurchases: 156,
+          lastOrder: null,
         });
       } finally {
         setStatsLoading(false);
@@ -370,16 +389,87 @@ export default function AdminDashboard() {
               </Card>
             </div>
 
-            {/* Recent Activity - placeholder */}
+            {/* Last Order Card */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Recent Activity</CardTitle>
-                <CardDescription>Latest actions and events</CardDescription>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-pink-500" />
+                  Last Order
+                </CardTitle>
+                <CardDescription>Most recent customer purchase</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  Activity logging coming soon...
-                </div>
+                {statsLoading ? (
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-4 bg-muted rounded w-3/4" />
+                    <div className="h-4 bg-muted rounded w-1/2" />
+                  </div>
+                ) : serverStats.lastOrder ? (
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium text-foreground">
+                          {serverStats.lastOrder.product_name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Ordered by <span className="font-medium text-foreground">{serverStats.lastOrder.username}</span>
+                        </p>
+                      </div>
+                      <Badge 
+                        variant="outline" 
+                        className={
+                          serverStats.lastOrder.status === "completed" 
+                            ? "bg-green-500/10 text-green-500 border-green-500/20"
+                            : serverStats.lastOrder.status === "pending"
+                            ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+                            : "bg-destructive/10 text-destructive border-destructive/20"
+                        }
+                      >
+                        {serverStats.lastOrder.status}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Order ID</span>
+                        <p className="font-mono">#{serverStats.lastOrder.id}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Quantity</span>
+                        <p>{serverStats.lastOrder.quantity}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Amount</span>
+                        <p className="font-medium text-primary">
+                          {serverStats.lastOrder.total_real > 0 
+                            ? `€${serverStats.lastOrder.total_real.toFixed(2)}`
+                            : serverStats.lastOrder.total_coins > 0
+                            ? `${serverStats.lastOrder.total_coins.toLocaleString()} Coins`
+                            : serverStats.lastOrder.total_zen > 0
+                            ? `${serverStats.lastOrder.total_zen.toLocaleString()} Zen`
+                            : "Free"
+                          }
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Date</span>
+                        <p>{new Date(serverStats.lastOrder.created_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full mt-2"
+                      onClick={() => setActiveTab("orders")}
+                    >
+                      View All Orders
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <ShoppingBag className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                    <p>No orders yet</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
