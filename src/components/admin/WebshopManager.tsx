@@ -21,86 +21,89 @@ import {
   Package,
   Euro,
   Tag,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Link as LinkIcon,
+  RefreshCw
 } from "lucide-react";
+import {
+  fetchProducts,
+  fetchCategories,
+  addProduct,
+  updateProduct,
+  deleteProduct,
+  addCategory,
+  WebshopProduct,
+  WebshopCategory,
+} from "@/lib/webshopApi";
 
-interface ShopProduct {
-  id: number;
+interface ProductFormData {
   name: string;
   description: string;
-  price: number;
-  category: string;
-  image_url: string;
+  category_id: number;
   item_id: number;
-  quantity: number;
+  item_quantity: number;
+  price_coins: number;
+  price_vip: number;
+  price_zen: number;
+  price_real: number;
+  image_url: string;
+  stripe_payment_link: string;
   is_active: boolean;
   is_featured: boolean;
+  stock: number;
 }
 
-const categories = [
-  { value: "fashion", label: "Fashion" },
-  { value: "pets", label: "Pet Eggs" },
-  { value: "currency", label: "Currency" },
-  { value: "items", label: "Items" },
-  { value: "bundles", label: "Bundles" },
-  { value: "vip", label: "VIP" },
-];
-
-const defaultProduct: Omit<ShopProduct, "id"> = {
+const defaultProduct: ProductFormData = {
   name: "",
   description: "",
-  price: 0,
-  category: "items",
-  image_url: "",
+  category_id: 1,
   item_id: 0,
-  quantity: 1,
+  item_quantity: 1,
+  price_coins: 0,
+  price_vip: 0,
+  price_zen: 0,
+  price_real: 0,
+  image_url: "",
+  stripe_payment_link: "",
   is_active: true,
   is_featured: false,
+  stock: -1,
 };
 
 export function WebshopManager() {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
-  const [products, setProducts] = useState<ShopProduct[]>([]);
+  const [products, setProducts] = useState<WebshopProduct[]>([]);
+  const [categories, setCategories] = useState<WebshopCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(null);
-  const [editData, setEditData] = useState<Omit<ShopProduct, "id">>(defaultProduct);
+  const [selectedProduct, setSelectedProduct] = useState<WebshopProduct | null>(null);
+  const [editData, setEditData] = useState<ProductFormData>(defaultProduct);
   const [isEditing, setIsEditing] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>("all");
 
+  // Category modal
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+
   useEffect(() => {
-    fetchProducts();
+    loadData();
   }, []);
 
-  const fetchProducts = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("https://woiendgame.online/api/webshop_admin.php?action=list", {
-        credentials: "include",
-      });
-      const data = await response.json();
-      
-      if (data.success && data.products) {
-        setProducts(data.products);
-      } else {
-        // Demo data
-        setProducts([
-          { id: 1, name: "Phoenix Wing", description: "Legendary fashion wings", price: 9.99, category: "fashion", image_url: "/placeholder.svg", item_id: 5001, quantity: 1, is_active: true, is_featured: true },
-          { id: 2, name: "Dragon Egg", description: "Rare pet egg", price: 14.99, category: "pets", image_url: "/placeholder.svg", item_id: 6001, quantity: 1, is_active: true, is_featured: false },
-          { id: 3, name: "1000 Zen", description: "In-game currency", price: 4.99, category: "currency", image_url: "/placeholder.svg", item_id: 0, quantity: 1000, is_active: true, is_featured: false },
-          { id: 4, name: "VIP 30 Days", description: "Premium membership", price: 19.99, category: "vip", image_url: "/placeholder.svg", item_id: 7001, quantity: 1, is_active: true, is_featured: true },
-        ]);
-      }
-    } catch {
-      // Demo data
-      setProducts([
-        { id: 1, name: "Phoenix Wing", description: "Legendary fashion wings", price: 9.99, category: "fashion", image_url: "/placeholder.svg", item_id: 5001, quantity: 1, is_active: true, is_featured: true },
-        { id: 2, name: "Dragon Egg", description: "Rare pet egg", price: 14.99, category: "pets", image_url: "/placeholder.svg", item_id: 6001, quantity: 1, is_active: true, is_featured: false },
-        { id: 3, name: "1000 Zen", description: "In-game currency", price: 4.99, category: "currency", image_url: "/placeholder.svg", item_id: 0, quantity: 1000, is_active: true, is_featured: false },
+      const [productsData, categoriesData] = await Promise.all([
+        fetchProducts({ limit: 100 }),
+        fetchCategories(),
       ]);
+      setProducts(productsData.products);
+      setCategories(categoriesData);
+    } catch (error) {
+      console.error("Failed to load data:", error);
+      toast({ title: "Error", description: "Failed to load products", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -108,22 +111,27 @@ export function WebshopManager() {
 
   const handleAddNew = () => {
     setSelectedProduct(null);
-    setEditData(defaultProduct);
+    setEditData({ ...defaultProduct, category_id: categories[0]?.id || 1 });
     setIsEditing(true);
   };
 
-  const handleEdit = (product: ShopProduct) => {
+  const handleEdit = (product: WebshopProduct) => {
     setSelectedProduct(product);
     setEditData({
       name: product.name,
-      description: product.description,
-      price: product.price,
-      category: product.category,
-      image_url: product.image_url,
+      description: product.description || "",
+      category_id: product.category_id,
       item_id: product.item_id,
-      quantity: product.quantity,
+      item_quantity: product.item_quantity,
+      price_coins: product.price_coins,
+      price_vip: product.price_vip,
+      price_zen: product.price_zen,
+      price_real: product.price_real,
+      image_url: product.image_url || "",
+      stripe_payment_link: product.stripe_payment_link || "",
       is_active: product.is_active,
       is_featured: product.is_featured,
+      stock: product.stock,
     });
     setIsEditing(true);
   };
@@ -140,101 +148,82 @@ export function WebshopManager() {
       return;
     }
 
-    if (editData.price <= 0) {
-      toast({ title: "Error", description: "Please enter a valid price", variant: "destructive" });
+    if (editData.price_real <= 0 && editData.price_zen <= 0 && editData.price_coins <= 0) {
+      toast({ title: "Error", description: "Please enter at least one price", variant: "destructive" });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const endpoint = selectedProduct
-        ? "https://woiendgame.online/api/webshop_admin.php?action=update"
-        : "https://woiendgame.online/api/webshop_admin.php?action=add";
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...editData,
-          id: selectedProduct?.id,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast({ title: "Success", description: selectedProduct ? "Product updated!" : "Product added!" });
-        fetchProducts();
-        handleCloseModal();
-      } else {
-        // Demo mode
-        if (selectedProduct) {
-          setProducts(products.map(p => p.id === selectedProduct.id ? { ...editData, id: selectedProduct.id } : p));
-        } else {
-          setProducts([...products, { ...editData, id: Date.now() }]);
-        }
-        toast({ title: "Success (Demo)", description: selectedProduct ? "Product updated locally" : "Product added locally" });
-        handleCloseModal();
-      }
-    } catch {
-      // Demo mode
       if (selectedProduct) {
-        setProducts(products.map(p => p.id === selectedProduct.id ? { ...editData, id: selectedProduct.id } : p));
+        const result = await updateProduct({ id: selectedProduct.id, ...editData });
+        if (result.success) {
+          toast({ title: "Success", description: "Product updated!" });
+          loadData();
+          handleCloseModal();
+        } else {
+          toast({ title: "Error", description: result.message || "Failed to update", variant: "destructive" });
+        }
       } else {
-        setProducts([...products, { ...editData, id: Date.now() }]);
+        const result = await addProduct(editData);
+        if (result.success) {
+          toast({ title: "Success", description: "Product added!" });
+          loadData();
+          handleCloseModal();
+        } else {
+          toast({ title: "Error", description: result.message || "Failed to add", variant: "destructive" });
+        }
       }
-      toast({ title: "Success (Demo)", description: selectedProduct ? "Product updated locally" : "Product added locally" });
-      handleCloseModal();
+    } catch (error) {
+      console.error("Save error:", error);
+      toast({ title: "Error", description: "Failed to save product", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this product?")) return;
+    
     try {
-      const response = await fetch("https://woiendgame.online/api/webshop_admin.php?action=delete", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
+      const result = await deleteProduct(id);
+      if (result.success) {
         toast({ title: "Deleted", description: "Product removed." });
-        fetchProducts();
+        loadData();
       } else {
-        setProducts(products.filter(p => p.id !== id));
-        toast({ title: "Deleted (Demo)", description: "Product removed locally" });
+        toast({ title: "Error", description: result.message || "Failed to delete", variant: "destructive" });
       }
-    } catch {
-      setProducts(products.filter(p => p.id !== id));
-      toast({ title: "Deleted (Demo)", description: "Product removed locally" });
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({ title: "Error", description: "Failed to delete product", variant: "destructive" });
     }
   };
 
-  const handleToggleActive = async (id: number, is_active: boolean) => {
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    
     try {
-      await fetch("https://woiendgame.online/api/webshop_admin.php?action=toggle", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, is_active }),
-      });
-    } catch {
-      // Demo mode
+      const result = await addCategory({ name: newCategoryName });
+      if (result.success) {
+        toast({ title: "Success", description: "Category added!" });
+        setNewCategoryName("");
+        setShowCategoryModal(false);
+        loadData();
+      } else {
+        toast({ title: "Error", description: result.message || "Failed to add category", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Add category error:", error);
+      toast({ title: "Error", description: "Failed to add category", variant: "destructive" });
     }
-    setProducts(products.map(p => p.id === id ? { ...p, is_active } : p));
   };
 
   const filteredProducts = products.filter(p => 
-    filterCategory === "all" || p.category === filterCategory
+    filterCategory === "all" || p.category_id === parseInt(filterCategory)
   );
 
   const ProductFormContent = () => (
-    <div className="space-y-4">
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2">
           <label className="text-sm font-medium mb-2 block">Product Name</label>
@@ -265,24 +254,57 @@ export function WebshopManager() {
             type="number"
             step="0.01"
             min={0}
-            value={editData.price}
-            onChange={(e) => setEditData({ ...editData, price: parseFloat(e.target.value) || 0 })}
+            value={editData.price_real}
+            onChange={(e) => setEditData({ ...editData, price_real: parseFloat(e.target.value) || 0 })}
           />
         </div>
         <div>
           <label className="text-sm font-medium mb-2 block flex items-center gap-1">
             <Tag className="h-3 w-3" /> Category
           </label>
-          <Select value={editData.category} onValueChange={(v) => setEditData({ ...editData, category: v })}>
+          <Select 
+            value={String(editData.category_id)} 
+            onValueChange={(v) => setEditData({ ...editData, category_id: parseInt(v) })}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {categories.map(cat => (
-                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label className="text-sm font-medium mb-2 block">Zen Price</label>
+          <Input
+            type="number"
+            min={0}
+            value={editData.price_zen}
+            onChange={(e) => setEditData({ ...editData, price_zen: parseInt(e.target.value) || 0 })}
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-2 block">Coins Price</label>
+          <Input
+            type="number"
+            min={0}
+            value={editData.price_coins}
+            onChange={(e) => setEditData({ ...editData, price_coins: parseInt(e.target.value) || 0 })}
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-2 block">VIP Price</label>
+          <Input
+            type="number"
+            min={0}
+            value={editData.price_vip}
+            onChange={(e) => setEditData({ ...editData, price_vip: parseInt(e.target.value) || 0 })}
+          />
         </div>
       </div>
 
@@ -301,21 +323,45 @@ export function WebshopManager() {
           <Input
             type="number"
             min={1}
-            value={editData.quantity}
-            onChange={(e) => setEditData({ ...editData, quantity: parseInt(e.target.value) || 1 })}
+            value={editData.item_quantity}
+            onChange={(e) => setEditData({ ...editData, item_quantity: parseInt(e.target.value) || 1 })}
           />
         </div>
       </div>
 
       <div>
+        <label className="text-sm font-medium mb-2 block">Stock (-1 = unlimited)</label>
+        <Input
+          type="number"
+          min={-1}
+          value={editData.stock}
+          onChange={(e) => setEditData({ ...editData, stock: parseInt(e.target.value) })}
+        />
+      </div>
+
+      <div>
         <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-          <ImageIcon className="h-3 w-3" /> Image URL
+          <ImageIcon className="h-3 w-3" /> Image URL (or emoji)
         </label>
         <Input
           value={editData.image_url}
           onChange={(e) => setEditData({ ...editData, image_url: e.target.value })}
-          placeholder="https://..."
+          placeholder="https://... or 🎁"
         />
+      </div>
+
+      <div>
+        <label className="text-sm font-medium mb-2 block flex items-center gap-1">
+          <LinkIcon className="h-3 w-3" /> Stripe Payment Link
+        </label>
+        <Input
+          value={editData.stripe_payment_link}
+          onChange={(e) => setEditData({ ...editData, stripe_payment_link: e.target.value })}
+          placeholder="https://buy.stripe.com/..."
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Create payment links at dashboard.stripe.com → Payment Links
+        </p>
       </div>
 
       <div className="flex items-center justify-between p-3 rounded-lg border">
@@ -359,10 +405,14 @@ export function WebshopManager() {
                 Webshop Products
               </CardTitle>
               <CardDescription>
-                Manage shop items and pricing
+                Manage shop items, pricing, and Stripe payment links
               </CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" size="sm" onClick={loadData} disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
               <Select value={filterCategory} onValueChange={setFilterCategory}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Category" />
@@ -370,10 +420,14 @@ export function WebshopManager() {
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   {categories.map(cat => (
-                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                    <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <Button variant="outline" onClick={() => setShowCategoryModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Category
+              </Button>
               <Button onClick={handleAddNew}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Product
@@ -410,8 +464,11 @@ export function WebshopManager() {
                       </div>
                       <p className="text-xs text-muted-foreground">{product.description}</p>
                       <div className="flex items-center gap-3 mt-2 text-xs">
-                        <Badge variant="outline">{product.category}</Badge>
-                        <span className="text-green-500 font-medium">€{product.price.toFixed(2)}</span>
+                        <Badge variant="outline">{product.category_name}</Badge>
+                        <span className="text-primary font-medium">€{product.price_real.toFixed(2)}</span>
+                        {product.stripe_payment_link && (
+                          <Badge variant="secondary" className="text-xs">Stripe</Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -444,6 +501,7 @@ export function WebshopManager() {
                   <TableHead>Category</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Item ID</TableHead>
+                  <TableHead>Stripe</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
@@ -458,19 +516,25 @@ export function WebshopManager() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{product.category}</Badge>
+                      <Badge variant="outline">{product.category_name || "—"}</Badge>
                     </TableCell>
-                    <TableCell className="text-green-500 font-medium">
-                      €{product.price.toFixed(2)}
+                    <TableCell className="text-primary font-medium">
+                      €{product.price_real.toFixed(2)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {product.item_id > 0 ? `#${product.item_id}` : "-"}
+                      {product.item_id || "—"}
                     </TableCell>
                     <TableCell>
-                      <Switch
-                        checked={product.is_active}
-                        onCheckedChange={(checked) => handleToggleActive(product.id, checked)}
-                      />
+                      {product.stripe_payment_link ? (
+                        <Badge variant="secondary">Linked</Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={product.is_active ? "default" : "secondary"}>
+                        {product.is_active ? "Active" : "Inactive"}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -500,30 +564,63 @@ export function WebshopManager() {
         </CardContent>
       </Card>
 
-      {/* Edit/Add Modal */}
+      {/* Product Modal */}
       {isMobile ? (
         <Drawer open={isEditing} onOpenChange={(open) => !open && handleCloseModal()}>
           <DrawerContent>
             <DrawerHeader>
               <DrawerTitle>{selectedProduct ? "Edit Product" : "Add Product"}</DrawerTitle>
-              <DrawerDescription>Configure product details</DrawerDescription>
+              <DrawerDescription>
+                {selectedProduct ? "Update product details" : "Create a new product"}
+              </DrawerDescription>
             </DrawerHeader>
-            <div className="px-4 pb-6">
+            <div className="p-4">
               <ProductFormContent />
             </div>
           </DrawerContent>
         </Drawer>
       ) : (
         <Dialog open={isEditing} onOpenChange={(open) => !open && handleCloseModal()}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>{selectedProduct ? "Edit Product" : "Add Product"}</DialogTitle>
-              <DialogDescription>Configure product details</DialogDescription>
+              <DialogDescription>
+                {selectedProduct ? "Update product details" : "Create a new product"}
+              </DialogDescription>
             </DialogHeader>
             <ProductFormContent />
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Add Category Modal */}
+      <Dialog open={showCategoryModal} onOpenChange={setShowCategoryModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Category</DialogTitle>
+            <DialogDescription>Create a new product category</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Category Name</label>
+              <Input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="e.g., Cosmetics"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleAddCategory} className="flex-1">
+                <Save className="mr-2 h-4 w-4" />
+                Add Category
+              </Button>
+              <Button variant="outline" onClick={() => setShowCategoryModal(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

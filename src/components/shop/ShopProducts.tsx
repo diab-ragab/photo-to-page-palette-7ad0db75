@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ShoppingCart, Sparkles, Star, Minus, Plus, ZoomIn, Eye } from "lucide-react";
+import { ShoppingCart, Sparkles, Star, Minus, Plus, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,6 +8,7 @@ import { ShopCategory } from "@/pages/Shop";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { fetchProducts, fetchCategories, WebshopProduct, WebshopCategory } from "@/lib/webshopApi";
 
 const ProductCardSkeleton = () => (
   <div className="glass-card overflow-hidden">
@@ -25,155 +26,6 @@ const ProductCardSkeleton = () => (
   </div>
 );
 
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: "fashion" | "pets" | "currency" | "passes";
-  image: string;
-  rarity?: "common" | "rare" | "epic" | "legendary";
-  popular?: boolean;
-  bonus?: string;
-  featured?: boolean;
-}
-
-const products: Product[] = [
-  // Game Passes
-  {
-    id: "elite-pass",
-    name: "Elite Game Pass",
-    description: "Unlock premium rewards for 30 days! Legendary items, bonus coins & exclusive gear",
-    price: 14.99,
-    category: "passes",
-    image: "👑",
-    rarity: "legendary",
-    popular: true,
-    featured: true,
-  },
-  // Fashion & Backgears
-  {
-    id: "fashion-1",
-    name: "Dragon Wings",
-    description: "Legendary backgear with flame effects",
-    price: 29.99,
-    category: "fashion",
-    image: "🐉",
-    rarity: "legendary",
-    popular: true,
-  },
-  {
-    id: "fashion-2",
-    name: "Angel Aura Set",
-    description: "Complete fashion set with divine glow",
-    price: 19.99,
-    category: "fashion",
-    image: "👼",
-    rarity: "epic",
-  },
-  {
-    id: "fashion-3",
-    name: "Shadow Cloak",
-    description: "Dark themed backgear with particles",
-    price: 14.99,
-    category: "fashion",
-    image: "🦇",
-    rarity: "rare",
-  },
-  {
-    id: "fashion-4",
-    name: "Phoenix Feathers",
-    description: "Fiery backgear with ember trail",
-    price: 24.99,
-    category: "fashion",
-    image: "🔥",
-    rarity: "epic",
-    popular: true,
-  },
-  // Pet Eggs
-  {
-    id: "pet-1",
-    name: "Rare Pet Egg",
-    description: "Chance for rare companion pets",
-    price: 4.99,
-    category: "pets",
-    image: "🥚",
-    rarity: "rare",
-  },
-  {
-    id: "pet-2",
-    name: "Epic Pet Egg",
-    description: "Higher chance for epic pets",
-    price: 9.99,
-    category: "pets",
-    image: "🥚",
-    rarity: "epic",
-    popular: true,
-  },
-  {
-    id: "pet-3",
-    name: "Legendary Pet Egg",
-    description: "Guaranteed epic or legendary pet",
-    price: 19.99,
-    category: "pets",
-    image: "🥚",
-    rarity: "legendary",
-  },
-  {
-    id: "pet-4",
-    name: "Pet Egg Bundle x10",
-    description: "10 random rare+ eggs with bonus",
-    price: 39.99,
-    category: "pets",
-    image: "📦",
-    rarity: "epic",
-    bonus: "+2 Free Eggs",
-  },
-  // Currency
-  {
-    id: "currency-1",
-    name: "1000 Zen",
-    description: "Premium currency for shop items",
-    price: 4.99,
-    category: "currency",
-    image: "💎",
-  },
-  {
-    id: "currency-2",
-    name: "5000 Zen",
-    description: "Premium currency pack",
-    price: 19.99,
-    category: "currency",
-    image: "💎",
-    bonus: "+500 Bonus",
-    popular: true,
-  },
-  {
-    id: "currency-3",
-    name: "10M Gold Coins",
-    description: "In-game gold currency",
-    price: 9.99,
-    category: "currency",
-    image: "🪙",
-  },
-  {
-    id: "currency-4",
-    name: "50M Gold Coins",
-    description: "Large gold pack for upgrades",
-    price: 39.99,
-    category: "currency",
-    image: "🪙",
-    bonus: "+10M Bonus",
-  },
-];
-
-const rarityColors = {
-  common: "bg-muted text-muted-foreground",
-  rare: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  epic: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  legendary: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-};
-
 interface ShopProductsProps {
   selectedCategory: ShopCategory;
 }
@@ -181,41 +33,92 @@ interface ShopProductsProps {
 export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
   const { t } = useLanguage();
   const { addToCart } = useCart();
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [products, setProducts] = useState<WebshopProduct[]>([]);
+  const [categories, setCategories] = useState<WebshopCategory[]>([]);
 
   useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
-  }, [selectedCategory]);
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const [productsData, categoriesData] = await Promise.all([
+          fetchProducts({ limit: 50 }),
+          fetchCategories(),
+        ]);
+        setProducts(productsData.products.filter(p => p.is_active));
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error("Failed to load shop data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
-  const filteredProducts = selectedCategory === "all" 
-    ? products 
-    : products.filter(p => p.category === selectedCategory);
+  // Map category slug to filter
+  const getCategorySlug = (cat: ShopCategory): string | null => {
+    if (cat === "all") return null;
+    return cat;
+  };
 
-  const getQuantity = (id: string) => quantities[id] || 1;
+  const filteredProducts = (() => {
+    const slug = getCategorySlug(selectedCategory);
+    if (!slug) return products;
+    
+    // Find category by slug
+    const category = categories.find(c => c.slug === slug);
+    if (!category) return products;
+    
+    return products.filter(p => p.category_id === category.id);
+  })();
+
+  const getQuantity = (id: number) => quantities[id] || 1;
   
-  const setQuantity = (id: string, qty: number) => {
+  const setQuantity = (id: number, qty: number) => {
     if (qty >= 1 && qty <= 99) {
       setQuantities(prev => ({ ...prev, [id]: qty }));
     }
   };
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = (product: WebshopProduct) => {
     const qty = getQuantity(product.id);
     addToCart({
-      id: product.id,
+      id: String(product.id),
       name: product.name,
       description: product.description,
-      price: product.price,
-      image: product.image,
-      rarity: product.rarity,
+      price: product.price_real,
+      image: product.image_url || "📦",
+      rarity: product.is_featured ? "legendary" : undefined,
     }, qty);
     toast.success(`${product.name} added to cart!`, {
-      description: `${qty}x €${product.price.toFixed(2)}`,
+      description: `${qty}x €${product.price_real.toFixed(2)}`,
     });
     setQuantities(prev => ({ ...prev, [product.id]: 1 }));
+  };
+
+  const handleBuyNow = (product: WebshopProduct) => {
+    if (product.stripe_payment_link) {
+      window.open(product.stripe_payment_link, "_blank");
+    } else {
+      handleAddToCart(product);
+    }
+  };
+
+  const getProductEmoji = (product: WebshopProduct): string => {
+    if (product.image_url && product.image_url.length <= 4) {
+      return product.image_url;
+    }
+    // Default emojis based on category
+    const cat = categories.find(c => c.id === product.category_id);
+    switch (cat?.slug) {
+      case "currency": return "💎";
+      case "vip": return "👑";
+      case "cosmetics": return "✨";
+      case "items": return "📦";
+      default: return "🎁";
+    }
   };
 
   return (
@@ -240,64 +143,41 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
               className="glass-card overflow-hidden group hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20 transition-all duration-300"
             >
               {/* Product Image/Icon */}
-              <div className="relative h-40 bg-gradient-to-br from-secondary/50 to-background flex items-center justify-center overflow-hidden cursor-pointer">
+              <div className="relative h-40 bg-gradient-to-br from-secondary/50 to-background flex items-center justify-center overflow-hidden">
                 {/* Background gradient overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 
-                {/* Zoom background effect */}
-                <div className="absolute inset-0 bg-primary/5 scale-0 group-hover:scale-100 rounded-full transition-transform duration-500 origin-center" />
-                
-                {/* Product emoji with zoom effect */}
-                <motion.span 
-                  className="text-6xl relative z-10 transition-all duration-300 group-hover:scale-125 group-hover:drop-shadow-[0_0_20px_hsl(var(--primary)/0.6)]"
-                  whileHover={{ rotate: [0, -5, 5, 0] }}
-                  transition={{ duration: 0.5 }}
-                >
-                  {product.image}
-                </motion.span>
-                
-                {/* Quick view overlay */}
-                <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-background/60 backdrop-blur-sm">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    whileHover={{ scale: 1.1 }}
-                    animate={{ scale: 1 }}
-                    className="p-2 rounded-full bg-primary/90 text-primary-foreground shadow-lg"
+                {/* Product image or emoji */}
+                {product.image_url && product.image_url.startsWith("http") ? (
+                  <img 
+                    src={product.image_url} 
+                    alt={product.name}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                  />
+                ) : (
+                  <motion.span 
+                    className="text-6xl relative z-10 transition-all duration-300 group-hover:scale-125 group-hover:drop-shadow-[0_0_20px_hsl(var(--primary)/0.6)]"
+                    whileHover={{ rotate: [0, -5, 5, 0] }}
+                    transition={{ duration: 0.5 }}
                   >
-                    <ZoomIn className="w-5 h-5" />
-                  </motion.div>
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    whileHover={{ scale: 1.1 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.05 }}
-                    className="p-2 rounded-full bg-secondary text-secondary-foreground shadow-lg"
-                  >
-                    <Eye className="w-5 h-5" />
-                  </motion.div>
-                </div>
+                    {getProductEmoji(product)}
+                  </motion.span>
+                )}
                 
                 {/* Badges */}
                 <div className="absolute top-3 left-3 flex flex-col gap-2 z-20">
-                  {product.popular && (
+                  {product.is_featured && (
                     <Badge className="bg-primary text-primary-foreground gap-1">
                       <Star className="w-3 h-3" />
-                      Popular
+                      Featured
                     </Badge>
                   )}
-                  {product.rarity && (
-                    <Badge variant="outline" className={rarityColors[product.rarity]}>
-                      {product.rarity.charAt(0).toUpperCase() + product.rarity.slice(1)}
+                  {product.stock > 0 && product.stock <= 10 && (
+                    <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                      Only {product.stock} left
                     </Badge>
                   )}
                 </div>
-                
-                {product.bonus && (
-                  <Badge className="absolute top-3 right-3 bg-primary/90 text-primary-foreground gap-1 z-20">
-                    <Sparkles className="w-3 h-3" />
-                    {product.bonus}
-                  </Badge>
-                )}
               </div>
 
               {/* Product Info */}
@@ -305,16 +185,71 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                 <h3 className="font-display font-semibold text-lg mb-1">
                   {product.name}
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                   {product.description}
                 </p>
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-center">
+                  {/* Price */}
+                  <div className="flex items-center justify-between">
                     <span className="text-2xl font-bold font-display text-primary">
-                      Coming Soon
+                      €{product.price_real.toFixed(2)}
+                    </span>
+                    {product.price_zen > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        or {product.price_zen} Zen
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Quantity selector */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => setQuantity(product.id, getQuantity(product.id) - 1)}
+                        disabled={getQuantity(product.id) <= 1}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </Button>
+                      <span className="w-8 text-center text-sm font-medium">
+                        {getQuantity(product.id)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => setQuantity(product.id, getQuantity(product.id) + 1)}
+                        disabled={getQuantity(product.id) >= 99 || (product.stock > 0 && getQuantity(product.id) >= product.stock)}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      = €{(product.price_real * getQuantity(product.id)).toFixed(2)}
                     </span>
                   </div>
+
+                  {/* Buy button */}
+                  <Button 
+                    className="w-full gap-2" 
+                    onClick={() => handleBuyNow(product)}
+                    disabled={product.stock === 0}
+                  >
+                    {product.stripe_payment_link ? (
+                      <>
+                        <ExternalLink className="w-4 h-4" />
+                        Buy Now
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="w-4 h-4" />
+                        Add to Cart
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             </motion.div>

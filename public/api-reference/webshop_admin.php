@@ -152,6 +152,7 @@ function ensureTables(PDO $pdo): void {
         price_zen INT DEFAULT 0,
         price_real DECIMAL(10,2) DEFAULT 0,
         image_url VARCHAR(500),
+        stripe_payment_link VARCHAR(500),
         is_featured TINYINT(1) DEFAULT 0,
         is_active TINYINT(1) DEFAULT 1,
         stock INT DEFAULT -1,
@@ -161,6 +162,13 @@ function ensureTables(PDO $pdo): void {
         KEY idx_featured (is_featured),
         KEY idx_active (is_active)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+    
+    // Add stripe_payment_link column if not exists (for existing tables)
+    try {
+        $pdo->exec("ALTER TABLE webshop_products ADD COLUMN stripe_payment_link VARCHAR(500) AFTER image_url");
+    } catch (Exception $e) {
+        // Column already exists, ignore
+    }
     
     // Orders
     $pdo->exec("CREATE TABLE IF NOT EXISTS webshop_orders (
@@ -338,6 +346,7 @@ if ($action === 'add_product' && $method === 'POST') {
     $priceZen = max(0, (int)($input['price_zen'] ?? 0));
     $priceReal = max(0, (float)($input['price_real'] ?? 0));
     $imageUrl = sanitize($input['image_url'] ?? '', 500);
+    $stripePaymentLink = sanitize($input['stripe_payment_link'] ?? '', 500);
     $isFeatured = (bool)($input['is_featured'] ?? false);
     $isActive = (bool)($input['is_active'] ?? true);
     $stock = (int)($input['stock'] ?? -1);
@@ -348,13 +357,13 @@ if ($action === 'add_product' && $method === 'POST') {
     
     $stmt = $pdo->prepare("
         INSERT INTO webshop_products 
-        (category_id, name, description, item_id, item_quantity, price_coins, price_vip, price_zen, price_real, image_url, is_featured, is_active, stock)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (category_id, name, description, item_id, item_quantity, price_coins, price_vip, price_zen, price_real, image_url, stripe_payment_link, is_featured, is_active, stock)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
         $categoryId, $name, $description, $itemId, $itemQuantity,
         $priceCoins, $priceVip, $priceZen, $priceReal,
-        $imageUrl, $isFeatured ? 1 : 0, $isActive ? 1 : 0, $stock
+        $imageUrl, $stripePaymentLink, $isFeatured ? 1 : 0, $isActive ? 1 : 0, $stock
     ]);
     
     json_response(['success' => true, 'id' => (int)$pdo->lastInsertId(), 'message' => 'Product created']);
@@ -383,6 +392,7 @@ if ($action === 'update_product' && $method === 'POST') {
         'price_zen' => 'int',
         'price_real' => 'float',
         'image_url' => 'string',
+        'stripe_payment_link' => 'string',
         'is_featured' => 'bool',
         'is_active' => 'bool',
         'stock' => 'int',
