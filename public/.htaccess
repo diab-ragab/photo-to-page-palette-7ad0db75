@@ -2,6 +2,14 @@
 # WOI Endgame - Full .htaccess
 # =========================
 
+# =========================
+# MIME Types for JavaScript modules
+# =========================
+<IfModule mod_mime.c>
+    AddType application/javascript .js .mjs
+    AddType text/css .css
+</IfModule>
+
 # Force RewriteEngine
 <IfModule mod_rewrite.c>
     RewriteEngine On
