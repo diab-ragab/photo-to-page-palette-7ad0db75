@@ -1,0 +1,325 @@
+<?php
+/**
+ * payment_confirm.php - Confirm Stripe Payment and fulfill order
+ * 
+ * POST /api/payment_confirm.php
+ * Body: { paymentIntentId: string, orderId?: number }
+ * Returns: { success: true, status: string }
+ * 
+ * Security:
+ * - Verifies payment status with Stripe
+ * - Only marks order as paid if Stripe confirms success
+ * - Rate limiting per IP
+ */
+
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL);
+
+$RID = bin2hex(random_bytes(6));
+
+function json_response($data) {
+    global $RID;
+    while (ob_get_level()) { ob_end_clean(); }
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array_merge($data, array('rid' => $RID)), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+function json_fail($code, $msg) {
+    global $RID;
+    error_log("RID={$RID} PAYMENT_CONFIRM RESP={$code} MSG={$msg}");
+    while (ob_get_level()) { ob_end_clean(); }
+    http_response_code($code);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array('success' => false, 'message' => $msg, 'rid' => $RID), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// CORS headers
+$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+$allowed = array('https://woiendgame.lovable.app', 'https://woiendgame.online', 'http://localhost:5173', 'http://localhost:8080');
+if (in_array($origin, $allowed)) {
+    header('Access-Control-Allow-Origin: ' . $origin);
+} else {
+    header('Access-Control-Allow-Origin: https://woiendgame.lovable.app');
+}
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Session-Token, X-CSRF-Token');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    json_fail(405, 'Method not allowed');
+}
+
+// Database connection
+$DBHost     = getenv('DB_HOST') ? getenv('DB_HOST') : '192.168.1.88';
+$DBUser     = getenv('DB_USER') ? getenv('DB_USER') : 'root';
+$DBPassword = getenv('DB_PASS') ? getenv('DB_PASS') : 'root';
+$DBName     = getenv('DB_NAME') ? getenv('DB_NAME') : 'shengui';
+
+try {
+    $pdo = new PDO("mysql:host={$DBHost};dbname={$DBName};charset=utf8", $DBUser, $DBPassword, array(
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ));
+} catch (PDOException $e) {
+    json_fail(503, 'Service temporarily unavailable');
+}
+
+// Rate limiting check
+$clientIP = isset($_SERVER['HTTP_X_FORWARDED_FOR']) 
+    ? explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0] 
+    : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown');
+$clientIP = trim($clientIP);
+
+$stmt = $pdo->prepare("SELECT COUNT(*) as cnt FROM payment_rate_limit WHERE ip_address = ? AND endpoint = 'confirm' AND request_time > DATE_SUB(NOW(), INTERVAL 1 MINUTE)");
+$stmt->execute(array($clientIP));
+$rateCheck = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if ($rateCheck && (int)$rateCheck['cnt'] >= 20) {
+    json_fail(429, 'Too many requests. Please wait a moment.');
+}
+
+// Log this request for rate limiting
+$stmt = $pdo->prepare("INSERT INTO payment_rate_limit (ip_address, endpoint, request_time) VALUES (?, 'confirm', NOW())");
+$stmt->execute(array($clientIP));
+
+// Parse request body
+$rawBody = file_get_contents('php://input');
+$body = json_decode($rawBody, true);
+
+if (!$body) {
+    json_fail(400, 'Invalid JSON body');
+}
+
+$paymentIntentId = isset($body['paymentIntentId']) ? trim($body['paymentIntentId']) : '';
+$orderId = isset($body['orderId']) ? (int)$body['orderId'] : 0;
+
+if (empty($paymentIntentId)) {
+    json_fail(400, 'Payment intent ID required');
+}
+
+// Validate payment intent ID format
+if (strpos($paymentIntentId, 'pi_') !== 0) {
+    json_fail(400, 'Invalid payment intent ID');
+}
+
+// Load Stripe secret key
+$configPath = __DIR__ . '/stripe_config.php';
+if (file_exists($configPath)) {
+    require_once $configPath;
+}
+
+$stripeSecretKey = defined('STRIPE_SECRET_KEY') 
+    ? STRIPE_SECRET_KEY 
+    : (getenv('STRIPE_SECRET_KEY') ? getenv('STRIPE_SECRET_KEY') : '');
+
+if (empty($stripeSecretKey)) {
+    error_log("RID={$RID} STRIPE_SECRET_KEY not configured");
+    json_fail(500, 'Payment system not configured');
+}
+
+// Retrieve PaymentIntent from Stripe
+$stripeUrl = 'https://api.stripe.com/v1/payment_intents/' . urlencode($paymentIntentId);
+
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, $stripeUrl);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+    'Authorization: Basic ' . base64_encode($stripeSecretKey . ':'),
+));
+curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curlError = curl_error($ch);
+curl_close($ch);
+
+if ($curlError) {
+    error_log("RID={$RID} STRIPE_CURL_ERROR: {$curlError}");
+    json_fail(502, 'Payment service unavailable');
+}
+
+$paymentIntent = json_decode($response, true);
+
+if ($httpCode >= 400 || !$paymentIntent) {
+    $errorMsg = isset($paymentIntent['error']['message']) ? $paymentIntent['error']['message'] : 'Failed to verify payment';
+    error_log("RID={$RID} STRIPE_RETRIEVE_ERROR: {$errorMsg} HTTP={$httpCode}");
+    json_fail(400, $errorMsg);
+}
+
+$status = isset($paymentIntent['status']) ? $paymentIntent['status'] : '';
+$amount = isset($paymentIntent['amount']) ? (int)$paymentIntent['amount'] : 0;
+$currency = isset($paymentIntent['currency']) ? strtoupper($paymentIntent['currency']) : 'EUR';
+$metadata = isset($paymentIntent['metadata']) ? $paymentIntent['metadata'] : array();
+
+error_log("RID={$RID} PAYMENT_INTENT_STATUS pi={$paymentIntentId} status={$status} amount={$amount}");
+
+// Check if payment succeeded
+if ($status !== 'succeeded') {
+    json_response(array(
+        'success' => false,
+        'status' => $status,
+        'message' => 'Payment not completed. Status: ' . $status,
+    ));
+}
+
+// Get order ID from metadata if not provided
+if ($orderId <= 0 && isset($metadata['order_id'])) {
+    $orderId = (int)$metadata['order_id'];
+}
+
+// Get user ID from metadata
+$userId = isset($metadata['user_id']) ? (int)$metadata['user_id'] : 0;
+
+// If we have an order, update it
+if ($orderId > 0) {
+    // Check if already processed
+    $stmt = $pdo->prepare("SELECT id, status, user_id, product_id, quantity FROM webshop_orders WHERE id = ? LIMIT 1");
+    $stmt->execute(array($orderId));
+    $order = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($order) {
+        if ($order['status'] === 'completed') {
+            // Already processed, return success
+            json_response(array(
+                'success' => true,
+                'status' => 'already_completed',
+                'message' => 'Order already fulfilled',
+                'orderId' => $orderId,
+            ));
+        }
+        
+        // Mark order as completed
+        $stmt = $pdo->prepare("
+            UPDATE webshop_orders 
+            SET status = 'completed', 
+                stripe_payment_intent = ?,
+                delivered_at = NOW()
+            WHERE id = ?
+        ");
+        $stmt->execute(array($paymentIntentId, $orderId));
+        
+        // Get user ID from order if not in metadata
+        if ($userId <= 0 && isset($order['user_id'])) {
+            $userId = (int)$order['user_id'];
+        }
+        
+        // Fulfill order - grant digital items
+        $productId = isset($order['product_id']) ? (int)$order['product_id'] : 0;
+        $quantity = isset($order['quantity']) ? (int)$order['quantity'] : 1;
+        
+        if ($productId > 0 && $userId > 0) {
+            fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID);
+        }
+        
+        error_log("RID={$RID} ORDER_COMPLETED order={$orderId} user={$userId} product={$productId}");
+    }
+} else {
+    // No order ID - create a new order record
+    $totalReal = $amount / 100; // Convert cents to currency
+    
+    $stmt = $pdo->prepare("
+        INSERT INTO webshop_orders 
+        (user_id, product_id, quantity, total_real, status, stripe_payment_intent, delivered_at, created_at)
+        VALUES (?, 0, 1, ?, 'completed', ?, NOW(), NOW())
+    ");
+    $stmt->execute(array($userId, $totalReal, $paymentIntentId));
+    $orderId = $pdo->lastInsertId();
+    
+    error_log("RID={$RID} NEW_ORDER_CREATED order={$orderId} amount={$totalReal} pi={$paymentIntentId}");
+}
+
+json_response(array(
+    'success' => true,
+    'status' => 'succeeded',
+    'message' => 'Payment confirmed and order fulfilled',
+    'orderId' => $orderId,
+));
+
+// ============ FULFILLMENT FUNCTIONS ============
+
+function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
+    // Get product details
+    $stmt = $pdo->prepare("SELECT * FROM webshop_products WHERE id = ? LIMIT 1");
+    $stmt->execute(array($productId));
+    $product = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$product) {
+        error_log("RID={$RID} FULFILL_ERROR product_not_found id={$productId}");
+        return false;
+    }
+    
+    // Check what type of item this is and grant accordingly
+    $itemId = isset($product['item_id']) ? (int)$product['item_id'] : 0;
+    $itemQuantity = isset($product['item_quantity']) ? (int)$product['item_quantity'] : 1;
+    $totalGrant = $itemQuantity * $quantity;
+    
+    // Example: If item_id represents currency type
+    // item_id = 1 = Zen, item_id = 2 = Coins, item_id = 3 = VIP Points, etc.
+    
+    // Ensure user_currency table exists
+    $pdo->exec("CREATE TABLE IF NOT EXISTS user_currency (
+        user_id INT PRIMARY KEY,
+        coins INT DEFAULT 0,
+        zen INT DEFAULT 0,
+        vip_points INT DEFAULT 0,
+        updated_at DATETIME,
+        KEY idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+    
+    // Insert user if not exists
+    $stmt = $pdo->prepare("INSERT IGNORE INTO user_currency (user_id, coins, zen, vip_points, updated_at) VALUES (?, 0, 0, 0, NOW())");
+    $stmt->execute(array($userId));
+    
+    // Grant based on item_id
+    switch ($itemId) {
+        case 1: // Zen
+            $stmt = $pdo->prepare("UPDATE user_currency SET zen = zen + ?, updated_at = NOW() WHERE user_id = ?");
+            $stmt->execute(array($totalGrant, $userId));
+            error_log("RID={$RID} GRANTED_ZEN user={$userId} amount={$totalGrant}");
+            break;
+            
+        case 2: // Coins
+            $stmt = $pdo->prepare("UPDATE user_currency SET coins = coins + ?, updated_at = NOW() WHERE user_id = ?");
+            $stmt->execute(array($totalGrant, $userId));
+            error_log("RID={$RID} GRANTED_COINS user={$userId} amount={$totalGrant}");
+            break;
+            
+        case 3: // VIP Points
+            $stmt = $pdo->prepare("UPDATE user_currency SET vip_points = vip_points + ?, updated_at = NOW() WHERE user_id = ?");
+            $stmt->execute(array($totalGrant, $userId));
+            error_log("RID={$RID} GRANTED_VIP user={$userId} amount={$totalGrant}");
+            break;
+            
+        default:
+            // Generic item - log for manual processing or game server integration
+            error_log("RID={$RID} ITEM_GRANT_PENDING user={$userId} item={$itemId} qty={$totalGrant} order={$orderId}");
+            
+            // Create pending delivery record
+            $pdo->exec("CREATE TABLE IF NOT EXISTS pending_deliveries (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                order_id INT NOT NULL,
+                user_id INT NOT NULL,
+                item_id INT NOT NULL,
+                quantity INT NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                created_at DATETIME,
+                delivered_at DATETIME,
+                KEY idx_user (user_id),
+                KEY idx_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+            
+            $stmt = $pdo->prepare("INSERT INTO pending_deliveries (order_id, user_id, item_id, quantity, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())");
+            $stmt->execute(array($orderId, $userId, $itemId, $totalGrant));
+            break;
+    }
+    
+    return true;
+}

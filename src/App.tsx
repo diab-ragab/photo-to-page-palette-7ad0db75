@@ -32,6 +32,8 @@ import Dashboard from "./pages/Dashboard";
 import SeasonHistory from "./pages/SeasonHistory";
 import AdminDashboard from "./pages/AdminDashboard";
 import ClassPage from "./pages/ClassPage";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentFailed from "./pages/PaymentFailed";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +54,8 @@ const AnimatedRoutes = () => {
         <Route path="/shop" element={<PageTransition><ProtectedRoute><Shop /></ProtectedRoute></PageTransition>} />
         <Route path="/cart" element={<PageTransition><ProtectedRoute><Cart /></ProtectedRoute></PageTransition>} />
         <Route path="/checkout" element={<PageTransition><ProtectedRoute><Checkout /></ProtectedRoute></PageTransition>} />
+        <Route path="/payment-success" element={<PageTransition><PaymentSuccess /></PageTransition>} />
+        <Route path="/payment-failed" element={<PageTransition><PaymentFailed /></PageTransition>} />
         <Route path="/blog" element={<PageTransition><Blog /></PageTransition>} />
         <Route path="/blog/:slug" element={<PageTransition><BlogPost /></PageTransition>} />
         <Route path="/download" element={<PageTransition><DownloadPage /></PageTransition>} />
