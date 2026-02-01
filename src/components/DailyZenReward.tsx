@@ -13,7 +13,9 @@ import {
   Coins, 
   Sparkles,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  Timer
 } from 'lucide-react';
 
 interface DailyZenRewardProps {
@@ -30,6 +32,7 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
   const [countdown, setCountdown] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [csrfToken, setCsrfToken] = useState<string>('');
 
   // Fetch status on mount
   const fetchStatus = useCallback(async () => {
@@ -47,7 +50,11 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCanClaim(status.can_claim);
         setHasClaimed(status.has_claimed);
         setRewardAmount(status.reward_amount);
-        setCountdown(status.seconds_until_reset);
+        setCountdown(status.seconds_until_next_claim);
+        if (status.csrf_token) {
+          setCsrfToken(status.csrf_token);
+          sessionStorage.setItem('csrf_token', status.csrf_token);
+        }
       } else {
         setError(status.error || 'Failed to check status');
       }
@@ -94,7 +101,7 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCanClaim(false);
         setHasClaimed(true);
         setShowSuccess(true);
-        setCountdown(result.seconds_until_reset || 0);
+        setCountdown(result.seconds_until_next_claim || 86400);
         
         toast.success(`🎉 Claimed ${(result.reward_amount || rewardAmount).toLocaleString()} Zen!`);
         
@@ -116,35 +123,84 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
     }
   };
 
+  // Calculate progress percentage for visual indicator
+  const progressPercent = countdown > 0 ? ((86400 - countdown) / 86400) * 100 : 100;
+
   if (!isLoggedIn) return null;
 
   return (
-    <Card className="relative overflow-hidden bg-card border-primary/20">
-      {/* Animated background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-transparent to-orange-500/5" />
+    <Card className="relative overflow-hidden bg-gradient-to-br from-card via-card to-cyan-950/20 border-cyan-500/30 shadow-lg shadow-cyan-500/5">
+      {/* Animated background effects */}
+      <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5" />
+      <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl" />
       
-      <CardHeader className="relative">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <div className="p-2 rounded-lg bg-yellow-500/10">
-            <Gift className="h-5 w-5 text-yellow-500" />
+      {/* Floating particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {canClaim && (
+          <>
+            <motion.div
+              className="absolute w-2 h-2 bg-cyan-400/60 rounded-full"
+              animate={{
+                y: [100, -20],
+                x: [20, 40],
+                opacity: [0, 1, 0],
+              }}
+              transition={{ duration: 3, repeat: Infinity, delay: 0 }}
+            />
+            <motion.div
+              className="absolute w-1.5 h-1.5 bg-purple-400/60 rounded-full"
+              animate={{
+                y: [120, -10],
+                x: [80, 60],
+                opacity: [0, 1, 0],
+              }}
+              transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 }}
+            />
+            <motion.div
+              className="absolute w-1 h-1 bg-yellow-400/60 rounded-full"
+              animate={{
+                y: [90, -30],
+                x: [150, 130],
+                opacity: [0, 1, 0],
+              }}
+              transition={{ duration: 3.5, repeat: Infinity, delay: 1 }}
+            />
+          </>
+        )}
+      </div>
+      
+      <CardHeader className="relative pb-2">
+        <CardTitle className="flex items-center gap-3 text-lg">
+          <motion.div 
+            className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30"
+            animate={canClaim ? { scale: [1, 1.1, 1] } : {}}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <Zap className="h-5 w-5 text-cyan-400" />
+          </motion.div>
+          <div>
+            <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent font-bold">
+              Daily Zen Reward
+            </span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <Timer className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground font-normal">24h Cooldown</span>
+            </div>
           </div>
-          Daily Zen Reward
         </CardTitle>
-        <CardDescription>
-          Claim your free Zen every day!
-        </CardDescription>
       </CardHeader>
       
-      <CardContent className="relative space-y-4">
+      <CardContent className="relative space-y-4 pt-2">
         {loading ? (
           <div className="space-y-3">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
           </div>
         ) : error ? (
-          <div className="flex flex-col gap-2 p-3 bg-muted/50 border border-border rounded-lg">
+          <div className="flex flex-col gap-2 p-4 bg-muted/30 border border-border/50 rounded-xl">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <AlertCircle className="h-5 w-5" />
+              <AlertCircle className="h-5 w-5 text-amber-500" />
               <span className="text-sm font-medium">Coming Soon</span>
             </div>
             <p className="text-xs text-muted-foreground/80">
@@ -154,26 +210,57 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         ) : (
           <>
             {/* Reward amount display */}
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl border border-yellow-500/20">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-full bg-yellow-500/20">
-                  <Coins className="h-6 w-6 text-yellow-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Reward</p>
-                  <p className="text-xl font-bold text-yellow-500">
-                    {rewardAmount.toLocaleString()} Zen
-                  </p>
-                </div>
-              </div>
-              
-              {hasClaimed && (
-                <div className="flex items-center gap-1 text-green-500">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span className="text-sm font-medium">Claimed</span>
+            <motion.div 
+              className="relative p-4 rounded-xl border overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
+                borderColor: canClaim ? 'rgba(6, 182, 212, 0.4)' : 'rgba(6, 182, 212, 0.2)',
+              }}
+              animate={canClaim ? { borderColor: ['rgba(6, 182, 212, 0.4)', 'rgba(168, 85, 247, 0.4)', 'rgba(6, 182, 212, 0.4)'] } : {}}
+              transition={{ duration: 3, repeat: Infinity }}
+            >
+              {/* Progress bar background */}
+              {!canClaim && countdown > 0 && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted/50">
+                  <motion.div 
+                    className="h-full bg-gradient-to-r from-cyan-500 to-purple-500"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progressPercent}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
                 </div>
               )}
-            </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <motion.div 
+                    className="p-2.5 rounded-full bg-gradient-to-br from-cyan-500/30 to-purple-500/30"
+                    animate={canClaim ? { rotate: [0, 360] } : {}}
+                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Coins className="h-6 w-6 text-cyan-400" />
+                  </motion.div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Reward</p>
+                    <p className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                      {rewardAmount.toLocaleString()} <span className="text-lg">Zen</span>
+                    </p>
+                  </div>
+                </div>
+                
+                {hasClaimed && !canClaim && (
+                  <motion.div 
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/20 border border-green-500/30"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', bounce: 0.5 }}
+                  >
+                    <CheckCircle2 className="h-4 w-4 text-green-400" />
+                    <span className="text-xs font-medium text-green-400">Claimed</span>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
 
             {/* Claim button or countdown */}
             <AnimatePresence mode="wait">
@@ -185,12 +272,16 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
                   exit={{ opacity: 0, y: -10 }}
                 >
                   <Button
-                    className="w-full h-12 text-lg font-bold relative overflow-hidden group"
+                    className="w-full h-14 text-lg font-bold relative overflow-hidden bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 border-0 shadow-lg shadow-cyan-500/25"
                     onClick={handleClaim}
                     disabled={claiming}
                   >
-                    {/* Shimmer effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                    {/* Animated shine effect */}
+                    <motion.div 
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      animate={{ x: ['-100%', '100%'] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                    />
                     
                     {claiming ? (
                       <>
@@ -205,18 +296,23 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
                     )}
                   </Button>
                 </motion.div>
-              ) : hasClaimed ? (
+              ) : hasClaimed || countdown > 0 ? (
                 <motion.div
                   key="countdown"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="flex items-center justify-center gap-3 p-4 bg-muted/50 rounded-xl"
+                  className="flex items-center justify-center gap-4 p-4 bg-muted/30 rounded-xl border border-border/50"
                 >
-                  <Clock className="h-5 w-5 text-muted-foreground" />
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Clock className="h-6 w-6 text-cyan-400" />
+                  </motion.div>
                   <div className="text-center">
-                    <p className="text-sm text-muted-foreground">Next reward in</p>
-                    <p className="text-2xl font-mono font-bold text-primary">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Next reward in</p>
+                    <p className="text-3xl font-mono font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
                       {formatCountdown(countdown)}
                     </p>
                   </div>
@@ -228,27 +324,39 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
             <AnimatePresence>
               {showSuccess && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 flex items-center justify-center bg-background/90 backdrop-blur-md rounded-lg z-10"
                 >
                   <div className="text-center">
                     <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
                       transition={{ type: 'spring', bounce: 0.5 }}
                     >
-                      <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                      <div className="relative">
+                        <CheckCircle2 className="h-20 w-20 text-green-400 mx-auto" />
+                        <motion.div
+                          className="absolute inset-0"
+                          animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
+                          transition={{ duration: 1, repeat: Infinity }}
+                        >
+                          <CheckCircle2 className="h-20 w-20 text-green-400 mx-auto" />
+                        </motion.div>
+                      </div>
                     </motion.div>
-                    <motion.p
+                    <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="text-xl font-bold text-green-500"
+                      transition={{ delay: 0.3 }}
+                      className="mt-4"
                     >
-                      {rewardAmount.toLocaleString()} Zen Claimed!
-                    </motion.p>
+                      <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent">
+                        +{rewardAmount.toLocaleString()} Zen
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">Added to your account!</p>
+                    </motion.div>
                   </div>
                 </motion.div>
               )}

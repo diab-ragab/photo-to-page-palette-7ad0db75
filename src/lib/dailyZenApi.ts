@@ -14,8 +14,8 @@ interface DailyZenStatus {
   can_claim: boolean;
   has_claimed: boolean;
   reward_amount: number;
-  seconds_until_reset: number;
-  reset_time: string;
+  seconds_until_next_claim: number;
+  csrf_token?: string;
   error?: string;
 }
 
@@ -23,7 +23,7 @@ interface ClaimResult {
   success: boolean;
   message?: string;
   reward_amount?: number;
-  seconds_until_reset?: number;
+  seconds_until_next_claim?: number;
   error?: string;
 }
 
@@ -54,8 +54,7 @@ export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
       can_claim: false,
       has_claimed: false,
       reward_amount: 0,
-      seconds_until_reset: 0,
-      reset_time: '',
+      seconds_until_next_claim: 0,
       error: 'Not logged in',
     };
   }
@@ -76,8 +75,7 @@ export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
       can_claim: false,
       has_claimed: false,
       reward_amount: 0,
-      seconds_until_reset: 0,
-      reset_time: '',
+      seconds_until_next_claim: 0,
       error: 'Failed to check status',
     };
   }
