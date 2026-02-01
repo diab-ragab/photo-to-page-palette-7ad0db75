@@ -465,7 +465,7 @@ export function WebshopManager() {
                       <p className="text-xs text-muted-foreground">{product.description}</p>
                       <div className="flex items-center gap-3 mt-2 text-xs">
                         <Badge variant="outline">{product.category_name}</Badge>
-                        <span className="text-primary font-medium">€{product.price_real.toFixed(2)}</span>
+                        <span className="text-primary font-medium">€{Number(product.price_real).toFixed(2)}</span>
                         {product.stripe_payment_link && (
                           <Badge variant="secondary" className="text-xs">Stripe</Badge>
                         )}
@@ -519,7 +519,7 @@ export function WebshopManager() {
                       <Badge variant="outline">{product.category_name || "—"}</Badge>
                     </TableCell>
                     <TableCell className="text-primary font-medium">
-                      €{product.price_real.toFixed(2)}
+                      €{Number(product.price_real).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {product.item_id || "—"}
