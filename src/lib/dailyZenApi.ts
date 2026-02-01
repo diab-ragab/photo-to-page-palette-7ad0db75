@@ -2,10 +2,10 @@
  * Daily Zen Reward API Client
  * 
  * Handles device fingerprinting and secure API communication
- * for the daily Zen reward system.
+ * for the daily Zen reward system with enhanced anti-abuse.
  */
 
-import { generateFingerprint } from './fingerprint';
+import { generateFingerprint, getDetailedFingerprint } from './fingerprint';
 
 const API_BASE = 'https://woiendgame.online/api';
 
@@ -69,19 +69,31 @@ export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
 
 /**
  * Claim daily Zen reward
- * Generates browser fingerprint and sends to API
+ * Generates enhanced browser fingerprint with risk signals
  */
 export async function claimDailyZen(): Promise<ClaimResult> {
   try {
-    // Generate browser fingerprint
-    const fingerprint = await generateFingerprint();
+    // Get detailed fingerprint with risk assessment
+    const fingerprintData = await getDetailedFingerprint();
     
     const response = await fetch(`${API_BASE}/daily_zen.php`, {
       method: 'POST',
       headers: getAuthHeaders(),
       credentials: 'include',
       body: JSON.stringify({
-        fingerprint,
+        fingerprint: fingerprintData.hash,
+        // Send risk signals for server-side validation
+        signals: {
+          vm: fingerprintData.signals.isVM,
+          headless: fingerprintData.signals.isHeadless,
+          inconsistent: fingerprintData.signals.hasInconsistencies,
+          risk: fingerprintData.signals.riskScore,
+          indicators: fingerprintData.signals.vmIndicators,
+        },
+        // Additional browser data for validation
+        screen: `${screen.width}x${screen.height}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        languages: navigator.languages?.join(',') || navigator.language,
       }),
     });
     
