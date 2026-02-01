@@ -131,13 +131,21 @@ if (!$skipAuth) { requireAdmin($pdo); }
 
 // ---------- Tables (Simplified Schema) ----------
 function ensureTables($pdo) {
-    // Simplified products table: id, name, item_id, item_quantity
+    // Simplified products table: id, name, item_id, item_quantity, price_real
     $pdo->exec("CREATE TABLE IF NOT EXISTS webshop_products (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(200) NOT NULL,
         item_id INT NOT NULL DEFAULT 0,
-        item_quantity INT NOT NULL DEFAULT 1
+        item_quantity INT NOT NULL DEFAULT 1,
+        price_real DECIMAL(10,2) NOT NULL DEFAULT 0.00
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+
+    // Add price_real column if table already exists without it
+    try {
+        $pdo->exec("ALTER TABLE webshop_products ADD COLUMN price_real DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+    } catch (Exception $e) {
+        // Column already exists, ignore
+    }
 
     // Simplified orders table
     $pdo->exec("CREATE TABLE IF NOT EXISTS webshop_orders (
@@ -241,9 +249,10 @@ switch ($action) {
         $itemId = isset($input['item_id']) ? (int)$input['item_id'] : 0;
         $itemQty = isset($input['item_quantity']) ? (int)$input['item_quantity'] : 1;
         if ($itemQty < 1) $itemQty = 1;
+        $priceReal = isset($input['price_real']) ? (float)$input['price_real'] : 0;
 
-        $stmt = $pdo->prepare("INSERT INTO webshop_products (name, item_id, item_quantity) VALUES (?, ?, ?)");
-        $stmt->execute(array($name, $itemId, $itemQty));
+        $stmt = $pdo->prepare("INSERT INTO webshop_products (name, item_id, item_quantity, price_real) VALUES (?, ?, ?, ?)");
+        $stmt->execute(array($name, $itemId, $itemQty, $priceReal));
 
         json_response(array('success' => true, 'id' => (int)$pdo->lastInsertId(), 'message' => 'Product created'));
     }
@@ -270,6 +279,10 @@ switch ($action) {
             if ($qty < 1) $qty = 1;
             $updates[] = "item_quantity = ?";
             $params[] = $qty;
+        }
+        if (array_key_exists('price_real', $input)) {
+            $updates[] = "price_real = ?";
+            $params[] = (float)$input['price_real'];
         }
 
         if (!count($updates)) json_fail(400, 'No fields to update');
