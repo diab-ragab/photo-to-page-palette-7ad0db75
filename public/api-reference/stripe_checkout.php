@@ -127,13 +127,26 @@ try {
   $stmt = $pdo->prepare("SELECT user_id, expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
   $stmt->execute(array($token));
   $sess = $stmt->fetch(PDO::FETCH_ASSOC);
-  if (!$sess) failSC(401, 'Invalid session');
-if (strtotime($sess['expires_at']) <= time()) {
-  // extend session for checkout (24h)
-  $pdo->prepare("UPDATE user_sessions SET expires_at = DATE_ADD(NOW(), INTERVAL 24 HOUR) WHERE session_token = ?")
-      ->execute(array($token));
-}
+  
+  if (!$sess) {
+    error_log("RID={$rid} SESSION_NOT_FOUND token=" . substr($token, 0, 20) . "...");
+    failSC(401, 'Invalid session');
+  }
+  
   $userId = (int)$sess['user_id'];
+  error_log("RID={$rid} SESSION_FOUND user_id={$userId} expires=" . $sess['expires_at']);
+  
+  if ($userId <= 0) {
+    error_log("RID={$rid} INVALID_USER_ID session has user_id=0");
+    failSC(401, 'Invalid user session');
+  }
+  
+  if (strtotime($sess['expires_at']) <= time()) {
+    // extend session for checkout (24h)
+    $pdo->prepare("UPDATE user_sessions SET expires_at = DATE_ADD(NOW(), INTERVAL 24 HOUR) WHERE session_token = ?")
+        ->execute(array($token));
+    error_log("RID={$rid} SESSION_EXTENDED user={$userId}");
+  }
 } catch (Exception $e) {
   error_log("RID={$rid} SESSION_LOOKUP_FAIL=" . $e->getMessage());
   failSC(500, 'Server error');
@@ -245,6 +258,8 @@ try {
 
   // Create order for each item in cart
   $sessionIdStr = (string)$data['id'];
+  $ordersCreated = 0;
+  
   foreach ($safeItems as $item) {
     $productId = isset($item['id']) ? (int)$item['id'] : 0;
     $qty = isset($item['quantity']) ? (int)$item['quantity'] : 1;
@@ -257,9 +272,13 @@ try {
       VALUES (?, ?, ?, ?, 'pending', ?, NOW())
     ");
     $ins->execute(array($userId, $productId, $qty, $totalReal, $sessionIdStr));
+    $newOrderId = $pdo->lastInsertId();
+    $ordersCreated++;
+    
+    error_log("RID={$rid} ORDER_CREATED id={$newOrderId} user={$userId} product={$productId} qty={$qty} total={$totalReal}");
   }
   
-  error_log("RID={$rid} ORDERS_CREATED session={$sessionIdStr} user={$userId} items=" . count($safeItems));
+  error_log("RID={$rid} CHECKOUT_COMPLETE session={$sessionIdStr} user={$userId} orders_created={$ordersCreated}");
 } catch (Exception $e) {
   error_log("RID={$rid} ORDER_CREATE_ERR=" . $e->getMessage());
   // Don't fail - let webhook handle order creation as fallback
