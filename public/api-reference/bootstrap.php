@@ -3,6 +3,11 @@
 // Unified app config + getConfig() + CORS handler
 // PHP 5.x compatible
 
+// Load environment variables (Stripe keys, etc.)
+if (file_exists(__DIR__ . '/env.php')) {
+  require_once __DIR__ . '/env.php';
+}
+
 $APP_CONFIG = array(
   'db' => array(
     'host' => '192.168.1.88',
@@ -35,6 +40,14 @@ $APP_CONFIG = array(
   'security' => array(
     // Bootstrap admin IDs (users.ID)
     'admin_user_ids' => array(24),
+  ),
+
+  'stripe' => array(
+    'secret_key' => getenv('STRIPE_SECRET_KEY') ? getenv('STRIPE_SECRET_KEY') : '',
+    'webhook_secret' => getenv('STRIPE_WEBHOOK_SECRET') ? getenv('STRIPE_WEBHOOK_SECRET') : '',
+    'currency' => 'eur',
+    'success_url' => 'https://woiendgame.online/payment-success?session_id={CHECKOUT_SESSION_ID}',
+    'cancel_url' => 'https://woiendgame.online/cart',
   ),
 );
 
