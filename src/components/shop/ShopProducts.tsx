@@ -193,7 +193,7 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                   {/* Price */}
                   <div className="flex items-center justify-between">
                     <span className="text-2xl font-bold font-display text-primary">
-                      €{product.price_real.toFixed(2)}
+                      €{Number(product.price_real).toFixed(2)}
                     </span>
                     {product.price_zen > 0 && (
                       <span className="text-sm text-muted-foreground">
@@ -228,7 +228,7 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                       </Button>
                     </div>
                     <span className="text-sm font-medium text-muted-foreground">
-                      = €{(product.price_real * getQuantity(product.id)).toFixed(2)}
+                      = €{(Number(product.price_real) * getQuantity(product.id)).toFixed(2)}
                     </span>
                   </div>
 
