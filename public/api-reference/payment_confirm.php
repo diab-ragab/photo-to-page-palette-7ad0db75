@@ -209,8 +209,8 @@ if ($orderId > 0) {
 
 if (count($ordersToProcess) > 0) {
     foreach ($ordersToProcess as $oid) {
-        // Get order details
-        $stmt = $pdo->prepare("SELECT id, status, user_id, product_id, quantity FROM webshop_orders WHERE id = ? LIMIT 1");
+        // Get order details including character_id
+        $stmt = $pdo->prepare("SELECT id, status, user_id, product_id, quantity, character_id, character_name FROM webshop_orders WHERE id = ? LIMIT 1");
         $stmt->execute(array($oid));
         $order = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -249,15 +249,21 @@ if (count($ordersToProcess) > 0) {
             $userId = (int)$order['user_id'];
         }
         
+        // Get character ID from order
+        $characterId = isset($order['character_id']) ? (int)$order['character_id'] : 0;
+        $characterName = isset($order['character_name']) ? $order['character_name'] : '';
+        
         // Fulfill order - grant digital items
         $productId = isset($order['product_id']) ? (int)$order['product_id'] : 0;
         $quantity = isset($order['quantity']) ? (int)$order['quantity'] : 1;
         
-        if ($productId > 0 && $userId > 0) {
-            fulfillOrder($pdo, $userId, $productId, $quantity, $oid, $RID);
+        if ($productId > 0 && $characterId > 0) {
+            fulfillOrder($pdo, $userId, $productId, $quantity, $oid, $characterId, $characterName, $RID);
+        } else {
+            error_log("RID={$RID} FULFILL_SKIPPED order={$oid} product={$productId} character={$characterId}");
         }
         
-        error_log("RID={$RID} ORDER_COMPLETED order={$oid} user={$userId} product={$productId}");
+        error_log("RID={$RID} ORDER_COMPLETED order={$oid} user={$userId} product={$productId} character={$characterId} ({$characterName})");
         $orderId = $oid; // Keep last processed order ID for response
     }
 } else {
@@ -291,8 +297,8 @@ json_response(array(
  *   item_id = -2 => Coins (send via coins field, no item)
  *   item_id = -3 => EXP (send via exp field, no item)
  */
-function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
-    error_log("RID={$RID} FULFILL_START user={$userId} product={$productId} qty={$quantity} order={$orderId}");
+function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $characterId, $characterName, $RID) {
+    error_log("RID={$RID} FULFILL_START user={$userId} product={$productId} qty={$quantity} order={$orderId} char={$characterId} ({$characterName})");
     
     // Get product details
     $stmt = $pdo->prepare("SELECT * FROM webshop_products WHERE id = ? LIMIT 1");
@@ -311,12 +317,12 @@ function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
     
     error_log("RID={$RID} FULFILL_PRODUCT name={$productName} item_id={$itemId} item_qty={$itemQuantity} total_grant={$totalGrant}");
     
-    // Get user's character role ID
-    $roleId = getUserRoleId($pdo, $userId);
-    error_log("RID={$RID} FULFILL_ROLE_LOOKUP user={$userId} role_id={$roleId}");
+    // Use character_id from order (RoleID from basetab_sg)
+    $roleId = $characterId;
+    error_log("RID={$RID} FULFILL_ROLE character_id={$roleId} character_name={$characterName}");
     
     if ($roleId <= 0) {
-        error_log("RID={$RID} FULFILL_ERROR no_character user={$userId}");
+        error_log("RID={$RID} FULFILL_ERROR no_character order={$orderId} user={$userId}");
         storePendingDelivery($pdo, $orderId, $userId, $itemId, $totalGrant, $RID);
         return false;
     }

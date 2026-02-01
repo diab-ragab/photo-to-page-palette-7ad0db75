@@ -10,6 +10,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import { SEO } from "@/components/SEO";
+import { CharacterSelector } from "@/components/shop/CharacterSelector";
 
 const API_BASE = "https://woiendgame.online/api";
 
@@ -20,6 +21,13 @@ const Checkout = () => {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
+
+  const handleCharacterSelect = (roleId: number | null, characterName: string | null) => {
+    setSelectedRoleId(roleId);
+    setSelectedCharacterName(characterName);
+  };
 
   const handleCheckout = async () => {
     if (!isLoggedIn) {
@@ -29,6 +37,12 @@ const Checkout = () => {
 
     if (items.length === 0) {
       navigate('/cart');
+      return;
+    }
+
+    if (!selectedRoleId) {
+      toast.error("Please select a character to receive the items");
+      setError("Please select a character");
       return;
     }
 
@@ -54,7 +68,11 @@ const Checkout = () => {
           "Authorization": `Bearer ${token}`,
         },
         credentials: "include",
-        body: JSON.stringify({ items: cartItems }),
+        body: JSON.stringify({ 
+          items: cartItems,
+          character_id: selectedRoleId,
+          character_name: selectedCharacterName
+        }),
       });
 
       const data = await response.json();
@@ -138,6 +156,14 @@ const Checkout = () => {
                 </div>
               </div>
 
+              {/* Character Selection */}
+              <div className="border-t border-border pt-4">
+                <CharacterSelector 
+                  onSelect={handleCharacterSelect}
+                  selectedRoleId={selectedRoleId}
+                />
+              </div>
+
               {error && (
                 <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -145,7 +171,7 @@ const Checkout = () => {
                 </div>
               )}
 
-              <Button 
+              <Button
                 onClick={handleCheckout}
                 className="w-full gap-2" 
                 size="lg" 

@@ -112,6 +112,14 @@ if (is_string($raw) && $raw !== '') {
 $items = isset($payload['items']) && is_array($payload['items']) ? $payload['items'] : array();
 if (count($items) < 1) failSC(400, 'Cart items required');
 
+// Get selected character for delivery
+$characterId = isset($payload['character_id']) ? (int)$payload['character_id'] : 0;
+$characterName = isset($payload['character_name']) ? trim((string)$payload['character_name']) : '';
+
+if ($characterId <= 0) {
+  failSC(400, 'Please select a character to receive the items');
+}
+
 // ---------- auth user via session token ----------
 $token = getBearerTokenSC();
 if ($token === '') failSC(401, 'Missing session token');
@@ -234,12 +242,14 @@ if ($code < 200 || $code >= 300 || !is_array($data) || !isset($data['url'])) {
 
 // Create order records in webshop_orders for each item
 try {
-  // Ensure webshop_orders table exists
+  // Ensure webshop_orders table has character_id column
   $pdo->exec("CREATE TABLE IF NOT EXISTS webshop_orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     product_id INT NOT NULL,
     quantity INT NOT NULL DEFAULT 1,
+    character_id INT NOT NULL DEFAULT 0,
+    character_name VARCHAR(50) DEFAULT NULL,
     total_coins INT NOT NULL DEFAULT 0,
     total_vip INT NOT NULL DEFAULT 0,
     total_zen INT NOT NULL DEFAULT 0,
@@ -256,6 +266,18 @@ try {
     INDEX idx_created_at (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 
+  // Migration: add character_id column if missing
+  try {
+    $pdo->exec("ALTER TABLE webshop_orders ADD COLUMN character_id INT NOT NULL DEFAULT 0 AFTER quantity");
+  } catch (Exception $e) {
+    // Column already exists
+  }
+  try {
+    $pdo->exec("ALTER TABLE webshop_orders ADD COLUMN character_name VARCHAR(50) DEFAULT NULL AFTER character_id");
+  } catch (Exception $e) {
+    // Column already exists
+  }
+
   // Create order for each item in cart
   $sessionIdStr = (string)$data['id'];
   $ordersCreated = 0;
@@ -268,12 +290,14 @@ try {
     
     $ins = $pdo->prepare("
       INSERT INTO webshop_orders 
-      (user_id, product_id, quantity, total_real, status, stripe_session_id, created_at)
-      VALUES (?, ?, ?, ?, 'pending', ?, NOW())
+      (user_id, product_id, quantity, character_id, character_name, total_real, status, stripe_session_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, NOW())
     ");
-    $ins->execute(array($userId, $productId, $qty, $totalReal, $sessionIdStr));
+    $ins->execute(array($userId, $productId, $qty, $characterId, $characterName, $totalReal, $sessionIdStr));
     $newOrderId = $pdo->lastInsertId();
     $ordersCreated++;
+    
+    error_log("RID={$rid} ORDER_CREATED id={$newOrderId} user={$userId} product={$productId} qty={$qty} char={$characterId} ({$characterName}) total={$totalReal}");
     
     error_log("RID={$rid} ORDER_CREATED id={$newOrderId} user={$userId} product={$productId} qty={$qty} total={$totalReal}");
   }
