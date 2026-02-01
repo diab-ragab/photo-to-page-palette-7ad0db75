@@ -484,4 +484,38 @@ if ($action === 'list_orders') {
     ]);
 }
 
+// ============ UPDATE ORDER STATUS ============
+if ($action === 'update_order' && $method === 'POST') {
+    $id = (int)($input['id'] ?? 0);
+    $status = $input['status'] ?? '';
+    
+    if ($id <= 0) {
+        json_fail(400, 'Invalid order ID');
+    }
+    
+    if (!in_array($status, ['pending', 'completed', 'failed', 'refunded'])) {
+        json_fail(400, 'Invalid status');
+    }
+    
+    // Build update query
+    $deliveredAt = null;
+    if ($status === 'completed') {
+        $deliveredAt = date('Y-m-d H:i:s');
+    }
+    
+    if ($deliveredAt) {
+        $stmt = $pdo->prepare("UPDATE webshop_orders SET status = ?, delivered_at = ? WHERE id = ?");
+        $stmt->execute([$status, $deliveredAt, $id]);
+    } else {
+        $stmt = $pdo->prepare("UPDATE webshop_orders SET status = ? WHERE id = ?");
+        $stmt->execute([$status, $id]);
+    }
+    
+    if ($stmt->rowCount() === 0) {
+        json_fail(404, 'Order not found');
+    }
+    
+    json_response(['success' => true, 'message' => 'Order status updated']);
+}
+
 json_fail(400, 'Invalid action');
