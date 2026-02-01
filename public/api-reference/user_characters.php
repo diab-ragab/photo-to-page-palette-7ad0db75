@@ -101,17 +101,17 @@ try {
     $stmt->execute(array($accountId));
     $characters = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Map profession IDs to names (adjust based on your game)
+    // Map profession IDs to class names (based on game data)
     $professionNames = array(
-        0 => 'Warrior',
-        1 => 'Mage',
-        2 => 'Ranger',
-        3 => 'Assassin',
-        4 => 'Priest',
-        5 => 'Paladin',
-        6 => 'Warlock',
-        7 => 'Berserker',
-        8 => 'Monk'
+        0 => 'Berzerker',
+        1 => 'Magus',
+        2 => 'Champion',
+        3 => 'Heretic',
+        4 => 'Slayer',
+        5 => 'Duelist',
+        6 => 'Ranger',
+        7 => 'Enchantress',
+        8 => 'Harbinger'
     );
     
     $result = array();
