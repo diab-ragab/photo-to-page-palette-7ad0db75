@@ -8,6 +8,7 @@
  */
 
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/mail_delivery.php';
 handleCors(array('POST', 'OPTIONS'));
 
 $RID = bin2hex(random_bytes(6));
@@ -264,8 +265,6 @@ json_response(array(
 ));
 
 // ============ FULFILLMENT FUNCTIONS ============
-
-require_once __DIR__ . '/mail_delivery.php';
 
 function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
     // Get product details
