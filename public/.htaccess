@@ -2,49 +2,52 @@
 # WOI Endgame - Full .htaccess
 # =========================
 
-# Enable RewriteEngine
-RewriteEngine On
-RewriteBase /
+# Force RewriteEngine
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # =========================
+    # HTTPS Redirect (use 307 to preserve POST body)
+    # =========================
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=307,L]
+
+    # =========================
+    # Handle OPTIONS preflight for API paths
+    # =========================
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^api(/|$) - [L]
+
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^api-reference(/|$) - [L]
+
+    # =========================
+    # Never rewrite API paths - let PHP handle them
+    # =========================
+    RewriteRule ^api(/|$) - [L]
+    RewriteRule ^api-reference(/|$) - [L]
+
+    # =========================
+    # Serve real files and directories
+    # =========================
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # =========================
+    # SPA fallback (React Router)
+    # All other routes go to index.html
+    # =========================
+    RewriteRule ^.*$ index.html [L]
+</IfModule>
 
 # =========================
-# HTTPS Redirect (use 307 to preserve POST body)
+# Fallback if mod_rewrite is not available
 # =========================
-RewriteCond %{HTTPS} off
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=307,L]
-
-# =========================
-# CORS is handled by PHP (bootstrap.php)
-# Don't add CORS headers here
-# =========================
-
-# =========================
-# Handle OPTIONS preflight for /api/ paths
-# Let PHP handle the full response
-# =========================
-RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^api(/|$) - [L]
-
-RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^api-reference(/|$) - [L]
-
-# =========================
-# Never rewrite API paths - let PHP handle them
-# =========================
-RewriteRule ^api(/|$) - [L]
-RewriteRule ^api-reference(/|$) - [L]
-
-# =========================
-# Serve real files and directories
-# =========================
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
-
-# =========================
-# SPA fallback (React Router)
-# All other routes go to index.html
-# =========================
-RewriteRule ^ index.html [L]
+<IfModule !mod_rewrite.c>
+    ErrorDocument 404 /index.html
+</IfModule>
 
 # =========================
 # Security: Block access to sensitive files
