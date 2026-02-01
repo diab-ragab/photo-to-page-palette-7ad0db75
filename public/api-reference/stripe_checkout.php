@@ -219,28 +219,50 @@ if ($code < 200 || $code >= 300 || !is_array($data) || !isset($data['url'])) {
   failSC(502, 'Payment provider error');
 }
 
-// Optional: store pending order record (best-effort; works even if table not created yet)
+// Create order records in webshop_orders for each item
 try {
-  $pdo->exec("CREATE TABLE IF NOT EXISTS stripe_orders (
+  // Ensure webshop_orders table exists
+  $pdo->exec("CREATE TABLE IF NOT EXISTS webshop_orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    session_id VARCHAR(255) NOT NULL,
-    status VARCHAR(30) NOT NULL DEFAULT 'pending',
-    currency VARCHAR(10) NOT NULL,
-    amount_total INT NOT NULL DEFAULT 0,
-    raw_items TEXT NULL,
-    created_at DATETIME NULL,
-    updated_at DATETIME NULL,
-    UNIQUE KEY uniq_session (session_id),
-    KEY idx_user (user_id),
-    KEY idx_status (status)
+    product_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    total_coins INT NOT NULL DEFAULT 0,
+    total_vip INT NOT NULL DEFAULT 0,
+    total_zen INT NOT NULL DEFAULT 0,
+    total_real DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    status ENUM('pending', 'completed', 'failed', 'refunded') NOT NULL DEFAULT 'pending',
+    stripe_session_id VARCHAR(255) DEFAULT NULL,
+    stripe_payment_intent VARCHAR(255) DEFAULT NULL,
+    delivered_at DATETIME DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    INDEX idx_user_id (user_id),
+    INDEX idx_status (status),
+    INDEX idx_session (stripe_session_id),
+    INDEX idx_created_at (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 
-  $ins = $pdo->prepare("INSERT IGNORE INTO stripe_orders (user_id, session_id, status, currency, amount_total, raw_items, created_at, updated_at)
-                        VALUES (?, ?, 'pending', ?, 0, ?, NOW(), NOW())");
-  $ins->execute(array($userId, (string)$data['id'], $currency, json_encode($safeItems)));
+  // Create order for each item in cart
+  $sessionIdStr = (string)$data['id'];
+  foreach ($safeItems as $item) {
+    $productId = isset($item['id']) ? (int)$item['id'] : 0;
+    $qty = isset($item['quantity']) ? (int)$item['quantity'] : 1;
+    $price = isset($item['price']) ? (float)$item['price'] : 0;
+    $totalReal = $price * $qty;
+    
+    $ins = $pdo->prepare("
+      INSERT INTO webshop_orders 
+      (user_id, product_id, quantity, total_real, status, stripe_session_id, created_at)
+      VALUES (?, ?, ?, ?, 'pending', ?, NOW())
+    ");
+    $ins->execute(array($userId, $productId, $qty, $totalReal, $sessionIdStr));
+  }
+  
+  error_log("RID={$rid} ORDERS_CREATED session={$sessionIdStr} user={$userId} items=" . count($safeItems));
 } catch (Exception $e) {
-  // ignore
+  error_log("RID={$rid} ORDER_CREATE_ERR=" . $e->getMessage());
+  // Don't fail - let webhook handle order creation as fallback
 }
 
 jsonOutSC(array('success' => true, 'url' => (string)$data['url'], 'session_id' => (string)$data['id']));

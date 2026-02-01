@@ -101,17 +101,17 @@ if (!empty($sessionId) && strpos($sessionId, 'cs_') === 0) {
             $paymentIntentId = $sessionData['payment_intent'];
             error_log("RID={$RID} SESSION_TO_PI session={$sessionId} pi={$paymentIntentId}");
         }
-        // Also try to get order from stripe_orders table
+        // Try to find order(s) by session_id in webshop_orders
         if ($orderId <= 0) {
-            $stmt = $pdo->prepare("SELECT id FROM stripe_orders WHERE session_id = ? LIMIT 1");
+            $stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE stripe_session_id = ? AND status = 'pending' ORDER BY id ASC LIMIT 1");
             $stmt->execute(array($sessionId));
-            $stripeOrder = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($stripeOrder) {
-                $orderId = (int)$stripeOrder['id'];
+            $webshopOrder = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($webshopOrder) {
+                $orderId = (int)$webshopOrder['id'];
+                error_log("RID={$RID} FOUND_ORDER_BY_SESSION session={$sessionId} order={$orderId}");
             }
         }
     }
-}
 
 if (empty($paymentIntentId)) {
     json_fail(400, 'Payment intent ID required');
@@ -185,22 +185,32 @@ if ($orderId <= 0 && isset($metadata['order_id'])) {
 // Get user ID from metadata
 $userId = isset($metadata['user_id']) ? (int)$metadata['user_id'] : 0;
 
-// If we have an order, update it
+// Try to find all orders by session_id if no specific order found
+$ordersToProcess = array();
+
 if ($orderId > 0) {
-    // Check if already processed
-    $stmt = $pdo->prepare("SELECT id, status, user_id, product_id, quantity FROM webshop_orders WHERE id = ? LIMIT 1");
-    $stmt->execute(array($orderId));
-    $order = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($order) {
+    $ordersToProcess[] = $orderId;
+} else if (!empty($sessionId)) {
+    // Find all pending orders for this session
+    $stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE stripe_session_id = ? AND status = 'pending'");
+    $stmt->execute(array($sessionId));
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $ordersToProcess[] = (int)$row['id'];
+    }
+}
+
+if (count($ordersToProcess) > 0) {
+    foreach ($ordersToProcess as $oid) {
+        // Get order details
+        $stmt = $pdo->prepare("SELECT id, status, user_id, product_id, quantity FROM webshop_orders WHERE id = ? LIMIT 1");
+        $stmt->execute(array($oid));
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$order) continue;
+        
         if ($order['status'] === 'completed') {
-            // Already processed, return success
-            json_response(array(
-                'success' => true,
-                'status' => 'already_completed',
-                'message' => 'Order already fulfilled',
-                'order_id' => $orderId,
-            ));
+            // Already processed
+            continue;
         }
         
         // Mark order as completed
@@ -208,10 +218,11 @@ if ($orderId > 0) {
             UPDATE webshop_orders 
             SET status = 'completed', 
                 stripe_payment_intent = ?,
-                delivered_at = NOW()
+                delivered_at = NOW(),
+                updated_at = NOW()
             WHERE id = ?
         ");
-        $stmt->execute(array($paymentIntentId, $orderId));
+        $stmt->execute(array($paymentIntentId, $oid));
         
         // Get user ID from order if not in metadata
         if ($userId <= 0 && isset($order['user_id'])) {
@@ -223,24 +234,25 @@ if ($orderId > 0) {
         $quantity = isset($order['quantity']) ? (int)$order['quantity'] : 1;
         
         if ($productId > 0 && $userId > 0) {
-            fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID);
+            fulfillOrder($pdo, $userId, $productId, $quantity, $oid, $RID);
         }
         
-        error_log("RID={$RID} ORDER_COMPLETED order={$orderId} user={$userId} product={$productId}");
+        error_log("RID={$RID} ORDER_COMPLETED order={$oid} user={$userId} product={$productId}");
+        $orderId = $oid; // Keep last processed order ID for response
     }
 } else {
-    // No order ID - create a new order record
+    // No orders found - create a fallback order record
     $totalReal = $amount / 100; // Convert cents to currency
     
     $stmt = $pdo->prepare("
         INSERT INTO webshop_orders 
-        (user_id, product_id, quantity, total_real, status, stripe_payment_intent, delivered_at, created_at)
-        VALUES (?, 0, 1, ?, 'completed', ?, NOW(), NOW())
+        (user_id, product_id, quantity, total_real, status, stripe_session_id, stripe_payment_intent, delivered_at, created_at)
+        VALUES (?, 0, 1, ?, 'completed', ?, ?, NOW(), NOW())
     ");
-    $stmt->execute(array($userId, $totalReal, $paymentIntentId));
+    $stmt->execute(array($userId, $totalReal, $sessionId, $paymentIntentId));
     $orderId = $pdo->lastInsertId();
     
-    error_log("RID={$RID} NEW_ORDER_CREATED order={$orderId} amount={$totalReal} pi={$paymentIntentId}");
+    error_log("RID={$RID} FALLBACK_ORDER_CREATED order={$orderId} amount={$totalReal} pi={$paymentIntentId}");
 }
 
 json_response(array(
