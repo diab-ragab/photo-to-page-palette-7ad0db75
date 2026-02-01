@@ -22,7 +22,6 @@ import {
   Euro,
   Tag,
   Image as ImageIcon,
-  Link as LinkIcon,
   RefreshCw
 } from "lucide-react";
 import {
@@ -47,7 +46,6 @@ interface ProductFormData {
   price_zen: number;
   price_real: number;
   image_url: string;
-  stripe_payment_link: string;
   is_active: boolean;
   is_featured: boolean;
   stock: number;
@@ -64,7 +62,6 @@ const defaultProduct: ProductFormData = {
   price_zen: 0,
   price_real: 0,
   image_url: "",
-  stripe_payment_link: "",
   is_active: true,
   is_featured: false,
   stock: -1,
@@ -216,20 +213,6 @@ const ProductFormContent = ({
       />
     </div>
 
-    <div>
-      <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-        <LinkIcon className="h-3 w-3" /> Stripe Payment Link
-      </label>
-      <Input
-        value={editData.stripe_payment_link}
-        onChange={(e) => setEditData(prev => ({ ...prev, stripe_payment_link: e.target.value }))}
-        placeholder="https://buy.stripe.com/..."
-      />
-      <p className="text-xs text-muted-foreground mt-1">
-        Create payment links at dashboard.stripe.com → Payment Links
-      </p>
-    </div>
-
     <div className="flex items-center justify-between p-3 rounded-lg border">
       <span className="text-sm font-medium">Active</span>
       <Switch
@@ -315,9 +298,8 @@ export function WebshopManager() {
       price_coins: product.price_coins,
       price_vip: product.price_vip,
       price_zen: product.price_zen,
-      price_real: product.price_real,
+      price_real: typeof product.price_real === 'string' ? parseFloat(product.price_real) : product.price_real,
       image_url: product.image_url || "",
-      stripe_payment_link: product.stripe_payment_link || "",
       is_active: product.is_active,
       is_featured: product.is_featured,
       stock: product.stock,
@@ -424,7 +406,7 @@ export function WebshopManager() {
                 Webshop Products
               </CardTitle>
               <CardDescription>
-                Manage shop items, pricing, and Stripe payment links
+                Manage shop items and pricing
               </CardDescription>
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -485,9 +467,6 @@ export function WebshopManager() {
                       <div className="flex items-center gap-3 mt-2 text-xs">
                         <Badge variant="outline">{product.category_name}</Badge>
                         <span className="text-primary font-medium">€{Number(product.price_real).toFixed(2)}</span>
-                        {product.stripe_payment_link && (
-                          <Badge variant="secondary" className="text-xs">Stripe</Badge>
-                        )}
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -520,7 +499,6 @@ export function WebshopManager() {
                   <TableHead>Category</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Item ID</TableHead>
-                  <TableHead>Stripe</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
@@ -542,13 +520,6 @@ export function WebshopManager() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {product.item_id || "—"}
-                    </TableCell>
-                    <TableCell>
-                      {product.stripe_payment_link ? (
-                        <Badge variant="secondary">Linked</Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">—</span>
-                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant={product.is_active ? "default" : "secondary"}>

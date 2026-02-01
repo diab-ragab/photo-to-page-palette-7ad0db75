@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ShoppingCart, Sparkles, Star, Minus, Plus, ExternalLink } from "lucide-react";
+import { ShoppingCart, Star, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -84,26 +84,21 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
 
   const handleAddToCart = (product: WebshopProduct) => {
     const qty = getQuantity(product.id);
+    const price = typeof product.price_real === 'string' 
+      ? parseFloat(product.price_real) 
+      : product.price_real;
     addToCart({
       id: String(product.id),
       name: product.name,
       description: product.description,
-      price: product.price_real,
+      price: price,
       image: product.image_url || "📦",
       rarity: product.is_featured ? "legendary" : undefined,
     }, qty);
     toast.success(`${product.name} added to cart!`, {
-      description: `${qty}x €${product.price_real.toFixed(2)}`,
+      description: `${qty}x €${price.toFixed(2)}`,
     });
     setQuantities(prev => ({ ...prev, [product.id]: 1 }));
-  };
-
-  const handleBuyNow = (product: WebshopProduct) => {
-    if (product.stripe_payment_link) {
-      window.open(product.stripe_payment_link, "_blank");
-    } else {
-      handleAddToCart(product);
-    }
   };
 
   const getProductEmoji = (product: WebshopProduct): string => {
@@ -235,20 +230,11 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                   {/* Buy button */}
                   <Button 
                     className="w-full gap-2" 
-                    onClick={() => handleBuyNow(product)}
+                    onClick={() => handleAddToCart(product)}
                     disabled={product.stock === 0}
                   >
-                    {product.stripe_payment_link ? (
-                      <>
-                        <ExternalLink className="w-4 h-4" />
-                        Buy Now
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart className="w-4 h-4" />
-                        Add to Cart
-                      </>
-                    )}
+                    <ShoppingCart className="w-4 h-4" />
+                    Add to Cart
                   </Button>
                 </div>
               </div>

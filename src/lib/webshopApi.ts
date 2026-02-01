@@ -29,7 +29,6 @@ export interface WebshopProduct {
   is_featured: boolean;
   is_active: boolean;
   stock: number;
-  stripe_payment_link?: string;
   created_at?: string;
   updated_at?: string;
 }
