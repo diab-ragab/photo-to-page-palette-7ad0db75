@@ -5,18 +5,13 @@
  * POST /api/payment_confirm.php
  * Body: { paymentIntentId: string, orderId?: number }
  * Returns: { success: true, status: string }
- * 
- * Security:
- * - Verifies payment status with Stripe
- * - Only marks order as paid if Stripe confirms success
- * - Rate limiting per IP
  */
 
-ini_set('display_errors', '0');
-ini_set('log_errors', '1');
-error_reporting(E_ALL);
+require_once __DIR__ . '/bootstrap.php';
+handleCors(array('POST', 'OPTIONS'));
 
 $RID = bin2hex(random_bytes(6));
+$cfg = getConfig();
 
 function json_response($data) {
     global $RID;
@@ -36,41 +31,12 @@ function json_fail($code, $msg) {
     exit;
 }
 
-// CORS headers
-$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
-$allowed = array('https://woiendgame.lovable.app', 'https://woiendgame.online', 'http://localhost:5173', 'http://localhost:8080');
-if (in_array($origin, $allowed)) {
-    header('Access-Control-Allow-Origin: ' . $origin);
-} else {
-    header('Access-Control-Allow-Origin: https://woiendgame.lovable.app');
-}
-header('Access-Control-Allow-Credentials: true');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Session-Token, X-CSRF-Token');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_fail(405, 'Method not allowed');
 }
 
-// Database connection
-$DBHost     = getenv('DB_HOST') ? getenv('DB_HOST') : '192.168.1.88';
-$DBUser     = getenv('DB_USER') ? getenv('DB_USER') : 'root';
-$DBPassword = getenv('DB_PASS') ? getenv('DB_PASS') : 'root';
-$DBName     = getenv('DB_NAME') ? getenv('DB_NAME') : 'shengui';
-
-try {
-    $pdo = new PDO("mysql:host={$DBHost};dbname={$DBName};charset=utf8", $DBUser, $DBPassword, array(
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ));
-} catch (PDOException $e) {
-    json_fail(503, 'Service temporarily unavailable');
-}
+// Get database connection
+$pdo = getDB();
 
 // Rate limiting check
 $clientIP = isset($_SERVER['HTTP_X_FORWARDED_FOR']) 
@@ -110,15 +76,8 @@ if (strpos($paymentIntentId, 'pi_') !== 0) {
     json_fail(400, 'Invalid payment intent ID');
 }
 
-// Load Stripe secret key
-$configPath = __DIR__ . '/stripe_config.php';
-if (file_exists($configPath)) {
-    require_once $configPath;
-}
-
-$stripeSecretKey = defined('STRIPE_SECRET_KEY') 
-    ? STRIPE_SECRET_KEY 
-    : (getenv('STRIPE_SECRET_KEY') ? getenv('STRIPE_SECRET_KEY') : '');
+// Get Stripe secret key from config
+$stripeSecretKey = isset($cfg['stripe']['secret_key']) ? $cfg['stripe']['secret_key'] : '';
 
 if (empty($stripeSecretKey)) {
     error_log("RID={$RID} STRIPE_SECRET_KEY not configured");
@@ -261,9 +220,6 @@ function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
     $itemQuantity = isset($product['item_quantity']) ? (int)$product['item_quantity'] : 1;
     $totalGrant = $itemQuantity * $quantity;
     
-    // Example: If item_id represents currency type
-    // item_id = 1 = Zen, item_id = 2 = Coins, item_id = 3 = VIP Points, etc.
-    
     // Ensure user_currency table exists
     $pdo->exec("CREATE TABLE IF NOT EXISTS user_currency (
         user_id INT PRIMARY KEY,
@@ -299,7 +255,7 @@ function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
             break;
             
         default:
-            // Generic item - log for manual processing or game server integration
+            // Generic item - log for manual processing
             error_log("RID={$RID} ITEM_GRANT_PENDING user={$userId} item={$itemId} qty={$totalGrant} order={$orderId}");
             
             // Create pending delivery record
