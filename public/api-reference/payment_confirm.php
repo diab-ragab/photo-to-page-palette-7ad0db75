@@ -65,16 +65,8 @@ if (!$body) {
 }
 
 $paymentIntentId = isset($body['paymentIntentId']) ? trim($body['paymentIntentId']) : '';
+$sessionId = isset($body['sessionId']) ? trim($body['sessionId']) : '';
 $orderId = isset($body['orderId']) ? (int)$body['orderId'] : 0;
-
-if (empty($paymentIntentId)) {
-    json_fail(400, 'Payment intent ID required');
-}
-
-// Validate payment intent ID format
-if (strpos($paymentIntentId, 'pi_') !== 0) {
-    json_fail(400, 'Invalid payment intent ID');
-}
 
 // Get Stripe secret key from config
 $stripeSecretKey = isset($cfg['stripe']['secret_key']) ? $cfg['stripe']['secret_key'] : '';
@@ -84,24 +76,80 @@ if (empty($stripeSecretKey)) {
     json_fail(500, 'Payment system not configured');
 }
 
+// If we have a sessionId (from Stripe Checkout), retrieve the session to get payment_intent
+if (!empty($sessionId) && strpos($sessionId, 'cs_') === 0) {
+    $sessionUrl = 'https://api.stripe.com/v1/checkout/sessions/' . urlencode($sessionId);
+    
+    $opts = array(
+        'http' => array(
+            'method' => 'GET',
+            'header' => 'Authorization: Bearer ' . $stripeSecretKey,
+            'timeout' => 30,
+            'ignore_errors' => true,
+        ),
+        'ssl' => array(
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+        ),
+    );
+    $context = stream_context_create($opts);
+    $sessionResp = @file_get_contents($sessionUrl, false, $context);
+    
+    if ($sessionResp) {
+        $sessionData = json_decode($sessionResp, true);
+        if (isset($sessionData['payment_intent'])) {
+            $paymentIntentId = $sessionData['payment_intent'];
+            error_log("RID={$RID} SESSION_TO_PI session={$sessionId} pi={$paymentIntentId}");
+        }
+        // Also try to get order from stripe_orders table
+        if ($orderId <= 0) {
+            $stmt = $pdo->prepare("SELECT id FROM stripe_orders WHERE session_id = ? LIMIT 1");
+            $stmt->execute(array($sessionId));
+            $stripeOrder = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($stripeOrder) {
+                $orderId = (int)$stripeOrder['id'];
+            }
+        }
+    }
+}
+
+if (empty($paymentIntentId)) {
+    json_fail(400, 'Payment intent ID required');
+}
+
+// Validate payment intent ID format
+if (strpos($paymentIntentId, 'pi_') !== 0) {
+    json_fail(400, 'Invalid payment intent ID format');
+}
+
 // Retrieve PaymentIntent from Stripe
 $stripeUrl = 'https://api.stripe.com/v1/payment_intents/' . urlencode($paymentIntentId);
 
-$ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, $stripeUrl);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-    'Authorization: Basic ' . base64_encode($stripeSecretKey . ':'),
-));
-curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+$opts = array(
+    'http' => array(
+        'method' => 'GET',
+        'header' => 'Authorization: Bearer ' . $stripeSecretKey,
+        'timeout' => 30,
+        'ignore_errors' => true,
+    ),
+    'ssl' => array(
+        'verify_peer' => true,
+        'verify_peer_name' => true,
+    ),
+);
+$context = stream_context_create($opts);
+$response = @file_get_contents($stripeUrl, false, $context);
 
-$response = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$curlError = curl_error($ch);
-curl_close($ch);
+// Parse HTTP response code from headers
+$httpCode = 0;
+if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
+    if (preg_match('/HTTP\/\d+\.?\d*\s+(\d+)/', $http_response_header[0], $m)) {
+        $httpCode = (int)$m[1];
+    }
+}
 
-if ($curlError) {
-    error_log("RID={$RID} STRIPE_CURL_ERROR: {$curlError}");
+if ($response === false) {
+    error_log("RID={$RID} STRIPE_REQUEST_FAILED");
     json_fail(502, 'Payment service unavailable');
 }
 
@@ -151,7 +199,7 @@ if ($orderId > 0) {
                 'success' => true,
                 'status' => 'already_completed',
                 'message' => 'Order already fulfilled',
-                'orderId' => $orderId,
+                'order_id' => $orderId,
             ));
         }
         
@@ -199,7 +247,7 @@ json_response(array(
     'success' => true,
     'status' => 'succeeded',
     'message' => 'Payment confirmed and order fulfilled',
-    'orderId' => $orderId,
+    'order_id' => $orderId,
 ));
 
 // ============ FULFILLMENT FUNCTIONS ============
