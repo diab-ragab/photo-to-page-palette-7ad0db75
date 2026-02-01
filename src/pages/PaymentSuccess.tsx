@@ -3,10 +3,11 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { motion } from "framer-motion";
-import { CheckCircle, ShoppingBag, Home } from "lucide-react";
+import { CheckCircle, ShoppingBag, Home, Package } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/SEO";
 import { useEffect, useState } from "react";
+import { useCart } from "@/contexts/CartContext";
 
 const API_BASE = "https://woiendgame.online/api";
 
@@ -15,13 +16,20 @@ const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [orderDetails, setOrderDetails] = useState<{
+    orderId?: string;
+    items?: string[];
+  } | null>(null);
+  const { clearCart } = useCart();
 
-  // Handle redirect from Stripe with payment_intent in URL
+  // Handle redirect from Stripe with session_id in URL
   useEffect(() => {
+    const sessionId = searchParams.get('session_id');
     const paymentIntent = searchParams.get('payment_intent');
     const redirectStatus = searchParams.get('redirect_status');
 
-    if (paymentIntent && redirectStatus === 'succeeded' && !confirmed) {
+    // If we have a session_id or successful payment_intent
+    if ((sessionId || (paymentIntent && redirectStatus === 'succeeded')) && !confirmed) {
       setIsConfirming(true);
       
       // Confirm with backend
@@ -29,26 +37,35 @@ const PaymentSuccess = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ paymentIntentId: paymentIntent }),
+        body: JSON.stringify({ 
+          sessionId: sessionId,
+          paymentIntentId: paymentIntent 
+        }),
       })
         .then(res => res.json())
         .then(data => {
           console.log("Payment confirmed:", data);
           setConfirmed(true);
+          // Clear cart after successful payment
+          clearCart();
+          if (data.order_id) {
+            setOrderDetails({ orderId: data.order_id });
+          }
         })
         .catch(err => {
           console.error("Confirmation error:", err);
           // Still show success - webhook handles fulfillment
           setConfirmed(true);
+          clearCart();
         })
         .finally(() => {
           setIsConfirming(false);
         });
-    } else if (!paymentIntent) {
+    } else if (!sessionId && !paymentIntent) {
       // Direct navigation without Stripe redirect
       setConfirmed(true);
     }
-  }, [searchParams, confirmed]);
+  }, [searchParams, confirmed, clearCart]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -92,11 +109,23 @@ const PaymentSuccess = () => {
                   {t('checkout.success') || 'Payment Successful!'}
                 </h1>
                 
-                <p className="text-muted-foreground mb-8">
+                <p className="text-muted-foreground mb-4">
                   Thank you for your purchase! Your items will be delivered to your account shortly.
                 </p>
 
+                {orderDetails?.orderId && (
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Order ID: <span className="font-mono text-foreground">{orderDetails.orderId}</span>
+                  </p>
+                )}
+
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button asChild variant="outline" className="gap-2">
+                    <Link to="/dashboard">
+                      <Package className="w-4 h-4" />
+                      View Orders
+                    </Link>
+                  </Button>
                   <Button asChild variant="outline" className="gap-2">
                     <Link to="/shop">
                       <ShoppingBag className="w-4 h-4" />
