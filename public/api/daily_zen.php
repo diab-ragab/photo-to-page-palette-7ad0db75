@@ -274,7 +274,7 @@ function sendZenReward($mysqli, $username, $amount) {
 
   if (!$userid) return array('success'=>false,'error'=>'Account not found');
 
-  $zoneid = 0; $sn = 0; $aid = 1; $point = 0; $cash = (int)$amount; $status = 1;
+  $zoneid = 1; $sn = -1; $aid = 1; $point = 0; $cash = (int)$amount; $status = 0;
 
   $stmt = $mysqli->prepare("CALL usecash(?, ?, ?, ?, ?, ?, ?, @p_error)");
   $stmt->bind_param("iiiiiii", $userid, $zoneid, $sn, $aid, $point, $cash, $status);
