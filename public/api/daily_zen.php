@@ -15,7 +15,7 @@
  */
 
 require_once __DIR__ . '/bootstrap.php';
-require_once __DIR__ . '/db.php';
+// Note: getDB() is defined in bootstrap.php - no separate db.php needed
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
