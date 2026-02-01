@@ -10,6 +10,7 @@ import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
 import { VoteSiteCard } from "@/components/VoteSiteCard";
 import { VoteStreakCard } from "@/components/VoteStreakCard";
+import { OrderHistory } from "@/components/OrderHistory";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -383,6 +384,9 @@ const Dashboard = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Order History */}
+            <OrderHistory />
           </div>
         </div>
 
