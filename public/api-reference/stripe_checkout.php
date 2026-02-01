@@ -52,21 +52,47 @@ function getBearerTokenSC() {
 }
 
 function stripeRequest($method, $url, $secretKey, $body = null) {
-  $ch = curl_init();
-  curl_setopt($ch, CURLOPT_URL, $url);
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-  curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-  curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+  // Use file_get_contents instead of cURL for compatibility
+  $headers = array(
     'Authorization: Bearer ' . $secretKey,
     'Content-Type: application/x-www-form-urlencoded',
-  ));
+  );
+  
+  $opts = array(
+    'http' => array(
+      'method' => $method,
+      'header' => implode("\r\n", $headers),
+      'ignore_errors' => true, // Get response even on 4xx/5xx
+      'timeout' => 30,
+    ),
+    'ssl' => array(
+      'verify_peer' => true,
+      'verify_peer_name' => true,
+    ),
+  );
+  
   if ($body !== null) {
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+    $opts['http']['content'] = $body;
   }
-  $resp = curl_exec($ch);
-  $err  = curl_error($ch);
-  $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-  curl_close($ch);
+  
+  $context = stream_context_create($opts);
+  $resp = @file_get_contents($url, false, $context);
+  
+  // Parse HTTP response code from headers
+  $code = 0;
+  $err = '';
+  if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
+    // First line: "HTTP/1.1 200 OK"
+    if (preg_match('/HTTP\/\d+\.?\d*\s+(\d+)/', $http_response_header[0], $m)) {
+      $code = (int)$m[1];
+    }
+  }
+  
+  if ($resp === false) {
+    $err = 'file_get_contents failed';
+    $resp = '';
+  }
+  
   return array($code, $resp, $err);
 }
 
