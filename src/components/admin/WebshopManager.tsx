@@ -173,16 +173,56 @@ const ProductFormContent = ({
 
     <div className="grid grid-cols-2 gap-4">
       <div>
-        <label className="text-sm font-medium mb-2 block">Item ID (in-game)</label>
-        <Input
-          type="number"
-          min={0}
-          value={editData.item_id}
-          onChange={(e) => setEditData(prev => ({ ...prev, item_id: parseInt(e.target.value) || 0 }))}
-        />
+        <label className="text-sm font-medium mb-2 block">Reward Type</label>
+        <Select 
+          value={editData.item_id <= 0 ? String(editData.item_id) : "item"} 
+          onValueChange={(v) => {
+            if (v === "item") {
+              setEditData(prev => ({ ...prev, item_id: 1 }));
+            } else {
+              setEditData(prev => ({ ...prev, item_id: parseInt(v) }));
+            }
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="item">🎁 Game Item</SelectItem>
+            <SelectItem value="-1">💎 Zen</SelectItem>
+            <SelectItem value="-2">🪙 Coins</SelectItem>
+            <SelectItem value="-3">⚡ EXP</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+      {editData.item_id > 0 ? (
+        <div>
+          <label className="text-sm font-medium mb-2 block">Item ID (in-game)</label>
+          <Input
+            type="number"
+            min={1}
+            value={editData.item_id}
+            onChange={(e) => setEditData(prev => ({ ...prev, item_id: parseInt(e.target.value) || 1 }))}
+          />
+        </div>
+      ) : (
+        <div>
+          <label className="text-sm font-medium mb-2 block">
+            {editData.item_id === -1 ? "Zen Amount" : editData.item_id === -2 ? "Coins Amount" : "EXP Amount"}
+          </label>
+          <Input
+            type="number"
+            min={1}
+            value={editData.item_quantity}
+            onChange={(e) => setEditData(prev => ({ ...prev, item_quantity: parseInt(e.target.value) || 1 }))}
+          />
+        </div>
+      )}
+    </div>
+
+    {editData.item_id > 0 && (
       <div>
-        <label className="text-sm font-medium mb-2 block">Quantity</label>
+        <label className="text-sm font-medium mb-2 block">Quantity per purchase</label>
         <Input
           type="number"
           min={1}
@@ -190,7 +230,7 @@ const ProductFormContent = ({
           onChange={(e) => setEditData(prev => ({ ...prev, item_quantity: parseInt(e.target.value) || 1 }))}
         />
       </div>
-    </div>
+    )}
 
     <div>
       <label className="text-sm font-medium mb-2 block">Stock (-1 = unlimited)</label>
@@ -519,7 +559,10 @@ export function WebshopManager() {
                       €{Number(product.price_real).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {product.item_id || "—"}
+                      {product.item_id === -1 ? "💎 Zen" : 
+                       product.item_id === -2 ? "🪙 Coins" : 
+                       product.item_id === -3 ? "⚡ EXP" : 
+                       product.item_id > 0 ? `🎁 #${product.item_id}` : "—"}
                     </TableCell>
                     <TableCell>
                       <Badge variant={product.is_active ? "default" : "secondary"}>
