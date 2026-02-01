@@ -109,17 +109,22 @@ export function OrderHistory() {
   }, []);
 
   const formatPrice = (order: Order): string => {
-    if (order.total_real > 0) {
-      return `€${order.total_real.toFixed(2)}`;
+    const totalReal = Number(order.total_real) || 0;
+    const totalCoins = Number(order.total_coins) || 0;
+    const totalZen = Number(order.total_zen) || 0;
+    const totalVip = Number(order.total_vip) || 0;
+    
+    if (totalReal > 0) {
+      return `€${totalReal.toFixed(2)}`;
     }
-    if (order.total_coins > 0) {
-      return `${order.total_coins.toLocaleString()} Coins`;
+    if (totalCoins > 0) {
+      return `${totalCoins.toLocaleString()} Coins`;
     }
-    if (order.total_zen > 0) {
-      return `${order.total_zen.toLocaleString()} Zen`;
+    if (totalZen > 0) {
+      return `${totalZen.toLocaleString()} Zen`;
     }
-    if (order.total_vip > 0) {
-      return `${order.total_vip.toLocaleString()} VIP`;
+    if (totalVip > 0) {
+      return `${totalVip.toLocaleString()} VIP`;
     }
     return "Free";
   };
