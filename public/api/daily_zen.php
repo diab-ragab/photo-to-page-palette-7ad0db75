@@ -12,7 +12,7 @@ header('Content-Type: application/json; charset=utf-8');
 define('DAILY_ZEN_REWARD', 500000);
 
 // IMPORTANT: move this to config/env if possible
-define('SERVER_SECRET_SALT', 'CHANGE_ME_to_long_random_secret');
+define('SERVER_SECRET_SALT', 'wOi3ndG4m3_z3N_s4Lt_X9kP2mQ7vL5nR8tY1wZ6');
 
 // Cookie
 define('DEVICE_TOKEN_NAME', 'woi_device_token');
