@@ -142,9 +142,14 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : error ? (
-          <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-            <AlertCircle className="h-5 w-5 text-destructive" />
-            <span className="text-sm text-destructive">{error}</span>
+          <div className="flex flex-col gap-2 p-3 bg-muted/50 border border-border rounded-lg">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <AlertCircle className="h-5 w-5" />
+              <span className="text-sm font-medium">Coming Soon</span>
+            </div>
+            <p className="text-xs text-muted-foreground/80">
+              Daily Zen rewards are being set up. Check back soon!
+            </p>
           </div>
         ) : (
           <>
