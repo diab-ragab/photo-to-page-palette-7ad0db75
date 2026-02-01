@@ -50,7 +50,9 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCanClaim(status.can_claim);
         setHasClaimed(status.has_claimed);
         setRewardAmount(status.reward_amount);
-        setCountdown(status.seconds_until_next_claim);
+        // Cap countdown at 24 hours (86400 seconds) - shouldn't exceed this
+        const cappedCountdown = Math.min(status.seconds_until_next_claim, 86400);
+        setCountdown(cappedCountdown);
         if (status.csrf_token) {
           setCsrfToken(status.csrf_token);
           sessionStorage.setItem('csrf_token', status.csrf_token);
