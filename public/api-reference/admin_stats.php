@@ -209,7 +209,7 @@ try {
     }
 }
 
-// Last order with user and product info
+// Recent orders (last 10) with user and product info
 try {
     $stmt = $pdo->query("
         SELECT 
@@ -229,28 +229,35 @@ try {
         LEFT JOIN users u ON u.id = o.user_id
         LEFT JOIN webshop_products p ON p.id = o.product_id
         ORDER BY o.created_at DESC
-        LIMIT 1
+        LIMIT 10
     ");
-    $lastOrder = $stmt->fetch(PDO::FETCH_ASSOC);
+    $recentOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    if ($lastOrder) {
-        $stats['last_order'] = array(
-            'id' => (int)$lastOrder['id'],
-            'user_id' => (int)$lastOrder['user_id'],
-            'username' => $lastOrder['username'] ? $lastOrder['username'] : 'User #' . $lastOrder['user_id'],
-            'product_id' => (int)$lastOrder['product_id'],
-            'product_name' => $lastOrder['product_name'] ? $lastOrder['product_name'] : 'Product #' . $lastOrder['product_id'],
-            'quantity' => (int)$lastOrder['quantity'],
-            'total_real' => (float)$lastOrder['total_real'],
-            'total_coins' => (int)$lastOrder['total_coins'],
-            'total_zen' => (int)$lastOrder['total_zen'],
-            'total_vip' => (int)$lastOrder['total_vip'],
-            'status' => $lastOrder['status'],
-            'created_at' => $lastOrder['created_at'],
+    $stats['recent_orders'] = array();
+    foreach ($recentOrders as $order) {
+        $stats['recent_orders'][] = array(
+            'id' => (int)$order['id'],
+            'user_id' => (int)$order['user_id'],
+            'username' => $order['username'] ? $order['username'] : 'User #' . $order['user_id'],
+            'product_id' => (int)$order['product_id'],
+            'product_name' => $order['product_name'] ? $order['product_name'] : 'Product #' . $order['product_id'],
+            'quantity' => (int)$order['quantity'],
+            'total_real' => (float)$order['total_real'],
+            'total_coins' => (int)$order['total_coins'],
+            'total_zen' => (int)$order['total_zen'],
+            'total_vip' => (int)$order['total_vip'],
+            'status' => $order['status'],
+            'created_at' => $order['created_at'],
         );
+    }
+    
+    // Keep last_order for backwards compatibility
+    if (count($stats['recent_orders']) > 0) {
+        $stats['last_order'] = $stats['recent_orders'][0];
     }
 } catch (Exception $e) {
     // Table doesn't exist or query failed
+    $stats['recent_orders'] = array();
 }
 
 json_response($stats);

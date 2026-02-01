@@ -56,6 +56,7 @@ interface ServerStats {
   totalVotes: number;
   totalPurchases: number;
   lastOrder: LastOrder | null;
+  recentOrders: LastOrder[];
 }
 
 export default function AdminDashboard() {
@@ -74,6 +75,7 @@ export default function AdminDashboard() {
     totalVotes: 0,
     totalPurchases: 0,
     lastOrder: null,
+    recentOrders: [],
   });
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -155,6 +157,7 @@ export default function AdminDashboard() {
             totalVotes: data.total_votes || 0,
             totalPurchases: data.total_purchases || 0,
             lastOrder: data.last_order || null,
+            recentOrders: data.recent_orders || [],
           });
         }
       } catch {
@@ -167,6 +170,7 @@ export default function AdminDashboard() {
           totalVotes: 8540,
           totalPurchases: 156,
           lastOrder: null,
+          recentOrders: [],
         });
       } finally {
         setStatsLoading(false);
@@ -389,85 +393,95 @@ export default function AdminDashboard() {
               </Card>
             </div>
 
-            {/* Last Order Card */}
+            {/* Recent Orders Card */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Receipt className="h-5 w-5 text-pink-500" />
-                  Last Order
-                </CardTitle>
-                <CardDescription>Most recent customer purchase</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Receipt className="h-5 w-5 text-pink-500" />
+                    Recent Orders
+                  </CardTitle>
+                  <CardDescription>Last 10 customer purchases</CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setActiveTab("orders")}
+                >
+                  View All
+                </Button>
               </CardHeader>
               <CardContent>
                 {statsLoading ? (
-                  <div className="animate-pulse space-y-3">
-                    <div className="h-4 bg-muted rounded w-3/4" />
-                    <div className="h-4 bg-muted rounded w-1/2" />
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                        <div className="h-10 w-10 bg-muted rounded-lg" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-muted rounded w-3/4" />
+                          <div className="h-3 bg-muted rounded w-1/2" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ) : serverStats.lastOrder ? (
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {serverStats.lastOrder.product_name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Ordered by <span className="font-medium text-foreground">{serverStats.lastOrder.username}</span>
-                        </p>
-                      </div>
-                      <Badge 
-                        variant="outline" 
-                        className={
-                          serverStats.lastOrder.status === "completed" 
-                            ? "bg-green-500/10 text-green-500 border-green-500/20"
-                            : serverStats.lastOrder.status === "pending"
-                            ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
-                            : "bg-destructive/10 text-destructive border-destructive/20"
-                        }
+                ) : serverStats.recentOrders.length > 0 ? (
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                    {serverStats.recentOrders.map((order) => (
+                      <div 
+                        key={order.id} 
+                        className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                       >
-                        {serverStats.lastOrder.status}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Order ID</span>
-                        <p className="font-mono">#{serverStats.lastOrder.id}</p>
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <ShoppingBag className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium truncate text-sm">
+                              {order.product_name}
+                            </p>
+                            <Badge 
+                              variant="outline" 
+                              className={`shrink-0 text-xs ${
+                                order.status === "completed" 
+                                  ? "bg-green-500/10 text-green-500 border-green-500/20"
+                                  : order.status === "pending"
+                                  ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+                                  : order.status === "refunded"
+                                  ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                  : "bg-destructive/10 text-destructive border-destructive/20"
+                              }`}
+                            >
+                              {order.status}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
+                            <span>
+                              <span className="font-medium text-foreground">{order.username}</span>
+                              {order.quantity > 1 && ` × ${order.quantity}`}
+                            </span>
+                            <span className="font-medium text-primary">
+                              {order.total_real > 0 
+                                ? `€${order.total_real.toFixed(2)}`
+                                : order.total_coins > 0
+                                ? `${order.total_coins.toLocaleString()} Coins`
+                                : order.total_zen > 0
+                                ? `${order.total_zen.toLocaleString()} Zen`
+                                : "Free"
+                              }
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            #{order.id} • {new Date(order.created_at).toLocaleDateString()} {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Quantity</span>
-                        <p>{serverStats.lastOrder.quantity}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Amount</span>
-                        <p className="font-medium text-primary">
-                          {serverStats.lastOrder.total_real > 0 
-                            ? `€${serverStats.lastOrder.total_real.toFixed(2)}`
-                            : serverStats.lastOrder.total_coins > 0
-                            ? `${serverStats.lastOrder.total_coins.toLocaleString()} Coins`
-                            : serverStats.lastOrder.total_zen > 0
-                            ? `${serverStats.lastOrder.total_zen.toLocaleString()} Zen`
-                            : "Free"
-                          }
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Date</span>
-                        <p>{new Date(serverStats.lastOrder.created_at).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full mt-2"
-                      onClick={() => setActiveTab("orders")}
-                    >
-                      View All Orders
-                    </Button>
+                    ))}
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-muted-foreground">
+                  <div className="text-center py-8 text-muted-foreground">
                     <ShoppingBag className="h-10 w-10 mx-auto mb-2 opacity-50" />
                     <p>No orders yet</p>
+                    <p className="text-sm mt-1">Orders will appear here when customers make purchases</p>
                   </div>
                 )}
               </CardContent>
