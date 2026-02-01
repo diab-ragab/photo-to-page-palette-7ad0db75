@@ -88,7 +88,7 @@ export async function fetchProducts(options?: {
 
     const res = await fetch(`${API_BASE}/webshop_admin.php?${params.toString()}`, {
       credentials: "include",
-      headers: { "Accept": "application/json" },
+      headers: getAuthHeaders(),
     });
     const data: ProductsResponse = await res.json();
     if (data.success) {
