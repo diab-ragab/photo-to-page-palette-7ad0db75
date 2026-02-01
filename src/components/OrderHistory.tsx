@@ -20,11 +20,8 @@ interface Order {
   id: number;
   product_id: number;
   product_name: string | null;
-  product_image: string | null;
+  item_id: number;
   quantity: number;
-  total_coins: number;
-  total_vip: number;
-  total_zen: number;
   total_real: number;
   status: "pending" | "completed" | "failed" | "refunded";
   delivered_at: string | null;
@@ -110,23 +107,17 @@ export function OrderHistory() {
 
   const formatPrice = (order: Order): string => {
     const totalReal = Number(order.total_real) || 0;
-    const totalCoins = Number(order.total_coins) || 0;
-    const totalZen = Number(order.total_zen) || 0;
-    const totalVip = Number(order.total_vip) || 0;
-    
     if (totalReal > 0) {
       return `€${totalReal.toFixed(2)}`;
     }
-    if (totalCoins > 0) {
-      return `${totalCoins.toLocaleString()} Coins`;
-    }
-    if (totalZen > 0) {
-      return `${totalZen.toLocaleString()} Zen`;
-    }
-    if (totalVip > 0) {
-      return `${totalVip.toLocaleString()} VIP`;
-    }
     return "Free";
+  };
+
+  const getRewardLabel = (itemId: number): string => {
+    if (itemId === -1) return "💎 Zen";
+    if (itemId === -2) return "🪙 Coins";
+    if (itemId === -3) return "⚡ EXP";
+    return "🎁 Item";
   };
 
   if (loading && orders.length === 0) {
@@ -178,17 +169,11 @@ export function OrderHistory() {
                       key={order.id}
                       className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                     >
-                      {/* Product Image */}
-                      <div className="h-14 w-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                        {order.product_image ? (
-                          <img
-                            src={order.product_image}
-                            alt={order.product_name || "Product"}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <Package className="h-6 w-6 text-muted-foreground" />
-                        )}
+                    {/* Product Icon */}
+                      <div className="h-14 w-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0 text-2xl">
+                        {order.item_id === -1 ? "💎" : 
+                         order.item_id === -2 ? "🪙" : 
+                         order.item_id === -3 ? "⚡" : "🎁"}
                       </div>
 
                       {/* Order Details */}

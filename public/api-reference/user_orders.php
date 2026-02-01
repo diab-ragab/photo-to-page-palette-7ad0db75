@@ -5,6 +5,7 @@
  * Actions:
  * - list: Get user's order history
  * 
+ * Simplified schema: webshop_orders(id, user_id, product_id, quantity, total_real, status, ...)
  * Requires authentication.
  */
 
@@ -12,13 +13,24 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
+// PHP 5.3 random_bytes fallback
+if (!function_exists('random_bytes')) {
+    function random_bytes($length) {
+        $bytes = '';
+        for ($i = 0; $i < $length; $i++) {
+            $bytes .= chr(mt_rand(0, 255));
+        }
+        return $bytes;
+    }
+}
+
 $RID = bin2hex(random_bytes(6));
 
-function json_response(array $data) {
+function json_response($data) {
     global $RID;
     while (ob_get_level()) { ob_end_clean(); }
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(array_merge($data, array('rid' => $RID)), JSON_UNESCAPED_UNICODE);
+    echo json_encode(array_merge($data, array('rid' => $RID)));
     exit;
 }
 
@@ -26,9 +38,13 @@ function json_fail($code, $msg) {
     global $RID;
     error_log("RID={$RID} RESP={$code} MSG={$msg}");
     while (ob_get_level()) { ob_end_clean(); }
-    http_response_code($code);
+    if (function_exists('http_response_code')) {
+        http_response_code($code);
+    } else {
+        header("HTTP/1.1 {$code} Error");
+    }
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(array('success' => false, 'message' => $msg, 'rid' => $RID), JSON_UNESCAPED_UNICODE);
+    echo json_encode(array('success' => false, 'message' => $msg, 'rid' => $RID));
     exit;
 }
 
@@ -59,7 +75,11 @@ header('Access-Control-Allow-Methods: GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Accept, X-Session-Token, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
+    if (function_exists('http_response_code')) {
+        http_response_code(204);
+    } else {
+        header("HTTP/1.1 204 No Content");
+    }
     exit;
 }
 
@@ -150,27 +170,23 @@ if ($action === 'list') {
     $stmt->execute($params);
     $total = (int)$stmt->fetchColumn();
     
-    // Get orders with product info
+    // Get orders with product info (simplified schema)
     $sql = "
         SELECT 
             o.id,
             o.product_id,
             o.quantity,
-            o.total_coins,
-            o.total_vip,
-            o.total_zen,
             o.total_real,
             o.status,
             o.delivered_at,
             o.created_at,
             p.name as product_name,
-            p.image_url as product_image,
             p.item_id
         FROM webshop_orders o
         LEFT JOIN webshop_products p ON p.id = o.product_id
         {$where}
         ORDER BY o.created_at DESC
-        LIMIT {$limit} OFFSET {$offset}
+        LIMIT {$offset}, {$limit}
     ";
     
     $stmt = $pdo->prepare($sql);
