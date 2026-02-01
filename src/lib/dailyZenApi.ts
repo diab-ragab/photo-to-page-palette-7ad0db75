@@ -44,6 +44,22 @@ function getAuthHeaders(): Record<string, string> {
  * Check daily Zen claim status
  */
 export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
+  const sessionToken = localStorage.getItem('woi_session_token');
+  
+  // Don't make API call if not logged in
+  if (!sessionToken) {
+    console.log('[DailyZen] No session token found, skipping API call');
+    return {
+      success: false,
+      can_claim: false,
+      has_claimed: false,
+      reward_amount: 0,
+      seconds_until_reset: 0,
+      reset_time: '',
+      error: 'Not logged in',
+    };
+  }
+  
   try {
     const response = await fetch(`${API_BASE}/daily_zen.php`, {
       method: 'GET',
