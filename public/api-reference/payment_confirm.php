@@ -221,16 +221,28 @@ if (count($ordersToProcess) > 0) {
             continue;
         }
         
-        // Mark order as completed
-        $stmt = $pdo->prepare("
-            UPDATE webshop_orders 
-            SET status = 'completed', 
-                stripe_payment_intent = ?,
-                delivered_at = NOW(),
-                updated_at = NOW()
-            WHERE id = ?
-        ");
-        $stmt->execute(array($paymentIntentId, $oid));
+        // Mark order as completed (updated_at may not exist in all schemas)
+        try {
+            $stmt = $pdo->prepare("
+                UPDATE webshop_orders 
+                SET status = 'completed', 
+                    stripe_payment_intent = ?,
+                    delivered_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute(array($paymentIntentId, $oid));
+        } catch (Exception $e) {
+            // Fallback without updated_at
+            $stmt = $pdo->prepare("
+                UPDATE webshop_orders 
+                SET status = 'completed', 
+                    stripe_payment_intent = ?,
+                    delivered_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute(array($paymentIntentId, $oid));
+        }
         
         // Get user ID from order if not in metadata
         if ($userId <= 0 && isset($order['user_id'])) {
@@ -280,6 +292,8 @@ json_response(array(
  *   item_id = -3 => EXP (send via exp field, no item)
  */
 function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
+    error_log("RID={$RID} FULFILL_START user={$userId} product={$productId} qty={$quantity} order={$orderId}");
+    
     // Get product details
     $stmt = $pdo->prepare("SELECT * FROM webshop_products WHERE id = ? LIMIT 1");
     $stmt->execute(array($productId));
@@ -295,8 +309,11 @@ function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $RID) {
     $itemQuantity = isset($product['item_quantity']) ? (int)$product['item_quantity'] : 1;
     $totalGrant = $itemQuantity * $quantity;
     
+    error_log("RID={$RID} FULFILL_PRODUCT name={$productName} item_id={$itemId} item_qty={$itemQuantity} total_grant={$totalGrant}");
+    
     // Get user's character role ID
     $roleId = getUserRoleId($pdo, $userId);
+    error_log("RID={$RID} FULFILL_ROLE_LOOKUP user={$userId} role_id={$roleId}");
     
     if ($roleId <= 0) {
         error_log("RID={$RID} FULFILL_ERROR no_character user={$userId}");
