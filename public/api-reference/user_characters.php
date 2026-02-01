@@ -35,7 +35,7 @@ if (empty($token)) {
 }
 
 try {
-    $pdo = getDbConnection();
+    $pdo = getDB();
     
     // Verify session and get user
     $stmt = $pdo->prepare("SELECT user_id, expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
