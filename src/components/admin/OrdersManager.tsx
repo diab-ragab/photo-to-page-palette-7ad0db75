@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
+// Simplified Order interface matching new schema
 interface Order {
   id: number;
   user_id: number;
@@ -51,15 +52,13 @@ interface Order {
   product_id: number;
   product_name?: string;
   quantity: number;
-  total_coins: number;
-  total_vip: number;
-  total_zen: number;
   total_real: number;
   status: "pending" | "completed" | "failed" | "refunded";
   stripe_session_id?: string;
   stripe_payment_intent?: string;
   delivered_at: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 interface OrdersResponse {
@@ -201,12 +200,10 @@ export function OrdersManager() {
   };
 
   const formatPrice = (order: Order): string => {
-    const parts = [];
-    if (order.total_real > 0) parts.push(`€${order.total_real.toFixed(2)}`);
-    if (order.total_coins > 0) parts.push(`${order.total_coins.toLocaleString()} Coins`);
-    if (order.total_zen > 0) parts.push(`${order.total_zen.toLocaleString()} Zen`);
-    if (order.total_vip > 0) parts.push(`${order.total_vip.toLocaleString()} VIP`);
-    return parts.length > 0 ? parts.join(" + ") : "Free";
+    if (order.total_real > 0) {
+      return `€${Number(order.total_real).toFixed(2)}`;
+    }
+    return "Free";
   };
 
   const filteredOrders = orders.filter((order) => {

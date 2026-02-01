@@ -2,13 +2,11 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { 
@@ -20,57 +18,33 @@ import {
   X, 
   Package,
   Euro,
-  Tag,
-  Image as ImageIcon,
   RefreshCw
 } from "lucide-react";
 import {
   fetchProducts,
-  fetchCategories,
   addProduct,
   updateProduct,
   deleteProduct,
-  addCategory,
   WebshopProduct,
-  WebshopCategory,
 } from "@/lib/webshopApi";
 
 interface ProductFormData {
   name: string;
-  description: string;
-  category_id: number;
   item_id: number;
   item_quantity: number;
-  price_coins: number;
-  price_vip: number;
-  price_zen: number;
   price_real: number;
-  image_url: string;
-  is_active: boolean;
-  is_featured: boolean;
-  stock: number;
 }
 
 const defaultProduct: ProductFormData = {
   name: "",
-  description: "",
-  category_id: 1,
   item_id: 0,
   item_quantity: 1,
-  price_coins: 0,
-  price_vip: 0,
-  price_zen: 0,
   price_real: 0,
-  image_url: "",
-  is_active: true,
-  is_featured: false,
-  stock: -1,
 };
 
 interface ProductFormContentProps {
   editData: ProductFormData;
   setEditData: React.Dispatch<React.SetStateAction<ProductFormData>>;
-  categories: WebshopCategory[];
   isSubmitting: boolean;
   selectedProduct: WebshopProduct | null;
   onSave: () => void;
@@ -80,95 +54,32 @@ interface ProductFormContentProps {
 const ProductFormContent = ({
   editData,
   setEditData,
-  categories,
   isSubmitting,
   selectedProduct,
   onSave,
   onClose,
 }: ProductFormContentProps) => (
   <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
-    <div className="grid grid-cols-2 gap-4">
-      <div className="col-span-2">
-        <label className="text-sm font-medium mb-2 block">Product Name</label>
-        <Input
-          value={editData.name}
-          onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
-          placeholder="e.g., Phoenix Wing"
-        />
-      </div>
-    </div>
-
     <div>
-      <label className="text-sm font-medium mb-2 block">Description</label>
-      <Textarea
-        value={editData.description}
-        onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
-        placeholder="Product description..."
-        rows={2}
+      <label className="text-sm font-medium mb-2 block">Product Name</label>
+      <Input
+        value={editData.name}
+        onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
+        placeholder="e.g., 1000 Zen Pack"
       />
     </div>
 
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-          <Euro className="h-3 w-3" /> Price (EUR)
-        </label>
-        <Input
-          type="number"
-          step="0.01"
-          min={0}
-          value={editData.price_real}
-          onChange={(e) => setEditData(prev => ({ ...prev, price_real: parseFloat(e.target.value) || 0 }))}
-        />
-      </div>
-      <div>
-        <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-          <Tag className="h-3 w-3" /> Category
-        </label>
-        <Select 
-          value={String(editData.category_id)} 
-          onValueChange={(v) => setEditData(prev => ({ ...prev, category_id: parseInt(v) }))}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map(cat => (
-              <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-
-    <div className="grid grid-cols-3 gap-4">
-      <div>
-        <label className="text-sm font-medium mb-2 block">Zen Price</label>
-        <Input
-          type="number"
-          min={0}
-          value={editData.price_zen}
-          onChange={(e) => setEditData(prev => ({ ...prev, price_zen: parseInt(e.target.value) || 0 }))}
-        />
-      </div>
-      <div>
-        <label className="text-sm font-medium mb-2 block">Coins Price</label>
-        <Input
-          type="number"
-          min={0}
-          value={editData.price_coins}
-          onChange={(e) => setEditData(prev => ({ ...prev, price_coins: parseInt(e.target.value) || 0 }))}
-        />
-      </div>
-      <div>
-        <label className="text-sm font-medium mb-2 block">VIP Price</label>
-        <Input
-          type="number"
-          min={0}
-          value={editData.price_vip}
-          onChange={(e) => setEditData(prev => ({ ...prev, price_vip: parseInt(e.target.value) || 0 }))}
-        />
-      </div>
+    <div>
+      <label className="text-sm font-medium mb-2 block flex items-center gap-1">
+        <Euro className="h-3 w-3" /> Price (EUR)
+      </label>
+      <Input
+        type="number"
+        step="0.01"
+        min={0}
+        value={editData.price_real}
+        onChange={(e) => setEditData(prev => ({ ...prev, price_real: parseFloat(e.target.value) || 0 }))}
+      />
     </div>
 
     <div className="grid grid-cols-2 gap-4">
@@ -232,43 +143,6 @@ const ProductFormContent = ({
       </div>
     )}
 
-    <div>
-      <label className="text-sm font-medium mb-2 block">Stock (-1 = unlimited)</label>
-      <Input
-        type="number"
-        min={-1}
-        value={editData.stock}
-        onChange={(e) => setEditData(prev => ({ ...prev, stock: parseInt(e.target.value) }))}
-      />
-    </div>
-
-    <div>
-      <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-        <ImageIcon className="h-3 w-3" /> Image URL (or emoji)
-      </label>
-      <Input
-        value={editData.image_url}
-        onChange={(e) => setEditData(prev => ({ ...prev, image_url: e.target.value }))}
-        placeholder="https://... or 🎁"
-      />
-    </div>
-
-    <div className="flex items-center justify-between p-3 rounded-lg border">
-      <span className="text-sm font-medium">Active</span>
-      <Switch
-        checked={editData.is_active}
-        onCheckedChange={(checked) => setEditData(prev => ({ ...prev, is_active: checked }))}
-      />
-    </div>
-
-    <div className="flex items-center justify-between p-3 rounded-lg border">
-      <span className="text-sm font-medium">Featured</span>
-      <Switch
-        checked={editData.is_featured}
-        onCheckedChange={(checked) => setEditData(prev => ({ ...prev, is_featured: checked }))}
-      />
-    </div>
-
     <div className="flex gap-2 pt-2">
       <Button onClick={onSave} disabled={isSubmitting} className="flex-1">
         <Save className="mr-2 h-4 w-4" />
@@ -287,18 +161,12 @@ export function WebshopManager() {
   const isMobile = useIsMobile();
   
   const [products, setProducts] = useState<WebshopProduct[]>([]);
-  const [categories, setCategories] = useState<WebshopCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [selectedProduct, setSelectedProduct] = useState<WebshopProduct | null>(null);
   const [editData, setEditData] = useState<ProductFormData>(defaultProduct);
   const [isEditing, setIsEditing] = useState(false);
-  const [filterCategory, setFilterCategory] = useState<string>("all");
-
-  // Category modal
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
 
   useEffect(() => {
     loadData();
@@ -307,12 +175,8 @@ export function WebshopManager() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [productsData, categoriesData] = await Promise.all([
-        fetchProducts({ limit: 100 }),
-        fetchCategories(),
-      ]);
+      const productsData = await fetchProducts({ limit: 100 });
       setProducts(productsData.products);
-      setCategories(categoriesData);
     } catch (error) {
       console.error("Failed to load data:", error);
       toast({ title: "Error", description: "Failed to load products", variant: "destructive" });
@@ -323,7 +187,7 @@ export function WebshopManager() {
 
   const handleAddNew = () => {
     setSelectedProduct(null);
-    setEditData({ ...defaultProduct, category_id: categories[0]?.id || 1 });
+    setEditData({ ...defaultProduct });
     setIsEditing(true);
   };
 
@@ -331,18 +195,9 @@ export function WebshopManager() {
     setSelectedProduct(product);
     setEditData({
       name: product.name,
-      description: product.description || "",
-      category_id: product.category_id,
       item_id: product.item_id,
       item_quantity: product.item_quantity,
-      price_coins: product.price_coins,
-      price_vip: product.price_vip,
-      price_zen: product.price_zen,
-      price_real: typeof product.price_real === 'string' ? parseFloat(product.price_real) : product.price_real,
-      image_url: product.image_url || "",
-      is_active: product.is_active,
-      is_featured: product.is_featured,
-      stock: product.stock,
+      price_real: typeof product.price_real === 'string' ? parseFloat(product.price_real) : (product.price_real || 0),
     });
     setIsEditing(true);
   };
@@ -359,8 +214,8 @@ export function WebshopManager() {
       return;
     }
 
-    if (editData.price_real <= 0 && editData.price_zen <= 0 && editData.price_coins <= 0) {
-      toast({ title: "Error", description: "Please enter at least one price", variant: "destructive" });
+    if (editData.price_real <= 0) {
+      toast({ title: "Error", description: "Please enter a price", variant: "destructive" });
       return;
     }
 
@@ -410,29 +265,13 @@ export function WebshopManager() {
     }
   };
 
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    
-    try {
-      const result = await addCategory({ name: newCategoryName });
-      if (result.success) {
-        toast({ title: "Success", description: "Category added!" });
-        setNewCategoryName("");
-        setShowCategoryModal(false);
-        loadData();
-      } else {
-        toast({ title: "Error", description: result.message || "Failed to add category", variant: "destructive" });
-      }
-    } catch (error) {
-      console.error("Add category error:", error);
-      toast({ title: "Error", description: "Failed to add category", variant: "destructive" });
-    }
+  const getRewardLabel = (product: WebshopProduct): string => {
+    if (product.item_id === -1) return `💎 ${product.item_quantity.toLocaleString()} Zen`;
+    if (product.item_id === -2) return `🪙 ${product.item_quantity.toLocaleString()} Coins`;
+    if (product.item_id === -3) return `⚡ ${product.item_quantity.toLocaleString()} EXP`;
+    if (product.item_id > 0) return `🎁 #${product.item_id} x${product.item_quantity}`;
+    return "—";
   };
-
-  const filteredProducts = products.filter(p => 
-    filterCategory === "all" || p.category_id === parseInt(filterCategory)
-  );
-
 
   return (
     <div className="space-y-6">
@@ -454,21 +293,6 @@ export function WebshopManager() {
                 <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" onClick={() => setShowCategoryModal(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Category
-              </Button>
               <Button onClick={handleAddNew}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Product
@@ -479,7 +303,7 @@ export function WebshopManager() {
         <CardContent>
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading products...</div>
-          ) : filteredProducts.length === 0 ? (
+          ) : products.length === 0 ? (
             <div className="text-center py-8">
               <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
               <p className="text-muted-foreground">No products found</p>
@@ -490,23 +314,17 @@ export function WebshopManager() {
             </div>
           ) : isMobile ? (
             <div className="space-y-3">
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <div 
                   key={product.id} 
-                  className={`p-3 rounded-lg border bg-card/50 space-y-2 ${!product.is_active ? "opacity-60" : ""}`}
+                  className="p-3 rounded-lg border bg-card/50 space-y-2"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-sm">{product.name}</p>
-                        {product.is_featured && (
-                          <Badge className="text-xs">Featured</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">{product.description}</p>
+                      <p className="font-medium text-sm">{product.name}</p>
                       <div className="flex items-center gap-3 mt-2 text-xs">
-                        <Badge variant="outline">{product.category_name}</Badge>
-                        <span className="text-primary font-medium">€{Number(product.price_real).toFixed(2)}</span>
+                        <Badge variant="outline">{getRewardLabel(product)}</Badge>
+                        <span className="text-primary font-medium">€{Number(product.price_real || 0).toFixed(2)}</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -535,39 +353,25 @@ export function WebshopManager() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>ID</TableHead>
                   <TableHead>Product</TableHead>
-                  <TableHead>Category</TableHead>
+                  <TableHead>Reward</TableHead>
                   <TableHead>Price</TableHead>
-                  <TableHead>Item ID</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id} className={!product.is_active ? "opacity-60" : ""}>
+                {products.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-mono text-sm">#{product.id}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{product.name}</span>
-                        {product.is_featured && <Badge className="text-xs">Featured</Badge>}
-                      </div>
+                      <span className="font-medium">{product.name}</span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{product.category_name || "—"}</Badge>
+                      <Badge variant="outline">{getRewardLabel(product)}</Badge>
                     </TableCell>
                     <TableCell className="text-primary font-medium">
-                      €{Number(product.price_real).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {product.item_id === -1 ? "💎 Zen" : 
-                       product.item_id === -2 ? "🪙 Coins" : 
-                       product.item_id === -3 ? "⚡ EXP" : 
-                       product.item_id > 0 ? `🎁 #${product.item_id}` : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={product.is_active ? "default" : "secondary"}>
-                        {product.is_active ? "Active" : "Inactive"}
-                      </Badge>
+                      €{Number(product.price_real || 0).toFixed(2)}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -611,7 +415,6 @@ export function WebshopManager() {
               <ProductFormContent 
                 editData={editData}
                 setEditData={setEditData}
-                categories={categories}
                 isSubmitting={isSubmitting}
                 selectedProduct={selectedProduct}
                 onSave={handleSave}
@@ -622,7 +425,7 @@ export function WebshopManager() {
         </Drawer>
       ) : (
         <Dialog open={isEditing} onOpenChange={(open) => !open && handleCloseModal()}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{selectedProduct ? "Edit Product" : "Add Product"}</DialogTitle>
               <DialogDescription>
@@ -632,7 +435,6 @@ export function WebshopManager() {
             <ProductFormContent 
               editData={editData}
               setEditData={setEditData}
-              categories={categories}
               isSubmitting={isSubmitting}
               selectedProduct={selectedProduct}
               onSave={handleSave}
@@ -641,35 +443,6 @@ export function WebshopManager() {
           </DialogContent>
         </Dialog>
       )}
-
-      {/* Add Category Modal */}
-      <Dialog open={showCategoryModal} onOpenChange={setShowCategoryModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Category</DialogTitle>
-            <DialogDescription>Create a new product category</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Category Name</label>
-              <Input
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="e.g., Cosmetics"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={handleAddCategory} className="flex-1">
-                <Save className="mr-2 h-4 w-4" />
-                Add Category
-              </Button>
-              <Button variant="outline" onClick={() => setShowCategoryModal(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

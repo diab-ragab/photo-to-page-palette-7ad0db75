@@ -8,7 +8,7 @@ import { ShopCategory } from "@/pages/Shop";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
-import { fetchProducts, fetchCategories, WebshopProduct, WebshopCategory } from "@/lib/webshopApi";
+import { fetchProducts, WebshopProduct } from "@/lib/webshopApi";
 
 const ProductCardSkeleton = () => (
   <div className="glass-card overflow-hidden">
@@ -36,18 +36,14 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [products, setProducts] = useState<WebshopProduct[]>([]);
-  const [categories, setCategories] = useState<WebshopCategory[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const [productsData, categoriesData] = await Promise.all([
-          fetchProducts({ limit: 50 }),
-          fetchCategories(),
-        ]);
-        setProducts(productsData.products.filter(p => p.is_active));
-        setCategories(categoriesData);
+        const productsData = await fetchProducts({ limit: 50 });
+        // Filter only active products
+        setProducts(productsData.products.filter(p => p.is_active !== false));
       } catch (error) {
         console.error("Failed to load shop data:", error);
       } finally {
@@ -57,21 +53,15 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
     loadData();
   }, []);
 
-  // Map category slug to filter
-  const getCategorySlug = (cat: ShopCategory): string | null => {
-    if (cat === "all") return null;
-    return cat;
-  };
-
+  // Filter by item_id type (currency = negative, items = positive)
   const filteredProducts = (() => {
-    const slug = getCategorySlug(selectedCategory);
-    if (!slug) return products;
-    
-    // Find category by slug
-    const category = categories.find(c => c.slug === slug);
-    if (!category) return products;
-    
-    return products.filter(p => p.category_id === category.id);
+    if (selectedCategory === "all") return products;
+    if (selectedCategory === "currency") {
+      // Zen (-1), Coins (-2), EXP (-3)
+      return products.filter(p => p.item_id < 0);
+    }
+    // All other categories = real items
+    return products.filter(p => p.item_id > 0);
   })();
 
   const getQuantity = (id: number) => quantities[id] || 1;
@@ -86,14 +76,13 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
     const qty = getQuantity(product.id);
     const price = typeof product.price_real === 'string' 
       ? parseFloat(product.price_real) 
-      : product.price_real;
+      : (product.price_real || 0);
     addToCart({
       id: String(product.id),
       name: product.name,
-      description: product.description,
+      description: product.description || "",
       price: price,
-      image: product.image_url || "📦",
-      rarity: product.is_featured ? "legendary" : undefined,
+      image: product.image_url || getProductEmoji(product),
     }, qty);
     toast.success(`${product.name} added to cart!`, {
       description: `${qty}x €${price.toFixed(2)}`,
@@ -105,15 +94,19 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
     if (product.image_url && product.image_url.length <= 4) {
       return product.image_url;
     }
-    // Default emojis based on category
-    const cat = categories.find(c => c.id === product.category_id);
-    switch (cat?.slug) {
-      case "currency": return "💎";
-      case "vip": return "👑";
-      case "cosmetics": return "✨";
-      case "items": return "📦";
-      default: return "🎁";
-    }
+    // Default emojis based on item_id type
+    if (product.item_id === -1) return "💎"; // Zen
+    if (product.item_id === -2) return "🪙"; // Coins
+    if (product.item_id === -3) return "⚡"; // EXP
+    return "🎁"; // Regular item
+  };
+
+  const getRewardLabel = (product: WebshopProduct): string | null => {
+    if (product.item_id === -1) return `${product.item_quantity.toLocaleString()} Zen`;
+    if (product.item_id === -2) return `${product.item_quantity.toLocaleString()} Coins`;
+    if (product.item_id === -3) return `${product.item_quantity.toLocaleString()} EXP`;
+    if (product.item_id > 0) return `x${product.item_quantity}`;
+    return null;
   };
 
   return (
@@ -159,20 +152,14 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                   </motion.span>
                 )}
                 
-                {/* Badges */}
-                <div className="absolute top-3 left-3 flex flex-col gap-2 z-20">
-                  {product.is_featured && (
-                    <Badge className="bg-primary text-primary-foreground gap-1">
-                      <Star className="w-3 h-3" />
-                      Featured
+                {/* Reward badge */}
+                {getRewardLabel(product) && (
+                  <div className="absolute top-3 left-3 z-20">
+                    <Badge className="bg-primary text-primary-foreground">
+                      {getRewardLabel(product)}
                     </Badge>
-                  )}
-                  {product.stock > 0 && product.stock <= 10 && (
-                    <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30">
-                      Only {product.stock} left
-                    </Badge>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Product Info */}
@@ -181,20 +168,15 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                   {product.name}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                  {product.description}
+                  {product.description || "In-game reward delivered via mail"}
                 </p>
 
                 <div className="space-y-3">
                   {/* Price */}
                   <div className="flex items-center justify-between">
                     <span className="text-2xl font-bold font-display text-primary">
-                      €{Number(product.price_real).toFixed(2)}
+                      €{Number(product.price_real || 0).toFixed(2)}
                     </span>
-                    {product.price_zen > 0 && (
-                      <span className="text-sm text-muted-foreground">
-                        or {product.price_zen} Zen
-                      </span>
-                    )}
                   </div>
 
                   {/* Quantity selector */}
@@ -217,13 +199,13 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                         size="icon"
                         className="h-7 w-7"
                         onClick={() => setQuantity(product.id, getQuantity(product.id) + 1)}
-                        disabled={getQuantity(product.id) >= 99 || (product.stock > 0 && getQuantity(product.id) >= product.stock)}
+                        disabled={getQuantity(product.id) >= 99}
                       >
                         <Plus className="w-3 h-3" />
                       </Button>
                     </div>
                     <span className="text-sm font-medium text-muted-foreground">
-                      = €{(Number(product.price_real) * getQuantity(product.id)).toFixed(2)}
+                      = €{(Number(product.price_real || 0) * getQuantity(product.id)).toFixed(2)}
                     </span>
                   </div>
 
@@ -231,7 +213,6 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
                   <Button 
                     className="w-full gap-2" 
                     onClick={() => handleAddToCart(product)}
-                    disabled={product.stock === 0}
                   >
                     <ShoppingCart className="w-4 h-4" />
                     Add to Cart
