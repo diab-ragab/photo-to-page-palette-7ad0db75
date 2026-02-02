@@ -33,7 +33,7 @@ $APP_CONFIG = array(
   ),
 
   'stripe' => array(
-    'secret_key' => 'sk_test_51SvjV4HvRV9niQ97Y3n2QSVmAqXw3ihLul51C3MKpOlAGt2NrFT1x0OAvIpqJ1C8I0YjOC3BK6qEmEZ6wFc7dm2n00O74gCKv7',
+    'secret_key' => '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',
     'webhook_secret' => 'whsec_S9xbzDfBA9ufirKabbiWs1Qzj4DoM7i9',
     'success_url' => 'https://woiendgame.online/checkout/success?session_id={CHECKOUT_SESSION_ID}',
     'cancel_url'  => 'https://woiendgame.online/shop',
