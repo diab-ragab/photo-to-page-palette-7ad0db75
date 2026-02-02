@@ -207,6 +207,22 @@ if ($orderId > 0) {
     }
 }
 
+// Check if any orders were already completed for this payment intent (prevent duplicates)
+$stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE stripe_payment_intent = ? AND status = 'completed' LIMIT 1");
+$stmt->execute(array($paymentIntentId));
+$existingCompleted = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if ($existingCompleted) {
+    // Already processed this payment - return success without creating duplicates
+    error_log("RID={$RID} PAYMENT_ALREADY_PROCESSED pi={$paymentIntentId} existing_order={$existingCompleted['id']}");
+    json_response(array(
+        'success' => true,
+        'status' => 'succeeded',
+        'message' => 'Payment already confirmed',
+        'order_id' => (int)$existingCompleted['id'],
+    ));
+}
+
 if (count($ordersToProcess) > 0) {
     foreach ($ordersToProcess as $oid) {
         // Get order details including character_id
@@ -267,18 +283,9 @@ if (count($ordersToProcess) > 0) {
         $orderId = $oid; // Keep last processed order ID for response
     }
 } else {
-    // No orders found - create a fallback order record
-    $totalReal = $amount / 100; // Convert cents to currency
-    
-    $stmt = $pdo->prepare("
-        INSERT INTO webshop_orders 
-        (user_id, product_id, quantity, total_real, status, stripe_session_id, stripe_payment_intent, delivered_at, created_at)
-        VALUES (?, 0, 1, ?, 'completed', ?, ?, NOW(), NOW())
-    ");
-    $stmt->execute(array($userId, $totalReal, $sessionId, $paymentIntentId));
-    $orderId = $pdo->lastInsertId();
-    
-    error_log("RID={$RID} FALLBACK_ORDER_CREATED order={$orderId} amount={$totalReal} pi={$paymentIntentId}");
+    // No pending orders found for this session - log warning but don't create fallback
+    error_log("RID={$RID} NO_PENDING_ORDERS session={$sessionId} pi={$paymentIntentId} user={$userId}");
+    // Return success anyway - orders were likely already processed
 }
 
 json_response(array(
