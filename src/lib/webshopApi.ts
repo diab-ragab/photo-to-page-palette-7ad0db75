@@ -46,7 +46,8 @@ export async function fetchProducts(options?: {
     if (options?.limit) params.append("limit", String(options.limit));
 
     const res = await fetch(`${API_BASE}/webshop_products.php?${params.toString()}`, {
-      credentials: "include",
+      // Public endpoint: do not send cookies, otherwise CORS will block in preview domains.
+      credentials: "omit",
     });
     const data: ProductsResponse = await res.json();
     if (data.success) {
