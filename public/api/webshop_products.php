@@ -4,17 +4,12 @@
  * Returns active products for all users (no auth required)
  */
 
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
-
+// IMPORTANT:
+// Rely on centralized CORS + error handling in bootstrap.php.
+// Do NOT set wildcard origin here (breaks when credentials are involved).
 require_once __DIR__ . '/bootstrap.php';
+
+header('Content-Type: application/json');
 
 try {
     $pdo = getDbConnection();
