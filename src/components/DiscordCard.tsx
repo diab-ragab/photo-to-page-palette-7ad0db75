@@ -1,8 +1,20 @@
+import { useState, useEffect } from 'react';
 import { motion } from "framer-motion";
 import { MessageCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getSiteSettings } from "@/lib/siteSettingsApi";
 
 export const DiscordCard = () => {
+  const [discordLink, setDiscordLink] = useState('https://discord.gg/vubqbv3U3y');
+  const [memberCount, setMemberCount] = useState('15,403');
+
+  useEffect(() => {
+    getSiteSettings().then(settings => {
+      setDiscordLink(settings.discord_link);
+      setMemberCount(settings.discord_members);
+    });
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -16,13 +28,13 @@ export const DiscordCard = () => {
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-display font-semibold text-xs md:text-sm">Discord</h3>
-          <p className="text-[10px] md:text-xs text-muted-foreground">15,403 Members</p>
+          <p className="text-[10px] md:text-xs text-muted-foreground">{memberCount} Members</p>
         </div>
         <Button 
           variant="outline" 
           size="sm" 
           className="text-[10px] md:text-xs px-2 md:px-3"
-          onClick={() => window.open('https://discord.gg/vubqbv3U3y', '_blank')}
+          onClick={() => window.open(discordLink, '_blank')}
         >
           <span className="hidden sm:inline">Join Server</span>
           <span className="sm:hidden">Join</span>
