@@ -33,7 +33,34 @@ function getAuthHeaders(): HeadersInit {
   };
 }
 
+// Public endpoint for all users to view products
 export async function fetchProducts(options?: {
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<ProductsResponse> {
+  try {
+    const params = new URLSearchParams();
+    if (options?.search) params.append("search", options.search);
+    if (options?.page) params.append("page", String(options.page));
+    if (options?.limit) params.append("limit", String(options.limit));
+
+    const res = await fetch(`${API_BASE}/webshop_products.php?${params.toString()}`, {
+      credentials: "include",
+    });
+    const data: ProductsResponse = await res.json();
+    if (data.success) {
+      return data;
+    }
+    return { success: false, products: [], total: 0, page: 1, pages: 0 };
+  } catch {
+    console.error("Failed to fetch products");
+    return { success: false, products: [], total: 0, page: 1, pages: 0 };
+  }
+}
+
+// Admin-only endpoint for product management
+export async function fetchProductsAdmin(options?: {
   search?: string;
   page?: number;
   limit?: number;
