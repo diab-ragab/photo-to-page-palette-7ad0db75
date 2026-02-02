@@ -67,6 +67,8 @@ $stmt->execute(array($clientIP));
 $rawBody = file_get_contents('php://input');
 $body = json_decode($rawBody, true);
 
+error_log("RID={$RID} PAYMENT_CONFIRM_START body=" . substr($rawBody, 0, 200));
+
 if (!$body) {
     json_fail(400, 'Invalid JSON body');
 }
@@ -85,6 +87,8 @@ if (empty($stripeSecretKey)) {
 
 // If we have a sessionId (from Stripe Checkout), retrieve the session to get payment_intent
 if (!empty($sessionId) && strpos($sessionId, 'cs_') === 0) {
+    error_log("RID={$RID} FETCHING_SESSION session={$sessionId}");
+    
     $sessionUrl = 'https://api.stripe.com/v1/checkout/sessions/' . urlencode($sessionId);
     
     $opts = array(
@@ -225,7 +229,7 @@ if ($existingCompleted) {
 
 if (count($ordersToProcess) > 0) {
     foreach ($ordersToProcess as $oid) {
-        // Get order details including character_id
+        // Get order details INCLUDING character_id (this is the RoleID from basetab_sg)
         $stmt = $pdo->prepare("SELECT id, status, user_id, product_id, quantity, character_id, character_name FROM webshop_orders WHERE id = ? LIMIT 1");
         $stmt->execute(array($oid));
         $order = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -237,7 +241,7 @@ if (count($ordersToProcess) > 0) {
             continue;
         }
         
-        // Mark order as completed (updated_at may not exist in all schemas)
+        // Mark order as completed
         try {
             $stmt = $pdo->prepare("
                 UPDATE webshop_orders 
@@ -265,7 +269,7 @@ if (count($ordersToProcess) > 0) {
             $userId = (int)$order['user_id'];
         }
         
-        // Get character ID from order
+        // Get character ID from order - THIS IS THE ROLEID!
         $characterId = isset($order['character_id']) ? (int)$order['character_id'] : 0;
         $characterName = isset($order['character_name']) ? $order['character_name'] : '';
         
@@ -324,7 +328,7 @@ function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $character
     
     error_log("RID={$RID} FULFILL_PRODUCT name={$productName} item_id={$itemId} item_qty={$itemQuantity} total_grant={$totalGrant}");
     
-    // Use character_id from order (RoleID from basetab_sg)
+    // Use character_id from order - this IS the RoleID from basetab_sg
     $roleId = $characterId;
     error_log("RID={$RID} FULFILL_ROLE character_id={$roleId} character_name={$characterName}");
     
