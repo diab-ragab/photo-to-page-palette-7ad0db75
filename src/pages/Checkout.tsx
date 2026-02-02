@@ -12,7 +12,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { SEO } from "@/components/SEO";
 import { CharacterSelector } from "@/components/shop/CharacterSelector";
 
-const API_BASE = "https://woiendgame.online/api-reference";
+const API_BASE = "https://woiendgame.online/api";
 
 const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();
