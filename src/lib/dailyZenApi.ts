@@ -73,10 +73,13 @@ export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
   }
   
   try {
-    const response = await fetch(`${API_BASE}/daily_zen.php`, {
+    // Cache-bust to avoid CDN/browser serving stale cooldown values
+    const rid = Date.now();
+    const response = await fetch(`${API_BASE}/daily_zen.php?rid=${rid}`, {
       method: 'GET',
       headers: getAuthHeaders(),
       credentials: 'include',
+      cache: 'no-store',
     });
     
     const data = await response.json();

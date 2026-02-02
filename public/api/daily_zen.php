@@ -235,6 +235,11 @@ function secondsUntilNextClaim($pdo, $accountId) {
   }
 
   $lastClaim = strtotime($row['claimed_at']);
+  // Defensive: if DB/server timezone drift causes a future timestamp,
+  // treat it as "just claimed now" so remaining never exceeds 24h.
+  if ($lastClaim > time()) {
+    $lastClaim = time();
+  }
   $nextClaim = $lastClaim + COOLDOWN_SECONDS;
   $remaining = $nextClaim - time();
 
