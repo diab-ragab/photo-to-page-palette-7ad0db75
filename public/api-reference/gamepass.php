@@ -60,20 +60,21 @@ function getZenSkipCost() {
 }
 
 function getCycleInfo() {
-  $cycleLength = 30;
-  $epochStart = strtotime('2025-01-01');
+  // Cycle starts on day 1 of each month
   $now = time();
-
-  $daysSinceEpoch = floor(($now - $epochStart) / 86400);
-  $currentCycle = floor($daysSinceEpoch / $cycleLength);
-  $dayInCycle = ($daysSinceEpoch % $cycleLength) + 1;
-
-  $cycleStartDate = date('Y-m-d', $epochStart + ($currentCycle * $cycleLength * 86400));
+  $dayOfMonth = (int)date('j', $now);  // 1-31
+  $daysInMonth = (int)date('t', $now); // 28-31
+  
+  // Cap at 30 for consistency
+  $currentDay = min($dayOfMonth, 30);
+  $cycleLength = min($daysInMonth, 30);
+  
+  $cycleStartDate = date('Y-m-01', $now); // First day of current month
 
   return array(
-    'current_day' => (int)$dayInCycle,
+    'current_day' => $currentDay,
     'cycle_start' => $cycleStartDate,
-    'days_remaining' => (int)($cycleLength - $dayInCycle)
+    'days_remaining' => max(0, $cycleLength - $currentDay)
   );
 }
 
