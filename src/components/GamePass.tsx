@@ -244,16 +244,30 @@ export const GamePass = () => {
     const fetchUserPassStatus = async () => {
       if (!user) return;
       
+      const sessionToken = localStorage.getItem("woi_session_token") || "";
+      
       try {
         const response = await fetch(
-          `https://woiendgame.online/api/gamepass.php?action=get_status&user_id=${user.username}`
+          `https://woiendgame.online/api/gamepass.php?action=status`,
+          {
+            method: "GET",
+            credentials: "include",
+            headers: {
+              "Accept": "application/json",
+              "X-Session-Token": sessionToken,
+              "Authorization": `Bearer ${sessionToken}`,
+            },
+          }
         );
         const data = await response.json();
         
         if (data.success) {
-          setHasElitePass(data.hasElitePass || false);
-          setClaimedDays(data.claimedDays || []);
-          if (data.currentDay) setCurrentDay(data.currentDay);
+          setHasElitePass(data.is_premium || false);
+          // Merge free and elite claimed days into a single array
+          const freeClaimed = data.claimed_days?.free || [];
+          const eliteClaimed = data.claimed_days?.elite || [];
+          setClaimedDays([...new Set([...freeClaimed, ...eliteClaimed])]);
+          if (data.current_day) setCurrentDay(data.current_day);
         }
       } catch {
         // Silent fail - no claimed days to show
@@ -267,16 +281,22 @@ export const GamePass = () => {
     if (day > currentDay || claimedDays.includes(day)) return;
     if (isElite && !hasElitePass) return;
 
+    const sessionToken = localStorage.getItem("woi_session_token") || "";
+
     setLoading(true);
     try {
-      const response = await fetch("https://woiendgame.online/api/gamepass.php", {
+      const response = await fetch("https://woiendgame.online/api/gamepass.php?action=claim", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-Session-Token": sessionToken,
+          "Authorization": `Bearer ${sessionToken}`,
+        },
         body: JSON.stringify({
-          action: "claim_reward",
-          user_id: user?.username,
           day,
-          is_elite: isElite,
+          tier: isElite ? "elite" : "free",
         }),
       });
 
@@ -285,11 +305,11 @@ export const GamePass = () => {
       if (data.success) {
         setClaimedDays([...claimedDays, day]);
         toast.success("Reward claimed!", {
-          description: `You received: ${rewards[day - 1][isElite ? "eliteReward" : "freeReward"].name}`,
+          description: data.message || `You received: ${rewards[day - 1][isElite ? "eliteReward" : "freeReward"].name}`,
         });
       } else {
         toast.error("Failed to claim reward", {
-          description: data.message || "Please try again later.",
+          description: data.error || "Please try again later.",
         });
       }
     } catch {
