@@ -36,7 +36,7 @@ const rarityOptions = [
   { value: "legendary", label: "Legendary", color: "text-amber-500" },
 ];
 
-const iconOptions = ["🪙", "💰", "⭐", "🌟", "🧪", "💧", "⚡", "📦", "🗡️", "🔥", "🛡️", "✨", "🥚", "🐉", "🎁", "💎", "👑", "🏆"];
+const iconOptions = ["🎁", "💎", "👑", "🏆", "⭐", "💰", "🔥", "⚡", "💜", "💙", "💚", "❤️", "🎯", "🎮", "🎲", "🎪", "🎖️", "🥇", "🥈", "🥉", "💫", "🌈", "🍀", "🔮"];
 
 // Helper to get auth headers
 function getAuthHeaders(): HeadersInit {
