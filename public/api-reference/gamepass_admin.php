@@ -78,40 +78,20 @@ function requireAdminForWrite() {
     return $userId;
 }
 
-// Ensure gamepass_rewards table exists
+// Ensure gamepass_settings table exists (gamepass_rewards already created via SQL)
 try {
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS gamepass_rewards (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            day INT NOT NULL,
-            tier ENUM('free', 'elite') NOT NULL DEFAULT 'free',
-            item_id INT NOT NULL DEFAULT 0,
-            item_name VARCHAR(100) NOT NULL,
-            quantity INT NOT NULL DEFAULT 1,
-            coins INT NOT NULL DEFAULT 0,
-            zen INT NOT NULL DEFAULT 0,
-            exp INT NOT NULL DEFAULT 0,
-            rarity ENUM('common', 'rare', 'epic', 'legendary') NOT NULL DEFAULT 'common',
-            icon VARCHAR(10) NOT NULL DEFAULT '🎁',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY unique_day_tier (day, tier)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-    
-    // Gamepass settings table
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS gamepass_settings (
             setting_key VARCHAR(50) PRIMARY KEY,
             setting_value VARCHAR(255) NOT NULL,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            updated_at DATETIME NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
     
     // Insert default zen_skip_cost if not exists
     $stmt = $pdo->query("SELECT setting_value FROM gamepass_settings WHERE setting_key = 'zen_skip_cost'");
     if (!$stmt->fetch()) {
-        $pdo->exec("INSERT INTO gamepass_settings (setting_key, setting_value) VALUES ('zen_skip_cost', '100000')");
+        $pdo->exec("INSERT INTO gamepass_settings (setting_key, setting_value, updated_at) VALUES ('zen_skip_cost', '100000', NOW())");
     }
 } catch (Exception $e) {
     // Table may already exist
