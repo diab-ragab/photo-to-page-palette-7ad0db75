@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Gift, Crown, Plus, Pencil, Trash2, Save, X, Coins, Gem, Package } from "lucide-react";
 
+type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
+
 export interface GamePassReward {
   id?: number;
   day: number;
@@ -21,7 +23,7 @@ export interface GamePassReward {
   coins: number;
   zen: number;
   exp: number;
-  rarity: "common" | "rare" | "epic" | "legendary";
+  rarity: Rarity;
   icon: string;
 }
 
@@ -31,12 +33,45 @@ interface GamePassRewardsManagerProps {
 
 const rarityOptions = [
   { value: "common", label: "Common", color: "text-muted-foreground" },
+  { value: "uncommon", label: "Uncommon", color: "text-green-500" },
   { value: "rare", label: "Rare", color: "text-blue-500" },
   { value: "epic", label: "Epic", color: "text-purple-500" },
   { value: "legendary", label: "Legendary", color: "text-amber-500" },
 ];
 
-const iconOptions = ["🎁", "💎", "👑", "🏆", "⭐", "💰", "🔥", "⚡", "💜", "💙", "💚", "❤️", "🎯", "🎮", "🎲", "🎪", "🎖️", "🥇", "🥈", "🥉", "💫", "🌈", "🍀", "🔮"];
+// Use text codes that are safe for MySQL utf8 (not utf8mb4)
+const iconOptions = [
+  { value: "GIFT", display: "🎁" },
+  { value: "GEM", display: "💎" },
+  { value: "CROWN", display: "👑" },
+  { value: "TROPHY", display: "🏆" },
+  { value: "STAR", display: "⭐" },
+  { value: "COIN", display: "💰" },
+  { value: "FIRE", display: "🔥" },
+  { value: "BOLT", display: "⚡" },
+  { value: "HEART", display: "❤️" },
+  { value: "TARGET", display: "🎯" },
+  { value: "GAME", display: "🎮" },
+  { value: "DICE", display: "🎲" },
+  { value: "MEDAL", display: "🎖️" },
+  { value: "GOLD", display: "🥇" },
+  { value: "SILVER", display: "🥈" },
+  { value: "BRONZE", display: "🥉" },
+  { value: "SPARKLE", display: "💫" },
+  { value: "RAINBOW", display: "🌈" },
+  { value: "CLOVER", display: "🍀" },
+  { value: "ORB", display: "🔮" },
+  { value: "SWORD", display: "🗡️" },
+  { value: "SHIELD", display: "🛡️" },
+  { value: "POTION", display: "🧪" },
+  { value: "SCROLL", display: "📜" },
+];
+
+// Helper to get display icon from value
+const getIconDisplay = (value: string): string => {
+  const option = iconOptions.find(o => o.value === value);
+  return option ? option.display : value;
+};
 
 // Helper to get auth headers
 function getAuthHeaders(): HeadersInit {
@@ -59,7 +94,7 @@ const defaultReward: Omit<GamePassReward, "id"> = {
   zen: 0,
   exp: 0,
   rarity: "common",
-  icon: "🎁",
+  icon: "GIFT",
 };
 
 // Extracted form component to prevent focus issues
@@ -195,13 +230,13 @@ const RewardFormContent = memo(function RewardFormContent({
           <label className="text-sm font-medium mb-2 block">Icon</label>
           <Select value={editData.icon} onValueChange={(v) => setEditData({ ...editData, icon: v })}>
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue>{getIconDisplay(editData.icon)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <div className="grid grid-cols-6 gap-1 p-1">
                 {iconOptions.map(icon => (
-                  <SelectItem key={icon} value={icon} className="text-center cursor-pointer">
-                    <span className="text-xl">{icon}</span>
+                  <SelectItem key={icon.value} value={icon.value} className="text-center cursor-pointer">
+                    <span className="text-xl">{icon.display}</span>
                   </SelectItem>
                 ))}
               </div>
@@ -497,7 +532,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl">{reward.icon}</span>
+                      <span className="text-2xl">{getIconDisplay(reward.icon)}</span>
                       <div>
                         <p className="font-medium text-sm">{reward.item_name}</p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -554,7 +589,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <span className="text-xl">{reward.icon}</span>
+                        <span className="text-xl">{getIconDisplay(reward.icon)}</span>
                         <span>{reward.item_name}</span>
                       </div>
                     </TableCell>
