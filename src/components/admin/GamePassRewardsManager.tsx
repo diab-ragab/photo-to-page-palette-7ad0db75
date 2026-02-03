@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,137 +62,25 @@ const defaultReward: Omit<GamePassReward, "id"> = {
   icon: "🎁",
 };
 
-export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps) {
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
-  
-  const [rewards, setRewards] = useState<GamePassReward[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedReward, setSelectedReward] = useState<GamePassReward | null>(null);
-  const [editData, setEditData] = useState<Omit<GamePassReward, "id">>(defaultReward);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [filterTier, setFilterTier] = useState<"all" | "free" | "elite">("all");
+// Extracted form component to prevent focus issues
+interface RewardFormContentProps {
+  editData: Omit<GamePassReward, "id">;
+  setEditData: (data: Omit<GamePassReward, "id">) => void;
+  selectedReward: GamePassReward | null;
+  isSubmitting: boolean;
+  onSave: () => void;
+  onClose: () => void;
+}
 
-  useEffect(() => {
-    fetchRewards();
-  }, []);
-
-  const fetchRewards = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=get_rewards");
-      const data = await response.json();
-      if (data.success && data.rewards) {
-        setRewards(data.rewards);
-      } else {
-        setRewards([]);
-      }
-    } catch (error) {
-      console.error("Failed to fetch rewards:", error);
-      toast({ title: "Error", description: "Failed to load rewards", variant: "destructive" });
-      setRewards([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSaveReward = async () => {
-    if (!editData.item_name.trim()) {
-      toast({ title: "Error", description: "Please enter item name", variant: "destructive" });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const endpoint = selectedReward 
-        ? "https://woiendgame.online/api/gamepass_admin.php?action=update_reward"
-        : "https://woiendgame.online/api/gamepass_admin.php?action=add_reward";
-      
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        credentials: "include",
-        body: JSON.stringify({
-          ...editData,
-          id: selectedReward?.id,
-          updated_by: username || "GM",
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        toast({ title: "Success", description: selectedReward ? "Reward updated!" : "Reward added!" });
-        fetchRewards();
-        handleCloseModal();
-      } else {
-        toast({ title: "Error", description: data.error || "Failed to save reward", variant: "destructive" });
-      }
-    } catch (error) {
-      console.error("Save reward error:", error);
-      toast({ title: "Error", description: "Failed to save reward", variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDeleteReward = async (id: number) => {
-    try {
-      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=delete_reward", {
-        method: "POST",
-        headers: getAuthHeaders(),
-        credentials: "include",
-        body: JSON.stringify({ id }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        toast({ title: "Deleted", description: "Reward removed." });
-        fetchRewards();
-      } else {
-        toast({ title: "Error", description: data.error || "Failed to delete reward", variant: "destructive" });
-      }
-    } catch (error) {
-      console.error("Delete reward error:", error);
-      toast({ title: "Error", description: "Failed to delete reward", variant: "destructive" });
-    }
-  };
-
-  const handleEditReward = (reward: GamePassReward) => {
-    setSelectedReward(reward);
-    setEditData({
-      day: reward.day,
-      tier: reward.tier,
-      item_id: reward.item_id,
-      item_name: reward.item_name,
-      quantity: reward.quantity,
-      coins: reward.coins,
-      zen: reward.zen,
-      exp: reward.exp,
-      rarity: reward.rarity,
-      icon: reward.icon,
-    });
-    setIsEditing(true);
-  };
-
-  const handleAddNew = () => {
-    setSelectedReward(null);
-    setEditData(defaultReward);
-    setIsEditing(true);
-  };
-
-  const handleCloseModal = () => {
-    setSelectedReward(null);
-    setIsEditing(false);
-    setEditData(defaultReward);
-  };
-
-  const filteredRewards = rewards
-    .filter(r => filterTier === "all" || r.tier === filterTier)
-    .sort((a, b) => a.day - b.day || (a.tier === "free" ? -1 : 1));
-
-  const RewardFormContent = () => (
+const RewardFormContent = memo(function RewardFormContent({
+  editData,
+  setEditData,
+  selectedReward,
+  isSubmitting,
+  onSave,
+  onClose,
+}: RewardFormContentProps) {
+  return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
@@ -323,17 +211,148 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       </div>
 
       <div className="flex gap-2 pt-2">
-        <Button onClick={handleSaveReward} disabled={isSubmitting} className="flex-1">
+        <Button onClick={onSave} disabled={isSubmitting} className="flex-1">
           <Save className="mr-2 h-4 w-4" />
           {isSubmitting ? "Saving..." : selectedReward ? "Update Reward" : "Add Reward"}
         </Button>
-        <Button variant="outline" onClick={handleCloseModal}>
+        <Button variant="outline" onClick={onClose}>
           <X className="mr-2 h-4 w-4" />
           Cancel
         </Button>
       </div>
     </div>
   );
+});
+
+export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps) {
+  const { toast } = useToast();
+  const isMobile = useIsMobile();
+  
+  const [rewards, setRewards] = useState<GamePassReward[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedReward, setSelectedReward] = useState<GamePassReward | null>(null);
+  const [editData, setEditData] = useState<Omit<GamePassReward, "id">>(defaultReward);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [filterTier, setFilterTier] = useState<"all" | "free" | "elite">("all");
+
+  useEffect(() => {
+    fetchRewards();
+  }, []);
+
+  const fetchRewards = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=get_rewards");
+      const data = await response.json();
+      if (data.success && data.rewards) {
+        setRewards(data.rewards);
+      } else {
+        setRewards([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch rewards:", error);
+      toast({ title: "Error", description: "Failed to load rewards", variant: "destructive" });
+      setRewards([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveReward = async () => {
+    if (!editData.item_name.trim()) {
+      toast({ title: "Error", description: "Please enter item name", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const endpoint = selectedReward 
+        ? "https://woiendgame.online/api/gamepass_admin.php?action=update_reward"
+        : "https://woiendgame.online/api/gamepass_admin.php?action=add_reward";
+      
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify({
+          ...editData,
+          id: selectedReward?.id,
+          updated_by: username || "GM",
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        toast({ title: "Success", description: selectedReward ? "Reward updated!" : "Reward added!" });
+        fetchRewards();
+        handleCloseModal();
+      } else {
+        toast({ title: "Error", description: data.error || "Failed to save reward", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Save reward error:", error);
+      toast({ title: "Error", description: "Failed to save reward", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteReward = async (id: number) => {
+    try {
+      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=delete_reward", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ id }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: "Deleted", description: "Reward removed." });
+        fetchRewards();
+      } else {
+        toast({ title: "Error", description: data.error || "Failed to delete reward", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Delete reward error:", error);
+      toast({ title: "Error", description: "Failed to delete reward", variant: "destructive" });
+    }
+  };
+
+  const handleEditReward = (reward: GamePassReward) => {
+    setSelectedReward(reward);
+    setEditData({
+      day: reward.day,
+      tier: reward.tier,
+      item_id: reward.item_id,
+      item_name: reward.item_name,
+      quantity: reward.quantity,
+      coins: reward.coins,
+      zen: reward.zen,
+      exp: reward.exp,
+      rarity: reward.rarity,
+      icon: reward.icon,
+    });
+    setIsEditing(true);
+  };
+
+  const handleAddNew = () => {
+    setSelectedReward(null);
+    setEditData(defaultReward);
+    setIsEditing(true);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedReward(null);
+    setIsEditing(false);
+    setEditData(defaultReward);
+  };
+
+  const filteredRewards = rewards
+    .filter(r => filterTier === "all" || r.tier === filterTier)
+    .sort((a, b) => a.day - b.day || (a.tier === "free" ? -1 : 1));
 
   return (
     <>
@@ -489,7 +508,14 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                 Configure the reward details for the Game Pass
               </DialogDescription>
             </DialogHeader>
-            <RewardFormContent />
+            <RewardFormContent 
+              editData={editData}
+              setEditData={setEditData}
+              selectedReward={selectedReward}
+              isSubmitting={isSubmitting}
+              onSave={handleSaveReward}
+              onClose={handleCloseModal}
+            />
           </DialogContent>
         </Dialog>
       )}
@@ -505,7 +531,14 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
               </DrawerDescription>
             </DrawerHeader>
             <div className="p-4 pb-8">
-              <RewardFormContent />
+              <RewardFormContent 
+                editData={editData}
+                setEditData={setEditData}
+                selectedReward={selectedReward}
+                isSubmitting={isSubmitting}
+                onSave={handleSaveReward}
+                onClose={handleCloseModal}
+              />
             </div>
           </DrawerContent>
         </Drawer>
