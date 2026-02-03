@@ -32,7 +32,8 @@ function requireAdminForWrite() {
         exit;
     }
     
-    // Get user from session token
+    // Get user from session token.
+    // Compatibility: some deployments store raw token, others store sha256(token).
     $stmt = $pdo->prepare("
         SELECT us.user_id, u.name
         FROM user_sessions us
@@ -42,6 +43,12 @@ function requireAdminForWrite() {
     ");
     $stmt->execute(array($sessionToken));
     $session = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$session) {
+        $sessionTokenHash = hash('sha256', $sessionToken);
+        $stmt->execute(array($sessionTokenHash));
+        $session = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
     
     if (!$session) {
         http_response_code(401);
