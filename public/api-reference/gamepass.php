@@ -10,6 +10,7 @@
 
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/session_helper.php';
 require_once __DIR__ . '/mail_delivery.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -18,17 +19,13 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
-// PHP 5.x compatible RID generation
 $RID = substr(md5(uniqid(mt_rand(), true)), 0, 12);
-
-// Output buffering
 ob_start();
 
 function json_out($code, $payload) {
   while (ob_get_level()) { @ob_end_clean(); }
   http_response_code($code);
   header('Content-Type: application/json; charset=utf-8');
-  // PHP 5.3 compatible json_encode (no JSON_UNESCAPED_UNICODE)
   echo json_encode($payload);
   exit;
 }
@@ -38,7 +35,6 @@ function json_fail($code, $msg) {
   json_out($code, array('success' => false, 'error' => $msg, 'rid' => $RID));
 }
 
-// Error handlers
 set_exception_handler(function($e) {
   error_log("GAMEPASS EX: " . $e->getMessage());
   json_fail(500, "Server error");
@@ -63,122 +59,6 @@ function getZenSkipCost() {
   }
 }
 
-function getSessionToken() {
-  $auth = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : '';
-  if (stripos($auth, 'Bearer ') === 0) return trim(substr($auth, 7));
-
-  $hdr = isset($_SERVER['HTTP_X_SESSION_TOKEN']) ? $_SERVER['HTTP_X_SESSION_TOKEN'] : '';
-  if ($hdr) return trim($hdr);
-
-  if (!empty($_GET['sessionToken'])) return trim((string)$_GET['sessionToken']);
-  if (!empty($_COOKIE['sessionToken'])) return trim((string)$_COOKIE['sessionToken']);
-
-  return '';
-}
-
-function resolveSessionRow($token) {
-  global $pdo;
-
-  if ($token === '') return null;
-
-  $hash = hash('sha256', $token);
-
-  // Try raw token first
-  try {
-    $stmt = $pdo->prepare("
-      SELECT us.user_id, u.name, us.expires_at
-      FROM user_sessions us
-      JOIN users u ON u.ID = us.user_id
-      WHERE us.session_token = ?
-      LIMIT 1
-    ");
-    $stmt->execute(array($token));
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($row) return $row;
-  } catch (Exception $e) {
-    error_log("SESSION_RAW_CHECK: " . $e->getMessage());
-  }
-
-  // Try SHA-256 hash
-  try {
-    $stmt = $pdo->prepare("
-      SELECT us.user_id, u.name, us.expires_at
-      FROM user_sessions us
-      JOIN users u ON u.ID = us.user_id
-      WHERE us.session_token = ?
-      LIMIT 1
-    ");
-    $stmt->execute(array($hash));
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($row) return $row;
-  } catch (Exception $e) {
-    error_log("SESSION_HASH_CHECK: " . $e->getMessage());
-  }
-
-  return null;
-}
-
-function getCurrentUser() {
-  global $pdo;
-  
-  $token = getSessionToken();
-  if ($token === '') return null;
-
-  $sess = resolveSessionRow($token);
-  if (!$sess) return null;
-
-  // Check expiration
-  if (!isset($sess['expires_at'])) return null;
-  
-  $expiresAt = strtotime($sess['expires_at']);
-  if ($expiresAt === false || $expiresAt <= time()) {
-    return null;
-  }
-
-  // touch last_activity best-effort
-  try {
-    $pdo->prepare("UPDATE user_sessions SET last_activity = NOW() WHERE session_token = ?")->execute(array($token));
-  } catch (Exception $e) {
-    // ignore
-  }
-
-  return $sess;
-}
-
-function getUserZen($userId) {
-  global $pdo;
-  try {
-    $stmt = $pdo->prepare("SELECT Gold FROM goldtab_sg WHERE AccountID = ? LIMIT 1");
-    $stmt->execute(array($userId));
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $row ? (int)$row['Gold'] : 0;
-  } catch (Exception $e) {
-    error_log("GET_ZEN_ERROR: " . $e->getMessage());
-    return 0;
-  }
-}
-
-function deductUserZen($userId, $amount) {
-  global $pdo;
-  try {
-    $currentZen = getUserZen($userId);
-    if ($currentZen < $amount) {
-      return array('success' => false, 'message' => 'Insufficient Zen balance');
-    }
-
-    $stmt = $pdo->prepare("UPDATE goldtab_sg SET Gold = Gold - ? WHERE AccountID = ? AND Gold >= ?");
-    $stmt->execute(array($amount, $userId, $amount));
-
-    if ($stmt->rowCount() > 0) {
-      return array('success' => true);
-    }
-    return array('success' => false, 'message' => 'Failed to deduct Zen');
-  } catch (Exception $e) {
-    error_log("DEDUCT_ZEN_ERROR: " . $e->getMessage());
-    return array('success' => false, 'message' => 'Database error');
-  }
-}
-
 function getCycleInfo() {
   $cycleLength = 30;
   $epochStart = strtotime('2025-01-01');
@@ -197,7 +77,26 @@ function getCycleInfo() {
   );
 }
 
-// Main logic wrapped in try-catch
+function formatRewards($rewards) {
+  $formatted = array();
+  foreach ($rewards as $r) {
+    $formatted[] = array(
+      'id' => (int)$r['id'],
+      'day' => (int)$r['day'],
+      'tier' => $r['tier'],
+      'item_id' => (int)$r['item_id'],
+      'item_name' => $r['item_name'],
+      'quantity' => (int)$r['quantity'],
+      'coins' => (int)$r['coins'],
+      'zen' => (int)$r['zen'],
+      'exp' => (int)$r['exp'],
+      'rarity' => isset($r['rarity']) && $r['rarity'] !== '' ? $r['rarity'] : 'common',
+      'icon' => isset($r['icon']) && $r['icon'] !== '' ? $r['icon'] : 'GIFT'
+    );
+  }
+  return $formatted;
+}
+
 try {
   switch ($action) {
 
@@ -207,26 +106,10 @@ try {
 
       try {
         $stmt = $pdo->query("SELECT id, day, tier, item_id, item_name, quantity, coins, zen, exp, rarity, icon FROM gamepass_rewards ORDER BY day ASC, tier ASC");
-        if ($stmt) {
-          $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
+        if ($stmt) $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
       } catch (Exception $e) {
         error_log("GAMEPASS_REWARDS_ERROR: " . $e->getMessage());
-        $rewards = array();
       }
-
-      foreach ($rewards as &$r) {
-        $r['id'] = (int)$r['id'];
-        $r['day'] = (int)$r['day'];
-        $r['item_id'] = (int)$r['item_id'];
-        $r['quantity'] = (int)$r['quantity'];
-        $r['coins'] = (int)$r['coins'];
-        $r['zen'] = (int)$r['zen'];
-        $r['exp'] = (int)$r['exp'];
-        $r['rarity'] = isset($r['rarity']) && $r['rarity'] !== '' ? $r['rarity'] : 'common';
-        $r['icon'] = isset($r['icon']) && $r['icon'] !== '' ? $r['icon'] : 'GIFT';
-      }
-      unset($r);
 
       json_out(200, array(
         'success' => true,
@@ -234,11 +117,12 @@ try {
         'cycle_start' => $cycle['cycle_start'],
         'days_remaining' => $cycle['days_remaining'],
         'zen_cost_per_day' => getZenSkipCost(),
-        'rewards' => $rewards
+        'rewards' => formatRewards($rewards)
       ));
       break;
 
     case 'status':
+      // Use unified helper
       $user = getCurrentUser();
       if (!$user) {
         json_out(401, array('success' => false, 'error' => 'Not authenticated'));
@@ -262,7 +146,8 @@ try {
         error_log("GAMEPASS_PREMIUM_CHECK: " . $e->getMessage());
       }
 
-      $userZen = getUserZen($userId);
+      // Use unified helper for Zen
+      $userZen = getUserZenBalance($userId);
 
       // Claims
       $claimedDays = array('free' => array(), 'elite' => array());
@@ -285,25 +170,10 @@ try {
       $rewards = array();
       try {
         $stmt = $pdo->query("SELECT id, day, tier, item_id, item_name, quantity, coins, zen, exp, rarity, icon FROM gamepass_rewards ORDER BY day ASC, tier ASC");
-        if ($stmt) {
-          $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
+        if ($stmt) $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
       } catch (Exception $e) {
         error_log("GAMEPASS_STATUS_REWARDS_ERROR: " . $e->getMessage());
       }
-
-      foreach ($rewards as &$r) {
-        $r['id'] = (int)$r['id'];
-        $r['day'] = (int)$r['day'];
-        $r['item_id'] = (int)$r['item_id'];
-        $r['quantity'] = (int)$r['quantity'];
-        $r['coins'] = (int)$r['coins'];
-        $r['zen'] = (int)$r['zen'];
-        $r['exp'] = (int)$r['exp'];
-        $r['rarity'] = isset($r['rarity']) && $r['rarity'] !== '' ? $r['rarity'] : 'common';
-        $r['icon'] = isset($r['icon']) && $r['icon'] !== '' ? $r['icon'] : 'GIFT';
-      }
-      unset($r);
 
       json_out(200, array(
         'success' => true,
@@ -314,7 +184,7 @@ try {
         'claimed_days' => $claimedDays,
         'user_zen' => $userZen,
         'zen_cost_per_day' => getZenSkipCost(),
-        'rewards' => $rewards
+        'rewards' => formatRewards($rewards)
       ));
       break;
 
@@ -323,6 +193,7 @@ try {
         json_fail(405, 'Method not allowed');
       }
 
+      // Use unified helper
       $user = getCurrentUser();
       if (!$user) {
         json_out(401, array('success' => false, 'error' => 'Not authenticated'));
@@ -345,10 +216,8 @@ try {
         json_fail(400, 'Please select a character to receive the reward');
       }
 
-      // Verify character belongs to account
-      $stmt = $pdo->prepare("SELECT RoleID, Name FROM basetab_sg WHERE RoleID = ? AND AccountID = ? AND IsDel = 0 LIMIT 1");
-      $stmt->execute(array($roleId, $userId));
-      $character = $stmt->fetch(PDO::FETCH_ASSOC);
+      // Use unified helper for character verification
+      $character = verifyCharacterOwnership($roleId, $userId);
       if (!$character) {
         json_fail(400, 'Invalid character selected. Please choose a valid character.');
       }
@@ -372,13 +241,14 @@ try {
             ));
           }
 
+          // Use unified helper
           $deductResult = deductUserZen($userId, $zenCost);
           if (!$deductResult['success']) {
             json_out(400, array(
               'success' => false,
               'error' => $deductResult['message'],
               'zen_cost' => $zenCost,
-              'user_zen' => getUserZen($userId)
+              'user_zen' => getUserZenBalance($userId)
             ));
           }
         } else {
@@ -434,14 +304,9 @@ try {
       if (!is_array($result) || empty($result['success'])) {
         error_log("GAMEPASS_CLAIM_FAILED user={$userId} day={$day} tier={$tier}");
 
-        // Refund zen if charged
+        // Use unified helper for refund
         if ($zenCost > 0) {
-          try {
-            $stmt = $pdo->prepare("UPDATE goldtab_sg SET Gold = Gold + ? WHERE AccountID = ?");
-            $stmt->execute(array($zenCost, $userId));
-          } catch (Exception $e) {
-            error_log("GAMEPASS_REFUND_FAIL: " . $e->getMessage());
-          }
+          refundUserZen($userId, $zenCost);
         }
 
         json_fail(500, 'Failed to deliver reward. Please try again.');
@@ -470,7 +335,7 @@ try {
 
       if ($zenCost > 0) {
         $resp['zen_spent'] = $zenCost;
-        $resp['user_zen'] = getUserZen($userId);
+        $resp['user_zen'] = getUserZenBalance($userId);
       }
 
       json_out(200, $resp);
