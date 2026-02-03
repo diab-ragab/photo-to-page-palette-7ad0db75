@@ -78,6 +78,22 @@ try {
             KEY idx_user (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
+    
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS gamepass_rewards (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            day INT NOT NULL,
+            tier VARCHAR(10) NOT NULL DEFAULT 'free',
+            item_id INT NOT NULL DEFAULT 0,
+            item_name VARCHAR(100) NOT NULL DEFAULT '',
+            quantity INT NOT NULL DEFAULT 1,
+            coins INT NOT NULL DEFAULT 0,
+            zen INT NOT NULL DEFAULT 0,
+            exp INT NOT NULL DEFAULT 0,
+            UNIQUE KEY unique_reward (day, tier),
+            KEY idx_day (day)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+    ");
 } catch (Exception $e) {
     // Tables may exist
 }
@@ -139,8 +155,16 @@ switch ($action) {
         }
         
         // Get rewards config
-        $stmt = $pdo->query("SELECT * FROM gamepass_rewards ORDER BY day ASC, tier ASC");
-        $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rewards = array();
+        try {
+            $stmt = $pdo->query("SELECT * FROM gamepass_rewards ORDER BY day ASC, tier ASC");
+            if ($stmt) {
+                $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+        } catch (Exception $e) {
+            // Table might not exist yet, return empty rewards
+            error_log("GAMEPASS_STATUS_REWARDS_ERROR: " . $e->getMessage());
+        }
         
         foreach ($rewards as &$r) {
             $r['id'] = (int)$r['id'];
