@@ -383,11 +383,14 @@ if (!function_exists('deductUserZen')) {
                 return array('success' => false, 'message' => 'Insufficient Zen balance');
             }
 
-            $stmt = $pdo->prepare("UPDATE goldtab_sg SET Gold = Gold - ? WHERE AccountID = ? AND Gold >= ?");
-            $stmt->execute(array($amount, $userId, $amount));
+            // Use deductcash stored procedure for proper GoldInfo encryption sync
+            $stmt = $pdo->prepare("CALL deductcash(?, ?)");
+            $stmt->execute(array((int)$userId, (int)$amount));
 
-            if ($stmt->rowCount() > 0) {
-                return array('success' => true);
+            // Verify deduction happened
+            $newZen = getUserZenBalance($userId);
+            if ($newZen <= ($currentZen - $amount + 1)) {
+                return array('success' => true, 'new_balance' => $newZen);
             }
             return array('success' => false, 'message' => 'Failed to deduct Zen');
         } catch (Exception $e) {
