@@ -235,10 +235,62 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [filterTier, setFilterTier] = useState<"all" | "free" | "elite">("all");
+  
+  // Settings state
+  const [zenSkipCost, setZenSkipCost] = useState<number>(100000);
+  const [zenSkipCostInput, setZenSkipCostInput] = useState<string>("100000");
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
     fetchRewards();
+    fetchSettings();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=get_settings", {
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (data.success && data.settings) {
+        setZenSkipCost(data.settings.zen_skip_cost || 100000);
+        setZenSkipCostInput(String(data.settings.zen_skip_cost || 100000));
+      }
+    } catch (error) {
+      console.error("Failed to fetch settings:", error);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    const cost = parseInt(zenSkipCostInput) || 0;
+    if (cost < 0) {
+      toast({ title: "Error", description: "Zen cost cannot be negative", variant: "destructive" });
+      return;
+    }
+    
+    setIsSavingSettings(true);
+    try {
+      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=update_settings", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ zen_skip_cost: cost }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setZenSkipCost(cost);
+        toast({ title: "Success", description: "Settings saved!" });
+      } else {
+        toast({ title: "Error", description: data.error || "Failed to save settings", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Save settings error:", error);
+      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const fetchRewards = async () => {
     setIsLoading(true);
@@ -356,6 +408,44 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
 
   return (
     <>
+      {/* Settings Card */}
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Gem className="h-5 w-5 text-primary" />
+            Skip Settings
+          </CardTitle>
+          <CardDescription>
+            Set the Zen cost for players to unlock future rewards early
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">Zen Cost Per Day (to skip)</label>
+              <Input
+                type="number"
+                min={0}
+                value={zenSkipCostInput}
+                onChange={(e) => setZenSkipCostInput(e.target.value)}
+                placeholder="100000"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Players pay this amount × days ahead to unlock. Current: {zenSkipCost.toLocaleString()} Zen/day
+              </p>
+            </div>
+            <Button 
+              onClick={handleSaveSettings} 
+              disabled={isSavingSettings || parseInt(zenSkipCostInput) === zenSkipCost}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {isSavingSettings ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Rewards Card */}
       <Card>
         <CardHeader className="pb-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
