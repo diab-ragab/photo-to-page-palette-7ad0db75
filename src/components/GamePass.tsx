@@ -180,17 +180,17 @@ const generateFallbackRewards = (): PassReward[] => {
 };
 
 const rarityColors = {
-  common: "border-muted-foreground/30 bg-muted/20",
-  rare: "border-blue-500/50 bg-blue-500/10",
-  epic: "border-purple-500/50 bg-purple-500/10",
-  legendary: "border-amber-500/50 bg-amber-500/10 animate-pulse",
+  common: "border-muted-foreground/40 bg-gradient-to-br from-muted/30 to-muted/10",
+  rare: "border-cyan-500/60 bg-gradient-to-br from-cyan-500/20 to-cyan-900/10",
+  epic: "border-purple-500/60 bg-gradient-to-br from-purple-500/20 to-purple-900/10",
+  legendary: "border-amber-400/70 bg-gradient-to-br from-amber-500/25 to-orange-900/15",
 };
 
 const rarityGlow = {
   common: "",
-  rare: "shadow-blue-500/20",
-  epic: "shadow-purple-500/20",
-  legendary: "shadow-amber-500/30 shadow-lg",
+  rare: "shadow-[0_0_15px_rgba(6,182,212,0.3)]",
+  epic: "shadow-[0_0_15px_rgba(168,85,247,0.3)]",
+  legendary: "shadow-[0_0_20px_rgba(251,191,36,0.4)] animate-[pulse_2s_ease-in-out_infinite]",
 };
 
 export const GamePass = () => {
@@ -351,28 +351,35 @@ export const GamePass = () => {
   const progressPercent = (currentDay / 30) * 100;
 
   return (
-    <Card className="bg-card border-primary/20 overflow-hidden">
-      <CardHeader className="pb-4">
+    <Card className="relative bg-gradient-to-br from-card via-card to-card/80 border-primary/30 overflow-hidden backdrop-blur-sm">
+      {/* Decorative background elements */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+      
+      <CardHeader className="pb-4 relative z-10">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Gift className="h-5 w-5 text-primary" />
-              Game Pass
+            <CardTitle className="flex items-center gap-3 text-2xl font-bold">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30">
+                <Gift className="h-6 w-6 text-primary" />
+              </div>
+              <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">Game Pass</span>
               {hasElitePass && (
-                <Badge className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black ml-2">
+                <Badge className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-bold shadow-[0_0_15px_rgba(251,191,36,0.4)] animate-[pulse_3s_ease-in-out_infinite]">
                   <Crown className="h-3 w-3 mr-1" />
                   Elite
                 </Badge>
               )}
             </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-2 ml-[52px]">
               Claim daily rewards for 30 days. Elite Pass unlocks premium rewards!
             </p>
           </div>
 
           {!hasElitePass && (
             <Button
-              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-semibold"
+              className="relative bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-600 hover:via-yellow-500 hover:to-amber-600 text-black font-bold shadow-[0_0_20px_rgba(251,191,36,0.3)] hover:shadow-[0_0_30px_rgba(251,191,36,0.5)] transition-all duration-300 hover:scale-105"
               onClick={() => {
                 toast.info("Visit the Shop to purchase Elite Pass", {
                   action: {
@@ -384,21 +391,24 @@ export const GamePass = () => {
             >
               <Crown className="h-4 w-4 mr-2" />
               Upgrade to Elite
+              <Sparkles className="h-4 w-4 ml-2 animate-pulse" />
             </Button>
           )}
         </div>
 
         {/* Season Timer */}
-        <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border border-primary/20">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div className="flex items-center gap-3">
+        <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-primary/10 via-background/50 to-purple-500/10 border border-primary/20 backdrop-blur-sm">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-primary" />
+                <div className="p-1.5 rounded-md bg-primary/20 border border-primary/30">
+                  <Calendar className="h-4 w-4 text-primary" />
+                </div>
                 <span className="text-sm font-medium">
-                  Season: <span className="text-primary">{getSeasonName()}</span>
+                  Season: <span className="text-primary font-bold">{getSeasonName()}</span>
                 </span>
               </div>
-              <Button variant="ghost" size="sm" asChild className="text-xs h-7 px-2">
+              <Button variant="ghost" size="sm" asChild className="text-xs h-7 px-3 hover:bg-primary/10 hover:text-primary transition-colors">
                 <Link to="/seasons">
                   <History className="h-3 w-3 mr-1" />
                   Upcoming Seasons
@@ -406,46 +416,58 @@ export const GamePass = () => {
               </Button>
             </div>
             
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Resets in:</span>
-              <div className="flex gap-1">
-                <div className="bg-background/80 border border-border px-2 py-1 rounded text-center min-w-[40px]">
-                  <span className="text-sm font-bold text-primary">{timeLeft.days}</span>
-                  <span className="text-[10px] text-muted-foreground block">days</span>
-                </div>
-                <div className="bg-background/80 border border-border px-2 py-1 rounded text-center min-w-[40px]">
-                  <span className="text-sm font-bold text-primary">{timeLeft.hours.toString().padStart(2, '0')}</span>
-                  <span className="text-[10px] text-muted-foreground block">hrs</span>
-                </div>
-                <div className="bg-background/80 border border-border px-2 py-1 rounded text-center min-w-[40px]">
-                  <span className="text-sm font-bold text-primary">{timeLeft.minutes.toString().padStart(2, '0')}</span>
-                  <span className="text-[10px] text-muted-foreground block">min</span>
-                </div>
-                <div className="bg-background/80 border border-border px-2 py-1 rounded text-center min-w-[40px]">
-                  <span className="text-sm font-bold text-primary">{timeLeft.seconds.toString().padStart(2, '0')}</span>
-                  <span className="text-[10px] text-muted-foreground block">sec</span>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
+                <span className="text-xs text-muted-foreground font-medium">Resets in:</span>
+              </div>
+              <div className="flex gap-1.5">
+                {[
+                  { value: timeLeft.days, label: "days" },
+                  { value: timeLeft.hours.toString().padStart(2, '0'), label: "hrs" },
+                  { value: timeLeft.minutes.toString().padStart(2, '0'), label: "min" },
+                  { value: timeLeft.seconds.toString().padStart(2, '0'), label: "sec" },
+                ].map((item, i) => (
+                  <div key={i} className="bg-background/90 border border-primary/20 px-2.5 py-1.5 rounded-lg text-center min-w-[44px] backdrop-blur-sm">
+                    <span className="text-sm font-bold bg-gradient-to-b from-primary to-primary/70 bg-clip-text text-transparent">{item.value}</span>
+                    <span className="text-[10px] text-muted-foreground block font-medium">{item.label}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
 
         {/* Progress Bar */}
-        <div className="mt-4 space-y-2">
+        <div className="mt-6 space-y-3">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Day {currentDay} of 30</span>
-            <span className="text-primary font-medium">{Math.round(progressPercent)}% Complete</span>
+            <span className="text-muted-foreground font-medium">
+              Day <span className="text-foreground font-bold">{currentDay}</span> of 30
+            </span>
+            <span className="text-primary font-bold">{Math.round(progressPercent)}% Complete</span>
           </div>
-          <Progress value={progressPercent} className="h-2" />
+          <div className="relative">
+            <Progress value={progressPercent} className="h-3 bg-muted/50" />
+            <div 
+              className="absolute top-0 left-0 h-3 rounded-full bg-gradient-to-r from-primary via-cyan-400 to-primary opacity-50 blur-sm"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
 
         {/* Character Selector - Only show when logged in */}
         {user && (
-          <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border">
-            <div className="flex items-center gap-2 mb-2">
-              <User className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Reward Delivery</span>
+          <div className="mt-6 p-4 rounded-xl bg-gradient-to-br from-muted/40 via-muted/20 to-muted/40 border border-border/50 backdrop-blur-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-1.5 rounded-md bg-primary/20 border border-primary/30">
+                <User className="h-4 w-4 text-primary" />
+              </div>
+              <span className="text-sm font-bold">Reward Delivery</span>
+              {selectedCharacterName && (
+                <Badge variant="outline" className="ml-auto border-primary/30 text-primary">
+                  {selectedCharacterName}
+                </Badge>
+              )}
             </div>
             <CharacterSelector 
               onSelect={handleCharacterSelect}
@@ -455,21 +477,23 @@ export const GamePass = () => {
         )}
       </CardHeader>
 
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 relative z-10">
         {/* Navigation */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <Button
             variant="outline"
             size="icon"
             onClick={scrollLeft}
             disabled={scrollPosition === 0}
-            className="shrink-0"
+            className="shrink-0 border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all disabled:opacity-30"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
 
-          <div className="flex-1 mx-2 text-center text-sm text-muted-foreground">
-            Days {scrollPosition + 1} - {Math.min(scrollPosition + 6, 30)}
+          <div className="flex-1 mx-4 text-center">
+            <span className="text-sm font-medium text-muted-foreground">
+              Days <span className="text-foreground font-bold">{scrollPosition + 1}</span> - <span className="text-foreground font-bold">{Math.min(scrollPosition + 6, 30)}</span>
+            </span>
           </div>
 
           <Button
@@ -477,21 +501,26 @@ export const GamePass = () => {
             size="icon"
             onClick={scrollRight}
             disabled={scrollPosition >= 24}
-            className="shrink-0"
+            className="shrink-0 border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all disabled:opacity-30"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
         {/* Pass Rows */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           {/* Elite Pass Row */}
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-2">
-              <Crown className="h-4 w-4 text-amber-500" />
-              <span className="text-sm font-medium text-amber-500">Elite Pass</span>
+          <div className="relative p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-amber-500/10 border border-amber-500/20">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-1.5 rounded-md bg-gradient-to-br from-amber-500/30 to-yellow-500/20 border border-amber-500/40">
+                <Crown className="h-4 w-4 text-amber-400" />
+              </div>
+              <span className="text-sm font-bold bg-gradient-to-r from-amber-400 to-yellow-300 bg-clip-text text-transparent">Elite Pass</span>
               {!hasElitePass && (
-                <Lock className="h-3 w-3 text-muted-foreground" />
+                <Badge variant="outline" className="ml-2 border-amber-500/30 text-amber-500/70 text-xs">
+                  <Lock className="h-2.5 w-2.5 mr-1" />
+                  Locked
+                </Badge>
               )}
             </div>
             <div className="flex gap-2 overflow-hidden">
@@ -506,38 +535,44 @@ export const GamePass = () => {
                   return (
                     <motion.div
                       key={`elite-${day}`}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{ delay: index * 0.05 }}
+                      initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.8, y: -10 }}
+                      transition={{ delay: index * 0.05, type: "spring", stiffness: 200 }}
                       className="flex-1 min-w-[80px]"
                     >
                       <button
                         onClick={() => isAvailable && claimReward(day, true)}
                         disabled={!isAvailable || loading}
                         className={`
-                          w-full aspect-square rounded-lg border-2 flex flex-col items-center justify-center
-                          transition-all duration-300 relative overflow-hidden
+                          w-full aspect-square rounded-xl border-2 flex flex-col items-center justify-center
+                          transition-all duration-300 relative overflow-hidden backdrop-blur-sm
                           ${rarityColors[rarity]} ${rarityGlow[rarity]}
-                          ${isAvailable ? "hover:scale-105 cursor-pointer hover:border-amber-500" : ""}
-                          ${isClaimed ? "opacity-50" : ""}
-                          ${isLocked ? "grayscale opacity-40" : ""}
+                          ${isAvailable ? "hover:scale-110 cursor-pointer hover:border-amber-400 hover:shadow-[0_0_25px_rgba(251,191,36,0.4)]" : ""}
+                          ${isClaimed ? "opacity-60" : ""}
+                          ${isLocked ? "grayscale opacity-30" : ""}
+                          group
                         `}
                       >
                         {isLocked && (
-                          <Lock className="absolute top-1 right-1 h-3 w-3 text-muted-foreground" />
+                          <Lock className="absolute top-1.5 right-1.5 h-3 w-3 text-muted-foreground/50" />
                         )}
                         {isClaimed && (
-                          <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                            <Check className="h-6 w-6 text-green-500" />
+                          <div className="absolute inset-0 bg-green-500/30 backdrop-blur-sm flex items-center justify-center">
+                            <div className="p-1.5 rounded-full bg-green-500/50 border border-green-400">
+                              <Check className="h-5 w-5 text-green-300" />
+                            </div>
                           </div>
                         )}
-                        <span className="text-2xl mb-1">{reward.eliteReward.icon}</span>
-                        <span className="text-[10px] text-muted-foreground text-center px-1 line-clamp-1">
+                        {isAvailable && !isClaimed && (
+                          <div className="absolute inset-0 bg-gradient-to-t from-amber-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        )}
+                        <span className="text-2xl mb-1 drop-shadow-lg group-hover:scale-110 transition-transform">{reward.eliteReward.icon}</span>
+                        <span className="text-[10px] text-muted-foreground text-center px-1 line-clamp-1 font-medium">
                           {reward.eliteReward.name}
                         </span>
                       </button>
-                      <div className="text-center text-xs text-muted-foreground mt-1">
+                      <div className="text-center text-xs text-muted-foreground mt-1.5 font-medium">
                         Day {day}
                       </div>
                     </motion.div>
@@ -547,14 +582,13 @@ export const GamePass = () => {
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="border-t border-border" />
-
           {/* Free Pass Row */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Gift className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Free Pass</span>
+          <div className="relative p-4 rounded-xl bg-gradient-to-r from-primary/10 via-cyan-500/5 to-primary/10 border border-primary/20">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/30 to-cyan-500/20 border border-primary/40">
+                <Gift className="h-4 w-4 text-primary" />
+              </div>
+              <span className="text-sm font-bold text-primary">Free Pass</span>
             </div>
             <div className="flex gap-2 overflow-hidden">
               <AnimatePresence mode="popLayout">
@@ -567,34 +601,40 @@ export const GamePass = () => {
                   return (
                     <motion.div
                       key={`free-${day}`}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{ delay: index * 0.05 }}
+                      initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.8, y: -10 }}
+                      transition={{ delay: index * 0.05, type: "spring", stiffness: 200 }}
                       className="flex-1 min-w-[80px]"
                     >
                       <button
                         onClick={() => isAvailable && claimReward(day, false)}
                         disabled={!isAvailable || loading}
                         className={`
-                          w-full aspect-square rounded-lg border-2 flex flex-col items-center justify-center
-                          transition-all duration-300 relative overflow-hidden
+                          w-full aspect-square rounded-xl border-2 flex flex-col items-center justify-center
+                          transition-all duration-300 relative overflow-hidden backdrop-blur-sm
                           ${rarityColors[rarity]} ${rarityGlow[rarity]}
-                          ${isAvailable ? "hover:scale-105 cursor-pointer hover:border-primary" : ""}
-                          ${isClaimed ? "opacity-50" : ""}
-                          ${day > currentDay ? "opacity-40" : ""}
+                          ${isAvailable ? "hover:scale-110 cursor-pointer hover:border-primary hover:shadow-[0_0_25px_rgba(6,182,212,0.4)]" : ""}
+                          ${isClaimed ? "opacity-60" : ""}
+                          ${day > currentDay ? "opacity-30" : ""}
+                          group
                         `}
                       >
                         {day > currentDay && (
-                          <Lock className="absolute top-1 right-1 h-3 w-3 text-muted-foreground" />
+                          <Lock className="absolute top-1.5 right-1.5 h-3 w-3 text-muted-foreground/50" />
                         )}
                         {isClaimed && (
-                          <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                            <Check className="h-6 w-6 text-green-500" />
+                          <div className="absolute inset-0 bg-green-500/30 backdrop-blur-sm flex items-center justify-center">
+                            <div className="p-1.5 rounded-full bg-green-500/50 border border-green-400">
+                              <Check className="h-5 w-5 text-green-300" />
+                            </div>
                           </div>
                         )}
-                        <span className="text-2xl mb-1">{reward.freeReward.icon}</span>
-                        <span className="text-[10px] text-muted-foreground text-center px-1 line-clamp-1">
+                        {isAvailable && !isClaimed && (
+                          <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        )}
+                        <span className="text-2xl mb-1 drop-shadow-lg group-hover:scale-110 transition-transform">{reward.freeReward.icon}</span>
+                        <span className="text-[10px] text-muted-foreground text-center px-1 line-clamp-1 font-medium">
                           {reward.freeReward.name}
                         </span>
                       </button>
@@ -607,18 +647,31 @@ export const GamePass = () => {
         </div>
 
         {/* Quick Jump */}
-        <div className="mt-4 flex items-center justify-center gap-2">
-          {[1, 7, 14, 21, 30].map((milestone) => (
-            <Button
-              key={milestone}
-              variant={scrollPosition <= milestone - 1 && scrollPosition + 6 > milestone ? "default" : "outline"}
-              size="sm"
-              onClick={() => setScrollPosition(Math.max(0, milestone - 3))}
-              className="text-xs"
-            >
-              {milestone === 30 ? "Final" : `Day ${milestone}`}
-            </Button>
-          ))}
+        <div className="mt-6 flex items-center justify-center gap-2 flex-wrap">
+          {[1, 7, 14, 21, 30].map((milestone) => {
+            const isActive = scrollPosition <= milestone - 1 && scrollPosition + 6 > milestone;
+            return (
+              <Button
+                key={milestone}
+                variant={isActive ? "default" : "outline"}
+                size="sm"
+                onClick={() => setScrollPosition(Math.max(0, milestone - 3))}
+                className={`
+                  text-xs font-medium transition-all duration-300
+                  ${isActive 
+                    ? "bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90 shadow-[0_0_15px_rgba(6,182,212,0.3)]" 
+                    : "border-primary/30 hover:bg-primary/10 hover:border-primary/50"
+                  }
+                `}
+              >
+                {milestone === 30 ? (
+                  <><Star className="h-3 w-3 mr-1" /> Final</>
+                ) : (
+                  `Day ${milestone}`
+                )}
+              </Button>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
