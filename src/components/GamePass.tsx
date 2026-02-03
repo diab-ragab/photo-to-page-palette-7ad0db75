@@ -151,33 +151,7 @@ const convertApiRewards = (apiRewards: ApiReward[]): PassReward[] => {
   return rewards;
 };
 
-// Fallback static rewards
-const generateFallbackRewards = (): PassReward[] => {
-  const rewards: PassReward[] = [];
-  const freeItems = [
-    { name: "10 Coins", icon: "🪙", type: "coins" as const, amount: 10 },
-    { name: "5 VIP Points", icon: "⭐", type: "vip_points" as const, amount: 5 },
-    { name: "25 Coins", icon: "🪙", type: "coins" as const, amount: 25 },
-    { name: "Health Potion", icon: "🧪", type: "item" as const, rarity: "common" as const },
-  ];
-
-  const eliteItems = [
-    { name: "100 Coins", icon: "💰", type: "coins" as const, amount: 100 },
-    { name: "25 VIP Points", icon: "🌟", type: "vip_points" as const, amount: 25 },
-    { name: "Epic Chest", icon: "📦", type: "item" as const, rarity: "epic" as const },
-    { name: "Shadow Blade", icon: "🗡️", type: "item" as const, rarity: "legendary" as const },
-  ];
-
-  for (let day = 1; day <= 30; day++) {
-    rewards.push({
-      day,
-      freeReward: freeItems[(day - 1) % freeItems.length],
-      eliteReward: eliteItems[(day - 1) % eliteItems.length],
-    });
-  }
-
-  return rewards;
-};
+// No fallback static rewards - only show DB rewards
 
 const rarityColors = {
   common: "border-muted-foreground/40 bg-gradient-to-br from-muted/30 to-muted/10",
@@ -201,7 +175,7 @@ export const GamePass = () => {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(getSeasonResetTime());
-  const [rewards, setRewards] = useState<PassReward[]>(generateFallbackRewards());
+  const [rewards, setRewards] = useState<PassReward[]>([]);
   const [passStatus, setPassStatus] = useState<PassStatus | null>(null);
   const [isLoadingRewards, setIsLoadingRewards] = useState(true);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
@@ -221,25 +195,22 @@ export const GamePass = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch rewards from API
+  // Fetch rewards from API - public endpoint
   useEffect(() => {
     const fetchRewards = async () => {
       setIsLoadingRewards(true);
       try {
         const response = await fetch(
-          "https://woiendgame.online/api/gamepass_admin.php?action=get_public_rewards"
+          "https://woiendgame.online/api/gamepass.php?action=rewards"
         );
         const data = await response.json();
         
         if (data.success && data.rewards && data.rewards.length > 0) {
           setRewards(convertApiRewards(data.rewards));
-          if (data.pass) {
-            setPassStatus(data.pass);
-            setCurrentDay(data.pass.currentDay || 1);
-          }
+          if (data.current_day) setCurrentDay(data.current_day);
         }
       } catch {
-        // Silent fail - keep fallback rewards
+        // Silent fail - rewards will be empty
       } finally {
         setIsLoadingRewards(false);
       }
@@ -248,7 +219,7 @@ export const GamePass = () => {
     fetchRewards();
   }, []);
 
-  // Fetch user pass status from PHP backend
+  // Fetch user pass status from PHP backend (also loads rewards)
   useEffect(() => {
     const fetchUserPassStatus = async () => {
       if (!user) return;
@@ -277,6 +248,11 @@ export const GamePass = () => {
           const eliteClaimed = data.claimed_days?.elite || [];
           setClaimedDays([...new Set([...freeClaimed, ...eliteClaimed])]);
           if (data.current_day) setCurrentDay(data.current_day);
+          
+          // Also update rewards from status response
+          if (data.rewards && data.rewards.length > 0) {
+            setRewards(convertApiRewards(data.rewards));
+          }
         }
       } catch {
         // Silent fail - no claimed days to show
