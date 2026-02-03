@@ -50,6 +50,7 @@ function getCurrentUser() {
         return null;
     }
     
+    // Try raw token first
     $stmt = $pdo->prepare("
         SELECT us.user_id, u.name
         FROM user_sessions us
@@ -58,7 +59,16 @@ function getCurrentUser() {
         LIMIT 1
     ");
     $stmt->execute(array($sessionToken));
-    return $stmt->fetch(PDO::FETCH_ASSOC);
+    $session = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // If not found, try SHA-256 hash (some deployments store hashed tokens)
+    if (!$session) {
+        $sessionTokenHash = hash('sha256', $sessionToken);
+        $stmt->execute(array($sessionTokenHash));
+        $session = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    
+    return $session;
 }
 
 function jsonResponse($data, $code = 200) {
