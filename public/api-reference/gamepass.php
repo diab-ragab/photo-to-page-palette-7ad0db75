@@ -16,8 +16,17 @@ header('Content-Type: application/json; charset=utf-8');
 $pdo = getDB();
 $action = isset($_GET['action']) ? $_GET['action'] : (isset($_POST['action']) ? $_POST['action'] : '');
 
-// Zen cost to skip to a future day (per day ahead)
-define('ZEN_COST_PER_DAY', 100000); // 100k Zen per day skipped
+// Get Zen skip cost from settings (fallback to 100k)
+function getZenSkipCost() {
+    global $pdo;
+    try {
+        $stmt = $pdo->query("SELECT setting_value FROM gamepass_settings WHERE setting_key = 'zen_skip_cost'");
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? (int)$row['setting_value'] : 100000;
+    } catch (Exception $e) {
+        return 100000;
+    }
+}
 
 // Token-based auth helper
 function getSessionToken() {
@@ -197,7 +206,7 @@ switch ($action) {
             'current_day' => $cycle['current_day'],
             'cycle_start' => $cycle['cycle_start'],
             'days_remaining' => $cycle['days_remaining'],
-            'zen_cost_per_day' => ZEN_COST_PER_DAY,
+            'zen_cost_per_day' => getZenSkipCost(),
             'rewards' => $rewards
         ));
         break;
@@ -272,7 +281,7 @@ switch ($action) {
             'days_remaining' => $cycle['days_remaining'],
             'claimed_days' => $claimedDays,
             'user_zen' => $userZen,
-            'zen_cost_per_day' => ZEN_COST_PER_DAY,
+            'zen_cost_per_day' => getZenSkipCost(),
             'rewards' => $rewards
         ));
         break;
@@ -317,12 +326,13 @@ switch ($action) {
         $zenCost = 0;
         
         // Check if this is a future day (requires Zen payment for Free tier)
+        $zenSkipCost = getZenSkipCost();
         if ($day > $cycle['current_day']) {
             if ($tier === 'free') {
                 // Free tier: Can pay Zen to unlock future days
                 if (!$payWithZen) {
                     $daysAhead = $day - $cycle['current_day'];
-                    $zenCost = $daysAhead * ZEN_COST_PER_DAY;
+                    $zenCost = $daysAhead * $zenSkipCost;
                     jsonResponse(array(
                         'success' => false, 
                         'error' => 'This day is locked. Pay Zen to unlock early.',
@@ -334,7 +344,7 @@ switch ($action) {
                 
                 // Calculate Zen cost
                 $daysAhead = $day - $cycle['current_day'];
-                $zenCost = $daysAhead * ZEN_COST_PER_DAY;
+                $zenCost = $daysAhead * $zenSkipCost;
                 
                 // Deduct Zen from user
                 $deductResult = deductUserZen($userId, $zenCost);

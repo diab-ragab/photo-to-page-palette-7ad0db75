@@ -97,8 +97,32 @@ try {
             UNIQUE KEY unique_day_tier (day, tier)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
+    
+    // Gamepass settings table
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS gamepass_settings (
+            setting_key VARCHAR(50) PRIMARY KEY,
+            setting_value VARCHAR(255) NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+    
+    // Insert default zen_skip_cost if not exists
+    $stmt = $pdo->query("SELECT setting_value FROM gamepass_settings WHERE setting_key = 'zen_skip_cost'");
+    if (!$stmt->fetch()) {
+        $pdo->exec("INSERT INTO gamepass_settings (setting_key, setting_value) VALUES ('zen_skip_cost', '100000')");
+    }
 } catch (Exception $e) {
     // Table may already exist
+}
+
+// Helper to get gamepass setting
+function getGamepassSetting($key, $default = null) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT setting_value FROM gamepass_settings WHERE setting_key = ?");
+    $stmt->execute([$key]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row ? $row['setting_value'] : $default;
 }
 
 switch ($action) {
@@ -118,7 +142,48 @@ switch ($action) {
             $r['exp'] = (int)$r['exp'];
         }
         
-        echo json_encode(['success' => true, 'rewards' => $rewards]);
+        // Get zen skip cost setting
+        $zenSkipCost = (int)getGamepassSetting('zen_skip_cost', '100000');
+        
+        echo json_encode(['success' => true, 'rewards' => $rewards, 'zen_skip_cost' => $zenSkipCost]);
+        break;
+    
+    case 'get_settings':
+        // Get gamepass settings (admin only)
+        requireAdminForWrite();
+        
+        $zenSkipCost = (int)getGamepassSetting('zen_skip_cost', '100000');
+        
+        echo json_encode([
+            'success' => true,
+            'settings' => [
+                'zen_skip_cost' => $zenSkipCost,
+            ]
+        ]);
+        break;
+    
+    case 'update_settings':
+        // Update gamepass settings (admin only)
+        requireAdminForWrite();
+        
+        $input = json_decode(file_get_contents('php://input'), true);
+        $zenSkipCost = isset($input['zen_skip_cost']) ? (int)$input['zen_skip_cost'] : null;
+        
+        if ($zenSkipCost !== null) {
+            if ($zenSkipCost < 0) {
+                echo json_encode(['success' => false, 'error' => 'Zen cost cannot be negative']);
+                exit;
+            }
+            
+            $stmt = $pdo->prepare("
+                INSERT INTO gamepass_settings (setting_key, setting_value) 
+                VALUES ('zen_skip_cost', ?)
+                ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+            ");
+            $stmt->execute([(string)$zenSkipCost]);
+        }
+        
+        echo json_encode(['success' => true]);
         break;
 
     case 'add_reward':
