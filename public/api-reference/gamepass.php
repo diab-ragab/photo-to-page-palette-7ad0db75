@@ -4,7 +4,7 @@
  * 
  * GET  ?action=status - Get current game pass status for user
  * GET  ?action=rewards - Get rewards list (public, no auth required)
- * POST ?action=claim  - Claim a daily reward
+ * POST ?action=claim  - Claim a daily reward (free on current/past days, costs Zen for future days)
  */
 
 require_once __DIR__ . '/bootstrap.php';
@@ -15,6 +15,9 @@ header('Content-Type: application/json; charset=utf-8');
 
 $pdo = getDB();
 $action = isset($_GET['action']) ? $_GET['action'] : (isset($_POST['action']) ? $_POST['action'] : '');
+
+// Zen cost to skip to a future day (per day ahead)
+define('ZEN_COST_PER_DAY', 100000); // 100k Zen per day skipped
 
 // Token-based auth helper
 function getSessionToken() {
@@ -55,6 +58,44 @@ function jsonResponse($data, $code = 200) {
     exit;
 }
 
+// Get user's Zen balance from goldtab_sg
+function getUserZen($userId) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("SELECT Gold FROM goldtab_sg WHERE AccountID = ? LIMIT 1");
+        $stmt->execute(array($userId));
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? (int)$row['Gold'] : 0;
+    } catch (Exception $e) {
+        error_log("GET_ZEN_ERROR: " . $e->getMessage());
+        return 0;
+    }
+}
+
+// Deduct Zen from user's account
+function deductUserZen($userId, $amount) {
+    global $pdo;
+    try {
+        // Check balance first
+        $currentZen = getUserZen($userId);
+        if ($currentZen < $amount) {
+            return array('success' => false, 'message' => 'Insufficient Zen balance');
+        }
+        
+        $stmt = $pdo->prepare("UPDATE goldtab_sg SET Gold = Gold - ? WHERE AccountID = ? AND Gold >= ?");
+        $stmt->execute(array($amount, $userId, $amount));
+        
+        if ($stmt->rowCount() > 0) {
+            return array('success' => true);
+        } else {
+            return array('success' => false, 'message' => 'Failed to deduct Zen');
+        }
+    } catch (Exception $e) {
+        error_log("DEDUCT_ZEN_ERROR: " . $e->getMessage());
+        return array('success' => false, 'message' => 'Database error');
+    }
+}
+
 // Ensure tables exist - using user's provided schema
 try {
     $pdo->exec("
@@ -76,6 +117,7 @@ try {
             tier VARCHAR(10) NOT NULL,
             claimed_at DATETIME,
             cycle_start DATE NOT NULL,
+            zen_cost INT NOT NULL DEFAULT 0,
             UNIQUE KEY unique_claim (user_id, day, tier, cycle_start),
             KEY idx_user (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
@@ -155,6 +197,7 @@ switch ($action) {
             'current_day' => $cycle['current_day'],
             'cycle_start' => $cycle['cycle_start'],
             'days_remaining' => $cycle['days_remaining'],
+            'zen_cost_per_day' => ZEN_COST_PER_DAY,
             'rewards' => $rewards
         ));
         break;
@@ -178,6 +221,9 @@ switch ($action) {
             $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
             $isPremium = (int)$gp['is_premium'] === 1 && ($expiresAt === null || strtotime($expiresAt) > time());
         }
+        
+        // Get user's Zen balance
+        $userZen = getUserZen($userId);
         
         // Get claimed days for this cycle - using user_gamepass_claims table
         $stmt = $pdo->prepare("
@@ -225,6 +271,8 @@ switch ($action) {
             'cycle_start' => $cycle['cycle_start'],
             'days_remaining' => $cycle['days_remaining'],
             'claimed_days' => $claimedDays,
+            'user_zen' => $userZen,
+            'zen_cost_per_day' => ZEN_COST_PER_DAY,
             'rewards' => $rewards
         ));
         break;
@@ -245,6 +293,7 @@ switch ($action) {
         $day = isset($input['day']) ? (int)$input['day'] : 0;
         $tier = isset($input['tier']) && in_array($input['tier'], array('free', 'elite')) ? $input['tier'] : 'free';
         $roleId = isset($input['roleId']) ? (int)$input['roleId'] : 0;
+        $payWithZen = isset($input['payWithZen']) && $input['payWithZen'] === true;
         
         if ($day < 1 || $day > 30) {
             jsonResponse(array('success' => false, 'error' => 'Invalid day'), 400);
@@ -265,10 +314,42 @@ switch ($action) {
         }
         
         $cycle = getCycleInfo();
+        $zenCost = 0;
         
-        // Check if can claim this day (must be current day or earlier)
+        // Check if this is a future day (requires Zen payment for Free tier)
         if ($day > $cycle['current_day']) {
-            jsonResponse(array('success' => false, 'error' => 'Cannot claim future days'), 400);
+            if ($tier === 'free') {
+                // Free tier: Can pay Zen to unlock future days
+                if (!$payWithZen) {
+                    $daysAhead = $day - $cycle['current_day'];
+                    $zenCost = $daysAhead * ZEN_COST_PER_DAY;
+                    jsonResponse(array(
+                        'success' => false, 
+                        'error' => 'This day is locked. Pay Zen to unlock early.',
+                        'requires_zen' => true,
+                        'zen_cost' => $zenCost,
+                        'days_ahead' => $daysAhead
+                    ), 400);
+                }
+                
+                // Calculate Zen cost
+                $daysAhead = $day - $cycle['current_day'];
+                $zenCost = $daysAhead * ZEN_COST_PER_DAY;
+                
+                // Deduct Zen from user
+                $deductResult = deductUserZen($userId, $zenCost);
+                if (!$deductResult['success']) {
+                    jsonResponse(array(
+                        'success' => false, 
+                        'error' => $deductResult['message'],
+                        'zen_cost' => $zenCost,
+                        'user_zen' => getUserZen($userId)
+                    ), 400);
+                }
+            } else {
+                // Elite tier: Cannot skip ahead (must wait for day)
+                jsonResponse(array('success' => false, 'error' => 'Cannot claim future Elite rewards'), 400);
+            }
         }
         
         // Check elite tier eligibility
@@ -322,19 +403,29 @@ switch ($action) {
         
         if (!$result['success']) {
             error_log("GAMEPASS_CLAIM_FAILED user={$userId} day={$day} tier={$tier} error={$result['message']}");
+            // Refund Zen if claim failed and we charged
+            if ($zenCost > 0) {
+                try {
+                    $stmt = $pdo->prepare("UPDATE goldtab_sg SET Gold = Gold + ? WHERE AccountID = ?");
+                    $stmt->execute(array($zenCost, $userId));
+                    error_log("GAMEPASS_ZEN_REFUND user={$userId} amount={$zenCost}");
+                } catch (Exception $e) {
+                    error_log("GAMEPASS_ZEN_REFUND_FAILED: " . $e->getMessage());
+                }
+            }
             jsonResponse(array('success' => false, 'error' => 'Failed to deliver reward. Please try again.'), 500);
         }
         
         // Record the claim - using user_gamepass_claims table
         $stmt = $pdo->prepare("
-            INSERT INTO user_gamepass_claims (user_id, day, tier, claimed_at, cycle_start)
-            VALUES (?, ?, ?, NOW(), ?)
+            INSERT INTO user_gamepass_claims (user_id, day, tier, claimed_at, cycle_start, zen_cost)
+            VALUES (?, ?, ?, NOW(), ?, ?)
         ");
-        $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start']));
+        $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start'], $zenCost));
         
-        error_log("GAMEPASS_CLAIMED user={$userId} role={$roleId} day={$day} tier={$tier} reward={$reward['item_name']}");
+        error_log("GAMEPASS_CLAIMED user={$userId} role={$roleId} day={$day} tier={$tier} reward={$reward['item_name']} zen_cost={$zenCost}");
         
-        jsonResponse(array(
+        $response = array(
             'success' => true,
             'message' => 'Reward claimed! Check your in-game mailbox.',
             'reward' => array(
@@ -344,7 +435,14 @@ switch ($action) {
                 'zen' => (int)$reward['zen'],
                 'exp' => (int)$reward['exp']
             )
-        ));
+        );
+        
+        if ($zenCost > 0) {
+            $response['zen_spent'] = $zenCost;
+            $response['user_zen'] = getUserZen($userId);
+        }
+        
+        jsonResponse($response);
         break;
         
     default:
