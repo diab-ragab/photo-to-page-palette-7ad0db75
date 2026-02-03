@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { CharacterSelector } from "@/components/shop/CharacterSelector";
 import {
   Crown,
   Lock,
@@ -25,6 +26,7 @@ import {
   Clock,
   Calendar,
   History,
+  User,
 } from "lucide-react";
 
 // Calculate time until next month reset
@@ -202,6 +204,13 @@ export const GamePass = () => {
   const [rewards, setRewards] = useState<PassReward[]>(generateFallbackRewards());
   const [passStatus, setPassStatus] = useState<PassStatus | null>(null);
   const [isLoadingRewards, setIsLoadingRewards] = useState(true);
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
+
+  const handleCharacterSelect = (roleId: number | null, name: string | null) => {
+    setSelectedRoleId(roleId);
+    setSelectedCharacterName(name);
+  };
 
   // Update countdown every second
   useEffect(() => {
@@ -280,6 +289,14 @@ export const GamePass = () => {
   const claimReward = async (day: number, isElite: boolean) => {
     if (day > currentDay || claimedDays.includes(day)) return;
     if (isElite && !hasElitePass) return;
+    
+    // Require character selection
+    if (!selectedRoleId) {
+      toast.error("Select a character", {
+        description: "Please select a character to receive the reward.",
+      });
+      return;
+    }
 
     const sessionToken = localStorage.getItem("woi_session_token") || "";
 
@@ -297,6 +314,7 @@ export const GamePass = () => {
         body: JSON.stringify({
           day,
           tier: isElite ? "elite" : "free",
+          roleId: selectedRoleId,
         }),
       });
 
@@ -305,7 +323,7 @@ export const GamePass = () => {
       if (data.success) {
         setClaimedDays([...claimedDays, day]);
         toast.success("Reward claimed!", {
-          description: data.message || `You received: ${rewards[day - 1][isElite ? "eliteReward" : "freeReward"].name}`,
+          description: `Sent to ${selectedCharacterName || "your character"}! Check your in-game mailbox.`,
         });
       } else {
         toast.error("Failed to claim reward", {
@@ -421,6 +439,20 @@ export const GamePass = () => {
           </div>
           <Progress value={progressPercent} className="h-2" />
         </div>
+
+        {/* Character Selector - Only show when logged in */}
+        {user && (
+          <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <User className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Reward Delivery</span>
+            </div>
+            <CharacterSelector 
+              onSelect={handleCharacterSelect}
+              selectedRoleId={selectedRoleId}
+            />
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="pt-0">

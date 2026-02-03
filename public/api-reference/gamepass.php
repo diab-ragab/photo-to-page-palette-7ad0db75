@@ -202,9 +202,24 @@ switch ($action) {
         
         $day = isset($input['day']) ? (int)$input['day'] : 0;
         $tier = isset($input['tier']) && in_array($input['tier'], array('free', 'elite')) ? $input['tier'] : 'free';
+        $roleId = isset($input['roleId']) ? (int)$input['roleId'] : 0;
         
         if ($day < 1 || $day > 30) {
             jsonResponse(array('success' => false, 'error' => 'Invalid day'), 400);
+        }
+        
+        // Validate roleId is provided and belongs to this user
+        if ($roleId <= 0) {
+            jsonResponse(array('success' => false, 'error' => 'Please select a character to receive the reward'), 400);
+        }
+        
+        // Verify the character belongs to this account
+        $stmt = $pdo->prepare("SELECT RoleID, Name FROM basetab_sg WHERE RoleID = ? AND AccountID = ? AND IsDel = 0 LIMIT 1");
+        $stmt->execute(array($roleId, $userId));
+        $character = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$character) {
+            jsonResponse(array('success' => false, 'error' => 'Invalid character selected. Please choose a valid character.'), 400);
         }
         
         $cycle = getCycleInfo();
@@ -248,13 +263,6 @@ switch ($action) {
         
         if (!$reward) {
             jsonResponse(array('success' => false, 'error' => 'No reward configured for this day'), 404);
-        }
-        
-        // Get user's character role ID
-        $roleId = getUserRoleId($pdo, $userId);
-        
-        if ($roleId <= 0) {
-            jsonResponse(array('success' => false, 'error' => 'No active character found. Please create a character first.'), 400);
         }
         
         // Send reward via in-game mail
