@@ -142,7 +142,7 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
     
-    // User's gamepass_rewards table structure
+    // User's gamepass_rewards table structure (icon uses text code, not emoji for MySQL 5.1 utf8 compat)
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS gamepass_rewards (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -152,10 +152,10 @@ try {
             item_name VARCHAR(100) NOT NULL DEFAULT '',
             quantity INT NOT NULL DEFAULT 1,
             coins INT NOT NULL DEFAULT 0,
-            zen INT NOT NULL DEFAULT 0,
+            zen BIGINT NOT NULL DEFAULT 0,
             exp INT NOT NULL DEFAULT 0,
             rarity VARCHAR(20) NOT NULL DEFAULT 'common',
-            icon VARCHAR(10) NOT NULL DEFAULT '🎁',
+            icon VARCHAR(10) NOT NULL DEFAULT 'GIFT',
             created_at DATETIME,
             updated_at DATETIME,
             UNIQUE KEY unique_reward (day, tier),
