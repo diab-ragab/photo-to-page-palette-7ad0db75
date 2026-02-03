@@ -9,145 +9,22 @@
  * Requires authentication.
  */
 
-ini_set('display_errors', '0');
-ini_set('log_errors', '1');
-error_reporting(E_ALL);
+require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/session_helper.php';
 
-// PHP 5.3 random_bytes fallback
-if (!function_exists('random_bytes')) {
-    function random_bytes($length) {
-        $bytes = '';
-        for ($i = 0; $i < $length; $i++) {
-            $bytes .= chr(mt_rand(0, 255));
-        }
-        return $bytes;
-    }
-}
-
-$RID = bin2hex(random_bytes(6));
-
-function json_response($data) {
-    global $RID;
-    while (ob_get_level()) { ob_end_clean(); }
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(array_merge($data, array('rid' => $RID)));
-    exit;
-}
-
-function json_fail($code, $msg) {
-    global $RID;
-    error_log("RID={$RID} RESP={$code} MSG={$msg}");
-    while (ob_get_level()) { ob_end_clean(); }
-    if (function_exists('http_response_code')) {
-        http_response_code($code);
-    } else {
-        header("HTTP/1.1 {$code} Error");
-    }
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(array('success' => false, 'message' => $msg, 'rid' => $RID));
-    exit;
-}
-
-// Security headers
 header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
 
-// CORS handling
-$allowedOrigins = array(
-    'https://woiendgame.online',
-    'https://www.woiendgame.online',
-    'https://woiendgame.lovable.app',
-    'http://localhost:5173',
-);
+$RID = generateRID();
 
-$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
-$isLovableOrigin = is_string($origin) && 
-    preg_match('/^https:\/\/[a-z0-9-]+\.(lovableproject\.com|lovable\.app)$/i', $origin);
-
-if ($origin && (in_array($origin, $allowedOrigins, true) || $isLovableOrigin)) {
-    header("Access-Control-Allow-Origin: $origin");
-    header("Vary: Origin");
-    header("Access-Control-Allow-Credentials: true");
-}
-
-header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Accept, X-Session-Token, Authorization');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    if (function_exists('http_response_code')) {
-        http_response_code(204);
-    } else {
-        header("HTTP/1.1 204 No Content");
-    }
-    exit;
-}
-
-// Database connection
-$DBHost     = getenv('DB_HOST') ? getenv('DB_HOST') : '192.168.1.88';
-$DBUser     = getenv('DB_USER') ? getenv('DB_USER') : 'root';
-$DBPassword = getenv('DB_PASS') ? getenv('DB_PASS') : 'root';
-$DBName     = getenv('DB_NAME') ? getenv('DB_NAME') : 'shengui';
-
-try {
-    $pdo = new PDO("mysql:host={$DBHost};dbname={$DBName};charset=utf8", $DBUser, $DBPassword, array(
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ));
-} catch (PDOException $e) {
-    json_fail(503, 'Service temporarily unavailable');
-}
-
-// Auth helper
-function getSessionToken() {
-    $auth = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : '';
-    if (stripos($auth, 'Bearer ') === 0) {
-        return trim(substr($auth, 7));
-    }
-    return isset($_SERVER['HTTP_X_SESSION_TOKEN']) ? trim($_SERVER['HTTP_X_SESSION_TOKEN']) : '';
-}
-
-function requireAuth($pdo) {
-    $sessionToken = getSessionToken();
-    
-    if ($sessionToken === '') {
-        json_fail(401, 'Authentication required');
-    }
-    
-    $stmt = $pdo->prepare("
-        SELECT us.user_id
-        FROM user_sessions us
-        WHERE us.session_token = ? AND us.expires_at > NOW()
-        LIMIT 1
-    ");
-    $stmt->execute(array($sessionToken));
-    $session = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$session) {
-        json_fail(401, 'Session expired or invalid');
-    }
-    
-    return (int)$session['user_id'];
-}
+// Require authentication
+$user = requireAuth();
+$userId = $user['user_id'];
 
 // Parse input
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
-// Check if user_sessions table exists (for demo mode)
-$skipAuth = false;
-try {
-    $pdo->query("SELECT 1 FROM user_sessions LIMIT 1");
-} catch (Exception $e) {
-    $skipAuth = true;
-}
-
-$userId = 0;
-if (!$skipAuth) {
-    $userId = requireAuth($pdo);
-} else {
-    // Demo mode - use provided user_id or default
-    $userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 1;
-}
+// Get database connection
+$pdo = getDB();
 
 // ============ LIST ORDERS ============
 if ($action === 'list') {
@@ -193,7 +70,7 @@ if ($action === 'list') {
     $stmt->execute($params);
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    json_response(array(
+    jsonResponse(array(
         'success' => true,
         'orders' => $orders,
         'total' => $total,
@@ -202,4 +79,4 @@ if ($action === 'list') {
     ));
 }
 
-json_fail(400, 'Invalid action');
+jsonFail(400, 'Invalid action');
