@@ -27,7 +27,18 @@ import {
   Calendar,
   History,
   User,
+  Unlock,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Calculate time until next month reset
 const getSeasonResetTime = () => {
@@ -91,6 +102,12 @@ interface PassStatus {
   totalDays: number;
   startDate: string;
   endDate: string;
+}
+
+interface ZenSkipConfirm {
+  day: number;
+  zenCost: number;
+  rewardName: string;
 }
 
 // Convert API rewards to PassReward format
@@ -170,7 +187,7 @@ const rarityGlow = {
 export const GamePass = () => {
   const { user } = useAuth();
   const [hasElitePass, setHasElitePass] = useState(false);
-  const [claimedDays, setClaimedDays] = useState<number[]>([]);
+  const [claimedDays, setClaimedDays] = useState<{ free: number[]; elite: number[] }>({ free: [], elite: [] });
   const [currentDay, setCurrentDay] = useState(1);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -180,6 +197,9 @@ export const GamePass = () => {
   const [isLoadingRewards, setIsLoadingRewards] = useState(true);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
+  const [userZen, setUserZen] = useState(0);
+  const [zenCostPerDay, setZenCostPerDay] = useState(100000);
+  const [zenSkipConfirm, setZenSkipConfirm] = useState<ZenSkipConfirm | null>(null);
 
   const handleCharacterSelect = (roleId: number | null, name: string | null) => {
     setSelectedRoleId(roleId);
@@ -243,11 +263,14 @@ export const GamePass = () => {
         
         if (data.success) {
           setHasElitePass(data.is_premium || false);
-          // Merge free and elite claimed days into a single array
-          const freeClaimed = data.claimed_days?.free || [];
-          const eliteClaimed = data.claimed_days?.elite || [];
-          setClaimedDays([...new Set([...freeClaimed, ...eliteClaimed])]);
+          // Store claimed days by tier
+          setClaimedDays({
+            free: data.claimed_days?.free || [],
+            elite: data.claimed_days?.elite || [],
+          });
           if (data.current_day) setCurrentDay(data.current_day);
+          if (data.user_zen !== undefined) setUserZen(data.user_zen);
+          if (data.zen_cost_per_day) setZenCostPerDay(data.zen_cost_per_day);
           
           // Also update rewards from status response
           if (data.rewards && data.rewards.length > 0) {
@@ -262,9 +285,25 @@ export const GamePass = () => {
     fetchUserPassStatus();
   }, [user]);
 
-  const claimReward = async (day: number, isElite: boolean) => {
-    if (day > currentDay || claimedDays.includes(day)) return;
+  const claimReward = async (day: number, isElite: boolean, payWithZen: boolean = false) => {
+    const tier = isElite ? "elite" : "free";
+    const isClaimed = claimedDays[tier].includes(day);
+    
+    if (isClaimed) return;
     if (isElite && !hasElitePass) return;
+    
+    // For future days in free tier, show Zen confirmation
+    if (!isElite && day > currentDay && !payWithZen) {
+      const daysAhead = day - currentDay;
+      const zenCost = daysAhead * zenCostPerDay;
+      const reward = rewards.find(r => r.day === day);
+      setZenSkipConfirm({
+        day,
+        zenCost,
+        rewardName: reward?.freeReward.name || "Reward",
+      });
+      return;
+    }
     
     // Require character selection
     if (!selectedRoleId) {
@@ -291,15 +330,23 @@ export const GamePass = () => {
           day,
           tier: isElite ? "elite" : "free",
           roleId: selectedRoleId,
+          payWithZen: payWithZen,
         }),
       });
 
       const data = await response.json();
       
       if (data.success) {
-        setClaimedDays([...claimedDays, day]);
+        setClaimedDays(prev => ({
+          ...prev,
+          [tier]: [...prev[tier], day],
+        }));
+        if (data.user_zen !== undefined) {
+          setUserZen(data.user_zen);
+        }
+        const zenMsg = data.zen_spent ? ` (-${data.zen_spent.toLocaleString()} Zen)` : "";
         toast.success("Reward claimed!", {
-          description: `Sent to ${selectedCharacterName || "your character"}! Check your in-game mailbox.`,
+          description: `Sent to ${selectedCharacterName || "your character"}!${zenMsg} Check your in-game mailbox.`,
         });
       } else {
         toast.error("Failed to claim reward", {
@@ -312,6 +359,13 @@ export const GamePass = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmZenSkip = () => {
+    if (zenSkipConfirm) {
+      claimReward(zenSkipConfirm.day, false, true);
+      setZenSkipConfirm(null);
     }
   };
 
@@ -503,7 +557,7 @@ export const GamePass = () => {
               <AnimatePresence mode="popLayout">
                 {visibleRewards.map((reward, index) => {
                   const day = reward.day;
-                  const isClaimed = claimedDays.includes(day);
+                  const isClaimed = claimedDays.elite.includes(day);
                   const isAvailable = day <= currentDay && !isClaimed && hasElitePass;
                   const isLocked = !hasElitePass;
                   const rarity = reward.eliteReward.rarity || "common";
@@ -565,14 +619,24 @@ export const GamePass = () => {
                 <Gift className="h-4 w-4 text-primary" />
               </div>
               <span className="text-sm font-bold text-primary">Free Pass</span>
+              {user && userZen > 0 && (
+                <Badge variant="outline" className="ml-auto border-primary/30 text-primary text-xs">
+                  <Coins className="h-3 w-3 mr-1" />
+                  {userZen.toLocaleString()} Zen
+                </Badge>
+              )}
             </div>
             <div className="flex gap-2 overflow-hidden">
               <AnimatePresence mode="popLayout">
                 {visibleRewards.map((reward, index) => {
                   const day = reward.day;
-                  const isClaimed = claimedDays.includes(day);
+                  const isClaimed = claimedDays.free.includes(day);
                   const isAvailable = day <= currentDay && !isClaimed;
+                  const isFuture = day > currentDay && !isClaimed;
                   const rarity = reward.freeReward.rarity || "common";
+                  const daysAhead = day - currentDay;
+                  const zenCost = daysAhead * zenCostPerDay;
+                  const canAffordSkip = userZen >= zenCost;
 
                   return (
                     <motion.div
@@ -584,20 +648,31 @@ export const GamePass = () => {
                       className="flex-1 min-w-[80px]"
                     >
                       <button
-                        onClick={() => isAvailable && claimReward(day, false)}
-                        disabled={!isAvailable || loading}
+                        onClick={() => {
+                          if (isClaimed) return;
+                          if (isAvailable) {
+                            claimReward(day, false);
+                          } else if (isFuture && user) {
+                            // Show Zen skip confirmation
+                            claimReward(day, false);
+                          }
+                        }}
+                        disabled={loading || isClaimed || (!isAvailable && !isFuture)}
                         className={`
                           w-full aspect-square rounded-xl border-2 flex flex-col items-center justify-center
                           transition-all duration-300 relative overflow-hidden backdrop-blur-sm
                           ${rarityColors[rarity]} ${rarityGlow[rarity]}
                           ${isAvailable ? "hover:scale-110 cursor-pointer hover:border-primary hover:shadow-[0_0_25px_rgba(6,182,212,0.4)]" : ""}
+                          ${isFuture && user && canAffordSkip ? "hover:scale-105 cursor-pointer hover:border-amber-400/60" : ""}
                           ${isClaimed ? "opacity-60" : ""}
-                          ${day > currentDay ? "opacity-30" : ""}
+                          ${isFuture && !user ? "opacity-30" : ""}
                           group
                         `}
                       >
-                        {day > currentDay && (
-                          <Lock className="absolute top-1.5 right-1.5 h-3 w-3 text-muted-foreground/50" />
+                        {isFuture && !isClaimed && (
+                          <div className="absolute top-1 right-1 flex items-center gap-0.5 bg-background/80 rounded-full px-1 py-0.5">
+                            <Unlock className="h-2.5 w-2.5 text-amber-400" />
+                          </div>
                         )}
                         {isClaimed && (
                           <div className="absolute inset-0 bg-green-500/30 backdrop-blur-sm flex items-center justify-center">
@@ -609,10 +684,18 @@ export const GamePass = () => {
                         {isAvailable && !isClaimed && (
                           <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         )}
+                        {isFuture && user && !isClaimed && (
+                          <div className="absolute inset-0 bg-gradient-to-t from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        )}
                         <span className="text-2xl mb-1 drop-shadow-lg group-hover:scale-110 transition-transform">{reward.freeReward.icon}</span>
                         <span className="text-[10px] text-muted-foreground text-center px-1 line-clamp-1 font-medium">
                           {reward.freeReward.name}
                         </span>
+                        {isFuture && !isClaimed && user && (
+                          <span className="text-[8px] text-amber-400/80 font-medium mt-0.5">
+                            {(zenCost / 1000).toFixed(0)}k Zen
+                          </span>
+                        )}
                       </button>
                     </motion.div>
                   );
@@ -650,6 +733,51 @@ export const GamePass = () => {
           })}
         </div>
       </CardContent>
+
+      {/* Zen Skip Confirmation Dialog */}
+      <AlertDialog open={zenSkipConfirm !== null} onOpenChange={(open) => !open && setZenSkipConfirm(null)}>
+        <AlertDialogContent className="border-primary/30">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Unlock className="h-5 w-5 text-amber-400" />
+              Unlock Reward Early
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Unlock <span className="font-bold text-foreground">{zenSkipConfirm?.rewardName}</span> for 
+                Day {zenSkipConfirm?.day} early by paying Zen.
+              </p>
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
+                <span className="text-sm font-medium">Cost:</span>
+                <span className="font-bold text-amber-400">
+                  {zenSkipConfirm?.zenCost.toLocaleString()} Zen
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Your Balance:</span>
+                <span className={userZen >= (zenSkipConfirm?.zenCost || 0) ? "text-green-400" : "text-destructive"}>
+                  {userZen.toLocaleString()} Zen
+                </span>
+              </div>
+              {userZen < (zenSkipConfirm?.zenCost || 0) && (
+                <p className="text-destructive text-sm">
+                  Insufficient Zen balance. You need {((zenSkipConfirm?.zenCost || 0) - userZen).toLocaleString()} more Zen.
+                </p>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmZenSkip}
+              disabled={userZen < (zenSkipConfirm?.zenCost || 0) || loading}
+              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-bold"
+            >
+              {loading ? "Processing..." : "Unlock Now"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
