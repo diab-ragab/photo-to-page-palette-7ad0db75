@@ -54,7 +54,7 @@ function jsonResponse($data, $code = 200) {
     exit;
 }
 
-// Ensure tables exist
+// Ensure tables exist (matches your SQL schema)
 try {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS user_gamepass (
@@ -66,32 +66,36 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
     
+    // Uses your gamepass_claims table structure
     $pdo->exec("
-        CREATE TABLE IF NOT EXISTS user_gamepass_claims (
+        CREATE TABLE IF NOT EXISTS gamepass_claims (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
+            reward_id INT NOT NULL,
             day INT NOT NULL,
-            tier VARCHAR(10) NOT NULL,
-            claimed_at DATETIME,
-            cycle_start DATE NOT NULL,
-            UNIQUE KEY unique_claim (user_id, day, tier, cycle_start),
-            KEY idx_user (user_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+            tier ENUM('free','elite') NOT NULL,
+            claimed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY IX_gamepass_claims_unique (user_id, day, tier),
+            KEY FK_gamepass_claims_rewards (reward_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci
     ");
     
+    // Uses your gamepass_rewards table structure with rarity and icon
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS gamepass_rewards (
             id INT AUTO_INCREMENT PRIMARY KEY,
             day INT NOT NULL,
-            tier VARCHAR(10) NOT NULL DEFAULT 'free',
-            item_id INT NOT NULL DEFAULT 0,
-            item_name VARCHAR(100) NOT NULL DEFAULT '',
-            quantity INT NOT NULL DEFAULT 1,
-            coins INT NOT NULL DEFAULT 0,
-            zen INT NOT NULL DEFAULT 0,
-            exp INT NOT NULL DEFAULT 0,
-            UNIQUE KEY unique_reward (day, tier),
-            KEY idx_day (day)
+            tier ENUM('free','elite') NOT NULL DEFAULT 'free',
+            item_id INT DEFAULT 0,
+            item_name VARCHAR(100) NOT NULL,
+            quantity INT DEFAULT 1,
+            coins INT DEFAULT 0,
+            zen BIGINT DEFAULT 0,
+            exp INT DEFAULT 0,
+            rarity ENUM('common','uncommon','rare','epic','legendary') DEFAULT 'common',
+            icon VARCHAR(10) DEFAULT '🎁',
+            created_at DATETIME,
+            UNIQUE KEY IX_gamepass_rewards_day_tier (day, tier)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
 } catch (Exception $e) {
@@ -138,12 +142,12 @@ switch ($action) {
             $isPremium = (int)$gp['is_premium'] === 1 && ($expiresAt === null || strtotime($expiresAt) > time());
         }
         
-        // Get claimed days for this cycle
+        // Get claimed days for this cycle (using gamepass_claims table)
         $stmt = $pdo->prepare("
-            SELECT day, tier FROM user_gamepass_claims 
-            WHERE user_id = ? AND cycle_start = ?
+            SELECT day, tier FROM gamepass_claims 
+            WHERE user_id = ?
         ");
-        $stmt->execute(array($userId, $cycle['cycle_start']));
+        $stmt->execute(array($userId));
         $claims = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         $claimedDays = array('free' => array(), 'elite' => array());
@@ -174,6 +178,9 @@ switch ($action) {
             $r['coins'] = (int)$r['coins'];
             $r['zen'] = (int)$r['zen'];
             $r['exp'] = (int)$r['exp'];
+            // Include rarity and icon from your schema
+            $r['rarity'] = isset($r['rarity']) ? $r['rarity'] : 'common';
+            $r['icon'] = isset($r['icon']) ? $r['icon'] : '🎁';
         }
         
         jsonResponse(array(
@@ -246,12 +253,12 @@ switch ($action) {
             }
         }
         
-        // Check if already claimed
+        // Check if already claimed (using gamepass_claims table)
         $stmt = $pdo->prepare("
-            SELECT id FROM user_gamepass_claims 
-            WHERE user_id = ? AND day = ? AND tier = ? AND cycle_start = ?
+            SELECT id FROM gamepass_claims 
+            WHERE user_id = ? AND day = ? AND tier = ?
         ");
-        $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start']));
+        $stmt->execute(array($userId, $day, $tier));
         if ($stmt->fetch()) {
             jsonResponse(array('success' => false, 'error' => 'Already claimed this reward'), 400);
         }
@@ -283,12 +290,12 @@ switch ($action) {
             jsonResponse(array('success' => false, 'error' => 'Failed to deliver reward. Please try again.'), 500);
         }
         
-        // Record the claim
+        // Record the claim (using gamepass_claims table with reward_id)
         $stmt = $pdo->prepare("
-            INSERT INTO user_gamepass_claims (user_id, day, tier, claimed_at, cycle_start)
-            VALUES (?, ?, ?, NOW(), ?)
+            INSERT INTO gamepass_claims (user_id, reward_id, day, tier)
+            VALUES (?, ?, ?, ?)
         ");
-        $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start']));
+        $stmt->execute(array($userId, (int)$reward['id'], $day, $tier));
         
         error_log("GAMEPASS_CLAIMED user={$userId} role={$roleId} day={$day} tier={$tier} reward={$reward['item_name']}");
         
