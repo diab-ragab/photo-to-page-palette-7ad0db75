@@ -202,9 +202,9 @@ switch ($action) {
         $zen = isset($input['zen']) ? (int)$input['zen'] : 0;
         $exp = isset($input['exp']) ? (int)$input['exp'] : 0;
         $rarityInput = isset($input['rarity']) ? $input['rarity'] : '';
-        $rarity = in_array($rarityInput, array('common', 'rare', 'epic', 'legendary')) ? $rarityInput : 'common';
-        $iconInput = isset($input['icon']) ? trim($input['icon']) : '🎁';
-        $icon = $iconInput ? $iconInput : '🎁';
+        $rarity = in_array($rarityInput, array('common', 'uncommon', 'rare', 'epic', 'legendary')) ? $rarityInput : 'common';
+        $iconInput = isset($input['icon']) ? trim($input['icon']) : 'GIFT';
+        $icon = $iconInput ? $iconInput : 'GIFT';
         
         if (empty($item_name)) {
             echo json_encode(array('success' => false, 'error' => 'Item name is required'));
@@ -254,9 +254,9 @@ switch ($action) {
         $zen = isset($input['zen']) ? (int)$input['zen'] : 0;
         $exp = isset($input['exp']) ? (int)$input['exp'] : 0;
         $rarityInput = isset($input['rarity']) ? $input['rarity'] : '';
-        $rarity = in_array($rarityInput, array('common', 'rare', 'epic', 'legendary')) ? $rarityInput : 'common';
-        $iconInput = isset($input['icon']) ? trim($input['icon']) : '🎁';
-        $icon = $iconInput ? $iconInput : '🎁';
+        $rarity = in_array($rarityInput, array('common', 'uncommon', 'rare', 'epic', 'legendary')) ? $rarityInput : 'common';
+        $iconInput = isset($input['icon']) ? trim($input['icon']) : 'GIFT';
+        $icon = $iconInput ? $iconInput : 'GIFT';
         
         if (empty($item_name)) {
             echo json_encode(array('success' => false, 'error' => 'Item name is required'));

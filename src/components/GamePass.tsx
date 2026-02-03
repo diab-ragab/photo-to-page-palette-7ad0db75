@@ -64,6 +64,8 @@ const getSeasonName = () => {
   return monthNames[month];
 };
 
+type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
+
 interface ApiReward {
   id: number;
   day: number;
@@ -74,7 +76,7 @@ interface ApiReward {
   coins: number;
   zen: number;
   exp: number;
-  rarity: "common" | "rare" | "epic" | "legendary";
+  rarity: Rarity;
   icon: string;
 }
 
@@ -85,14 +87,14 @@ interface PassReward {
     name: string;
     amount?: number;
     icon: string;
-    rarity?: "common" | "rare" | "epic" | "legendary";
+    rarity?: Rarity;
   };
   eliteReward: {
     type: "coins" | "vip_points" | "item";
     name: string;
     amount?: number;
     icon: string;
-    rarity?: "common" | "rare" | "epic" | "legendary";
+    rarity?: Rarity;
   };
 }
 
@@ -170,18 +172,54 @@ const convertApiRewards = (apiRewards: ApiReward[]): PassReward[] => {
 
 // No fallback static rewards - only show DB rewards
 
-const rarityColors = {
+const rarityColors: Record<Rarity, string> = {
   common: "border-muted-foreground/40 bg-gradient-to-br from-muted/30 to-muted/10",
+  uncommon: "border-green-500/60 bg-gradient-to-br from-green-500/20 to-green-900/10",
   rare: "border-cyan-500/60 bg-gradient-to-br from-cyan-500/20 to-cyan-900/10",
   epic: "border-purple-500/60 bg-gradient-to-br from-purple-500/20 to-purple-900/10",
   legendary: "border-amber-400/70 bg-gradient-to-br from-amber-500/25 to-orange-900/15",
 };
 
-const rarityGlow = {
+const rarityGlow: Record<Rarity, string> = {
   common: "",
+  uncommon: "shadow-[0_0_12px_rgba(34,197,94,0.25)]",
   rare: "shadow-[0_0_15px_rgba(6,182,212,0.3)]",
   epic: "shadow-[0_0_15px_rgba(168,85,247,0.3)]",
   legendary: "shadow-[0_0_20px_rgba(251,191,36,0.4)] animate-[pulse_2s_ease-in-out_infinite]",
+};
+
+// Icon map: convert text codes to emojis
+const iconMap: Record<string, string> = {
+  "GIFT": "🎁",
+  "GEM": "💎",
+  "CROWN": "👑",
+  "TROPHY": "🏆",
+  "STAR": "⭐",
+  "COIN": "💰",
+  "FIRE": "🔥",
+  "BOLT": "⚡",
+  "HEART": "❤️",
+  "TARGET": "🎯",
+  "GAME": "🎮",
+  "DICE": "🎲",
+  "MEDAL": "🎖️",
+  "GOLD": "🥇",
+  "SILVER": "🥈",
+  "BRONZE": "🥉",
+  "SPARKLE": "💫",
+  "RAINBOW": "🌈",
+  "CLOVER": "🍀",
+  "ORB": "🔮",
+  "SWORD": "🗡️",
+  "SHIELD": "🛡️",
+  "POTION": "🧪",
+  "SCROLL": "📜",
+};
+
+const getIconDisplay = (icon: string): string => {
+  // If it's already an emoji or not in the map, return as is
+  if (iconMap[icon]) return iconMap[icon];
+  return icon;
 };
 
 export const GamePass = () => {
@@ -597,7 +635,7 @@ export const GamePass = () => {
                         {isAvailable && !isClaimed && (
                           <div className="absolute inset-0 bg-gradient-to-t from-amber-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         )}
-                        <span className="text-2xl mb-1 drop-shadow-lg group-hover:scale-110 transition-transform">{reward.eliteReward.icon}</span>
+                        <span className="text-2xl mb-1 drop-shadow-lg group-hover:scale-110 transition-transform">{getIconDisplay(reward.eliteReward.icon)}</span>
                         <span className="text-[10px] text-muted-foreground text-center px-1 line-clamp-1 font-medium">
                           {reward.eliteReward.name}
                         </span>
@@ -687,7 +725,7 @@ export const GamePass = () => {
                         {isFuture && user && !isClaimed && (
                           <div className="absolute inset-0 bg-gradient-to-t from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         )}
-                        <span className="text-2xl mb-1 drop-shadow-lg group-hover:scale-110 transition-transform">{reward.freeReward.icon}</span>
+                        <span className="text-2xl mb-1 drop-shadow-lg group-hover:scale-110 transition-transform">{getIconDisplay(reward.freeReward.icon)}</span>
                         <span className="text-[10px] text-muted-foreground text-center px-1 line-clamp-1 font-medium">
                           {reward.freeReward.name}
                         </span>
