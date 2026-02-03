@@ -77,6 +77,83 @@ function getCycleInfo() {
   );
 }
 
+// Detect reward table columns dynamically
+function getRewardColumns() {
+  global $pdo;
+  try {
+    $cols = $pdo->query("SHOW COLUMNS FROM gamepass_rewards")->fetchAll(PDO::FETCH_COLUMN);
+    return $cols;
+  } catch (Exception $e) {
+    return array();
+  }
+}
+
+function fetchRewards($whereClause = '', $params = array()) {
+  global $pdo;
+  
+  $cols = getRewardColumns();
+  
+  // Determine column names based on schema
+  $nameCol = in_array('reward_name', $cols) ? 'reward_name' : (in_array('item_name', $cols) ? 'item_name' : 'name');
+  $typeCol = in_array('reward_type', $cols) ? 'reward_type' : (in_array('item_type', $cols) ? 'item_type' : null);
+  
+  // Build SELECT
+  $selectParts = array('id', 'day', 'tier', 'item_id', 'quantity', 'rarity', 'icon');
+  $selectParts[] = "$nameCol as item_name";
+  
+  // Handle coins, zen, exp - may be separate columns or derived from reward_type
+  $hasCoins = in_array('coins', $cols);
+  $hasZen = in_array('zen', $cols);
+  $hasExp = in_array('exp', $cols);
+  
+  if ($hasCoins) $selectParts[] = 'coins';
+  if ($hasZen) $selectParts[] = 'zen';
+  if ($hasExp) $selectParts[] = 'exp';
+  
+  $sql = "SELECT " . implode(', ', $selectParts) . " FROM gamepass_rewards";
+  if ($whereClause) $sql .= " WHERE $whereClause";
+  $sql .= " ORDER BY day ASC, tier ASC";
+  
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute($params);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+  
+  // Normalize rewards based on reward_type if coins/zen/exp not separate
+  $rewards = array();
+  foreach ($rows as $r) {
+    $reward = array(
+      'id' => (int)$r['id'],
+      'day' => (int)$r['day'],
+      'tier' => $r['tier'],
+      'item_id' => (int)$r['item_id'],
+      'item_name' => $r['item_name'],
+      'quantity' => (int)$r['quantity'],
+      'coins' => isset($r['coins']) ? (int)$r['coins'] : 0,
+      'zen' => isset($r['zen']) ? (int)$r['zen'] : 0,
+      'exp' => isset($r['exp']) ? (int)$r['exp'] : 0,
+      'rarity' => isset($r['rarity']) && $r['rarity'] !== '' ? $r['rarity'] : 'common',
+      'icon' => isset($r['icon']) && $r['icon'] !== '' ? $r['icon'] : 'GIFT'
+    );
+    
+    // If using reward_type system, derive coins/zen/exp from item_id rules
+    // item_id: -1 = zen, -2 = coins, -3 = exp
+    if ($reward['item_id'] === -1) {
+      $reward['zen'] = $reward['quantity'];
+      $reward['quantity'] = 0;
+    } elseif ($reward['item_id'] === -2) {
+      $reward['coins'] = $reward['quantity'];
+      $reward['quantity'] = 0;
+    } elseif ($reward['item_id'] === -3) {
+      $reward['exp'] = $reward['quantity'];
+      $reward['quantity'] = 0;
+    }
+    
+    $rewards[] = $reward;
+  }
+  
+  return $rewards;
+}
+
 function formatRewards($rewards) {
   $formatted = array();
   foreach ($rewards as $r) {
@@ -90,8 +167,8 @@ function formatRewards($rewards) {
       'coins' => (int)$r['coins'],
       'zen' => (int)$r['zen'],
       'exp' => (int)$r['exp'],
-      'rarity' => isset($r['rarity']) && $r['rarity'] !== '' ? $r['rarity'] : 'common',
-      'icon' => isset($r['icon']) && $r['icon'] !== '' ? $r['icon'] : 'GIFT'
+      'rarity' => $r['rarity'],
+      'icon' => $r['icon']
     );
   }
   return $formatted;
@@ -113,14 +190,7 @@ try {
 
     case 'rewards':
       $cycle = getCycleInfo();
-      $rewards = array();
-
-      try {
-        $stmt = $pdo->query("SELECT id, day, tier, item_id, item_name, quantity, coins, zen, exp, rarity, icon FROM gamepass_rewards ORDER BY day ASC, tier ASC");
-        if ($stmt) $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
-      } catch (Exception $e) {
-        error_log("GAMEPASS_REWARDS_ERROR: " . $e->getMessage());
-      }
+      $rewards = fetchRewards();
 
       json_out(200, array(
         'success' => true,
@@ -176,13 +246,7 @@ try {
       }
 
       // Rewards
-      $rewards = array();
-      try {
-        $stmt = $pdo->query("SELECT id, day, tier, item_id, item_name, quantity, coins, zen, exp, rarity, icon FROM gamepass_rewards ORDER BY day ASC, tier ASC");
-        if ($stmt) $rewards = $stmt->fetchAll(PDO::FETCH_ASSOC);
-      } catch (Exception $e) {
-        error_log("GAMEPASS_STATUS_REWARDS_ERROR: " . $e->getMessage());
-      }
+      $rewards = fetchRewards();
 
       json_out(200, array(
         'success' => true,
@@ -245,6 +309,8 @@ try {
       $zenCost = 0;
 
       $zenSkipCost = getZenSkipCost();
+      
+      // Check if day is in the future (locked)
       if ($day > $cycle['current_day']) {
         if ($tier === 'free') {
           $daysAhead = $day - $cycle['current_day'];
@@ -298,13 +364,12 @@ try {
         json_fail(400, 'Already claimed this reward');
       }
 
-      // Reward config
-      $stmt = $pdo->prepare("SELECT id, day, tier, item_id, item_name, quantity, coins, zen, exp, rarity, icon FROM gamepass_rewards WHERE day = ? AND tier = ?");
-      $stmt->execute(array($day, $tier));
-      $reward = $stmt->fetch(PDO::FETCH_ASSOC);
-      if (!$reward) {
+      // Fetch reward config using dynamic column detection
+      $allRewards = fetchRewards('day = ? AND tier = ?', array($day, $tier));
+      if (empty($allRewards)) {
         json_fail(404, 'No reward configured for this day');
       }
+      $reward = $allRewards[0];
 
       // Deliver
       $mailer = new GameMailer($pdo);
