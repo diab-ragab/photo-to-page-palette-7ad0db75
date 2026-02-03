@@ -36,7 +36,7 @@ function json_fail($code, $msg) {
 }
 
 set_exception_handler(function($e) {
-  error_log("GAMEPASS EX: " . $e->getMessage());
+  error_log("GAMEPASS EX: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
   json_fail(500, "Server error");
 });
 
@@ -97,6 +97,17 @@ function formatRewards($rewards) {
   return $formatted;
 }
 
+// Check if zen_cost column exists in user_gamepass_claims
+function hasZenCostColumn() {
+  global $pdo;
+  try {
+    $stmt = $pdo->query("SHOW COLUMNS FROM user_gamepass_claims LIKE 'zen_cost'");
+    return $stmt && $stmt->fetch();
+  } catch (Exception $e) {
+    return false;
+  }
+}
+
 try {
   switch ($action) {
 
@@ -122,7 +133,6 @@ try {
       break;
 
     case 'status':
-      // Use unified helper
       $user = getCurrentUser();
       if (!$user) {
         json_out(401, array('success' => false, 'error' => 'Not authenticated'));
@@ -146,7 +156,6 @@ try {
         error_log("GAMEPASS_PREMIUM_CHECK: " . $e->getMessage());
       }
 
-      // Use unified helper for Zen
       $userZen = getUserZenBalance($userId);
 
       // Claims
@@ -189,25 +198,35 @@ try {
       break;
 
     case 'claim':
-      if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        json_fail(405, 'Method not allowed');
+      // Accept both POST and GET for claim (some servers redirect POST to GET)
+      $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '';
+      error_log("GAMEPASS_CLAIM method=$method");
+      
+      // Read input from php://input for POST, or from $_GET for GET
+      $rawInput = file_get_contents('php://input');
+      $input = json_decode($rawInput, true);
+      if (!is_array($input)) {
+        // Fallback to GET/POST params
+        $input = array();
+        if (isset($_REQUEST['day'])) $input['day'] = $_REQUEST['day'];
+        if (isset($_REQUEST['tier'])) $input['tier'] = $_REQUEST['tier'];
+        if (isset($_REQUEST['roleId'])) $input['roleId'] = $_REQUEST['roleId'];
+        if (isset($_REQUEST['payWithZen'])) $input['payWithZen'] = $_REQUEST['payWithZen'];
       }
 
-      // Use unified helper
       $user = getCurrentUser();
       if (!$user) {
         json_out(401, array('success' => false, 'error' => 'Not authenticated'));
       }
 
       $userId = (int)$user['user_id'];
-      $rawInput = file_get_contents('php://input');
-      $input = json_decode($rawInput, true);
-      if (!is_array($input)) $input = array();
 
       $day = isset($input['day']) ? (int)$input['day'] : 0;
       $tier = (isset($input['tier']) && in_array($input['tier'], array('free', 'elite'))) ? $input['tier'] : 'free';
       $roleId = isset($input['roleId']) ? (int)$input['roleId'] : 0;
-      $payWithZen = (isset($input['payWithZen']) && $input['payWithZen'] === true);
+      $payWithZen = (isset($input['payWithZen']) && ($input['payWithZen'] === true || $input['payWithZen'] === 'true' || $input['payWithZen'] === '1'));
+
+      error_log("GAMEPASS_CLAIM_INPUT user=$userId day=$day tier=$tier roleId=$roleId payWithZen=" . ($payWithZen ? 'true' : 'false'));
 
       if ($day < 1 || $day > 30) {
         json_fail(400, 'Invalid day');
@@ -216,7 +235,7 @@ try {
         json_fail(400, 'Please select a character to receive the reward');
       }
 
-      // Use unified helper for character verification
+      // Verify character belongs to account
       $character = verifyCharacterOwnership($roleId, $userId);
       if (!$character) {
         json_fail(400, 'Invalid character selected. Please choose a valid character.');
@@ -241,7 +260,6 @@ try {
             ));
           }
 
-          // Use unified helper
           $deductResult = deductUserZen($userId, $zenCost);
           if (!$deductResult['success']) {
             json_out(400, array(
@@ -304,7 +322,7 @@ try {
       if (!is_array($result) || empty($result['success'])) {
         error_log("GAMEPASS_CLAIM_FAILED user={$userId} day={$day} tier={$tier}");
 
-        // Use unified helper for refund
+        // Refund zen if charged
         if ($zenCost > 0) {
           refundUserZen($userId, $zenCost);
         }
@@ -312,12 +330,21 @@ try {
         json_fail(500, 'Failed to deliver reward. Please try again.');
       }
 
-      // Record claim
-      $stmt = $pdo->prepare("
-        INSERT INTO user_gamepass_claims (user_id, day, tier, claimed_at, cycle_start, zen_cost)
-        VALUES (?, ?, ?, NOW(), ?, ?)
-      ");
-      $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start'], $zenCost));
+      // Record claim - check if zen_cost column exists
+      if (hasZenCostColumn()) {
+        $stmt = $pdo->prepare("
+          INSERT INTO user_gamepass_claims (user_id, day, tier, claimed_at, cycle_start, zen_cost)
+          VALUES (?, ?, ?, NOW(), ?, ?)
+        ");
+        $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start'], $zenCost));
+      } else {
+        // Table without zen_cost column
+        $stmt = $pdo->prepare("
+          INSERT INTO user_gamepass_claims (user_id, day, tier, claimed_at, cycle_start)
+          VALUES (?, ?, ?, NOW(), ?)
+        ");
+        $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start']));
+      }
 
       error_log("GAMEPASS_CLAIMED user={$userId} role={$roleId} day={$day} tier={$tier}");
 
