@@ -22,6 +22,50 @@ if (!function_exists('getDB')) {
 }
 
 /**
+ * Generate unique Request ID
+ */
+if (!function_exists('generateRID')) {
+    function generateRID() {
+        if (function_exists('random_bytes')) {
+            return bin2hex(random_bytes(6));
+        }
+        return substr(md5(uniqid(mt_rand(), true)), 0, 12);
+    }
+}
+
+/**
+ * Send JSON response and exit
+ */
+if (!function_exists('jsonResponse')) {
+    function jsonResponse($data, $rid = null) {
+        while (ob_get_level()) { ob_end_clean(); }
+        header('Content-Type: application/json; charset=utf-8');
+        if ($rid) $data['rid'] = $rid;
+        echo json_encode($data);
+        exit;
+    }
+}
+
+/**
+ * Send JSON error and exit
+ */
+if (!function_exists('jsonFail')) {
+    function jsonFail($code, $msg, $rid = null) {
+        while (ob_get_level()) { ob_end_clean(); }
+        if (function_exists('http_response_code')) {
+            http_response_code($code);
+        } else {
+            header("HTTP/1.1 {$code} Error");
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        $data = array('success' => false, 'error' => $msg);
+        if ($rid) $data['rid'] = $rid;
+        echo json_encode($data);
+        exit;
+    }
+}
+
+/**
  * Extract session token from various sources
  * Priority: Authorization header > X-Session-Token header > query param > cookie
  */
@@ -65,10 +109,19 @@ if (!function_exists('resolveSessionRow')) {
         $pdo = getDB();
         $hash = hash('sha256', $token);
 
+        // Detect username column (name or login)
+        $usernameCol = 'name';
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+            if (in_array('login', $cols) && !in_array('name', $cols)) {
+                $usernameCol = 'login';
+            }
+        } catch (Exception $e) {}
+
         // Try raw token first
         try {
             $stmt = $pdo->prepare("
-                SELECT us.user_id, u.name, us.expires_at
+                SELECT us.user_id, u.{$usernameCol} as name, us.expires_at
                 FROM user_sessions us
                 JOIN users u ON u.ID = us.user_id
                 WHERE us.session_token = ?
@@ -78,13 +131,13 @@ if (!function_exists('resolveSessionRow')) {
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($row) return $row;
         } catch (Exception $e) {
-            // Continue to next attempt
+            error_log("SESSION_RESOLVE_RAW_ERROR: " . $e->getMessage());
         }
 
         // Try SHA-256 hash
         try {
             $stmt = $pdo->prepare("
-                SELECT us.user_id, u.name, us.expires_at
+                SELECT us.user_id, u.{$usernameCol} as name, us.expires_at
                 FROM user_sessions us
                 JOIN users u ON u.ID = us.user_id
                 WHERE us.session_token = ?
@@ -94,7 +147,7 @@ if (!function_exists('resolveSessionRow')) {
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($row) return $row;
         } catch (Exception $e) {
-            // Continue
+            error_log("SESSION_RESOLVE_HASH_ERROR: " . $e->getMessage());
         }
 
         // Try optional hash columns (for different DB schemas)
@@ -102,7 +155,7 @@ if (!function_exists('resolveSessionRow')) {
         foreach ($optionalColumns as $col) {
             try {
                 $stmt = $pdo->prepare("
-                    SELECT us.user_id, u.name, us.expires_at
+                    SELECT us.user_id, u.{$usernameCol} as name, us.expires_at
                     FROM user_sessions us
                     JOIN users u ON u.ID = us.user_id
                     WHERE us.$col = ?
