@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { GamePassRewardsManager } from "@/components/admin/GamePassRewardsManager";
 import { VoteSitesManager } from "@/components/admin/VoteSitesManager";
 import { NotificationsManager } from "@/components/admin/NotificationsManager";
+import { PushNotificationManager } from "@/components/admin/PushNotificationManager";
 import { UsersManager } from "@/components/admin/UsersManager";
 import { WebshopManager } from "@/components/admin/WebshopManager";
 import { OrdersManager } from "@/components/admin/OrdersManager";
@@ -38,7 +39,8 @@ import {
   Settings,
   Trophy,
   Sparkles,
-  Calendar
+  Calendar,
+  Send
 } from "lucide-react";
 
 interface LastOrder {
@@ -553,7 +555,8 @@ export default function AdminDashboard() {
           </TabsContent>
 
           {/* Notifications Tab */}
-          <TabsContent value="notifications">
+          <TabsContent value="notifications" className="space-y-6">
+            <PushNotificationManager />
             <NotificationsManager username={user?.username} />
           </TabsContent>
 
