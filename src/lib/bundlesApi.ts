@@ -124,6 +124,28 @@ export const bundlesApi = {
     const data = await response.json();
     if (!data.success) throw new Error(data.message || "Failed to toggle bundle");
   },
+
+  // Public: Purchase bundle
+  async purchase(
+    bundleId: number,
+    characterId: number,
+    characterName: string
+  ): Promise<{ url: string; order_id: number }> {
+    const response = await fetch(`${API_BASE}/bundles.php`, {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        action: "purchase",
+        bundle_id: bundleId,
+        character_id: characterId,
+        character_name: characterName,
+      }),
+    });
+    const data = await response.json();
+    if (!data.success) throw new Error(data.message || "Failed to initiate purchase");
+    return { url: data.url, order_id: data.order_id };
+  },
 };
 
 // Icon options for bundle items
