@@ -181,10 +181,9 @@ switch ($action) {
 
   // ADMIN: List all bundles including inactive
   case 'list_all':
-    $auth = requireAdmin();
-    if (!$auth['success']) {
-      jsonFail(403, 'Admin access required');
-    }
+    // requireAdmin() exits with 403 if not admin, returns user array on success
+    $adminUser = requireAdmin();
+    // If we reach here, user is admin
     
     try {
       $stmt = $pdo->query("
@@ -211,10 +210,7 @@ switch ($action) {
 
   // ADMIN: Create bundle
   case 'create':
-    $auth = requireAdmin();
-    if (!$auth['success']) {
-      jsonFail(403, 'Admin access required');
-    }
+    $adminUser = requireAdmin();
     
     $name = isset($input['name']) ? trim($input['name']) : '';
     $description = isset($input['description']) ? trim($input['description']) : '';
@@ -269,10 +265,7 @@ switch ($action) {
 
   // ADMIN: Update bundle
   case 'update':
-    $auth = requireAdmin();
-    if (!$auth['success']) {
-      jsonFail(403, 'Admin access required');
-    }
+    $adminUser = requireAdmin();
     
     $id = isset($input['id']) ? intval($input['id']) : 0;
     if (!$id) {
@@ -338,10 +331,7 @@ switch ($action) {
 
   // ADMIN: Delete bundle
   case 'delete':
-    $auth = requireAdmin();
-    if (!$auth['success']) {
-      jsonFail(403, 'Admin access required');
-    }
+    $adminUser = requireAdmin();
     
     $id = isset($input['id']) ? intval($input['id']) : 0;
     if (!$id) {
@@ -362,10 +352,7 @@ switch ($action) {
 
   // ADMIN: Toggle active status
   case 'toggle':
-    $auth = requireAdmin();
-    if (!$auth['success']) {
-      jsonFail(403, 'Admin access required');
-    }
+    $adminUser = requireAdmin();
     
     $id = isset($input['id']) ? intval($input['id']) : 0;
     $isActive = isset($input['is_active']) ? ($input['is_active'] ? 1 : 0) : 0;
@@ -547,10 +534,7 @@ switch ($action) {
 
   // ADMIN: List bundle orders
   case 'list_bundle_orders':
-    $auth = requireAdmin();
-    if (!$auth['success']) {
-      jsonFail(403, 'Admin access required');
-    }
+    $adminUser = requireAdmin();
     
     $page = max(1, isset($_GET['page']) ? (int)$_GET['page'] : 1);
     $limit = min(50, max(5, isset($_GET['limit']) ? (int)$_GET['limit'] : 15));
@@ -600,10 +584,7 @@ switch ($action) {
     
   // ADMIN: Update bundle order status
   case 'update_order_status':
-    $auth = requireAdmin();
-    if (!$auth['success']) {
-      jsonFail(403, 'Admin access required');
-    }
+    $adminUser = requireAdmin();
     
     $orderId = isset($input['id']) ? (int)$input['id'] : 0;
     $newStatus = isset($input['status']) ? trim($input['status']) : '';
