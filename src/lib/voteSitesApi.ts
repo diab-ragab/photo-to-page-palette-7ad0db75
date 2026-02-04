@@ -30,6 +30,7 @@ export interface VoteSiteStatus extends VoteSite {
   lastVoteTime: string | null;
   nextVoteTime: string | null;
   timeRemaining: number | null; // milliseconds
+  secondsRemaining: number | null; // seconds from server
 }
 
 export interface VoteSiteFormData {
