@@ -217,11 +217,17 @@ function ensureTablesExist($pdo) {
 
 /**
  * Get seconds until next claim based on LAST claimed_at for THIS account only
+ * Uses database server time (NOW()) for consistency
  * Returns 0 if can claim now
  */
 function secondsUntilNextClaim($pdo, $accountId) {
+  // Use database time for consistency - calculates remaining seconds server-side
   $stmt = $pdo->prepare("
-    SELECT claimed_at
+    SELECT 
+      claimed_at,
+      UNIX_TIMESTAMP(NOW()) as server_now,
+      UNIX_TIMESTAMP(claimed_at) as claim_timestamp,
+      GREATEST(0, UNIX_TIMESTAMP(DATE_ADD(claimed_at, INTERVAL " . COOLDOWN_SECONDS . " SECOND)) - UNIX_TIMESTAMP(NOW())) as remaining_seconds
     FROM daily_zen_claims
     WHERE account_id = ?
     ORDER BY claimed_at DESC
@@ -234,16 +240,7 @@ function secondsUntilNextClaim($pdo, $accountId) {
     return 0; // Never claimed, can claim now
   }
 
-  $lastClaim = strtotime($row['claimed_at']);
-  // Defensive: if DB/server timezone drift causes a future timestamp,
-  // treat it as "just claimed now" so remaining never exceeds 24h.
-  if ($lastClaim > time()) {
-    $lastClaim = time();
-  }
-  $nextClaim = $lastClaim + COOLDOWN_SECONDS;
-  $remaining = $nextClaim - time();
-
-  return ($remaining > 0) ? $remaining : 0;
+  return (int)$row['remaining_seconds'];
 }
 
 /**
@@ -314,8 +311,13 @@ try {
     $deviceToken = getOrCreateDeviceToken();
     $deviceHash = hashDeviceToken($deviceToken);
 
-    // Calculate remaining time from last claim for THIS account
+    // Calculate remaining time from last claim for THIS account using DB time
     $remain = secondsUntilNextClaim($pdo, $user['account_id']);
+    
+    // Get server timestamp for frontend synchronization
+    $serverStmt = $pdo->query("SELECT UNIX_TIMESTAMP(NOW()) as server_time");
+    $serverRow = $serverStmt->fetch();
+    $serverTime = (int)$serverRow['server_time'];
 
     jsonOut(array(
       'success'=>true,
@@ -323,6 +325,7 @@ try {
       'has_claimed'=>($remain > 0),
       'reward_amount'=>DAILY_ZEN_REWARD,
       'seconds_until_next_claim'=>$remain,
+      'server_time'=>$serverTime,
       'csrf_token'=>getCsrfToken()
     ));
   }
@@ -419,12 +422,18 @@ try {
 
     logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'successful_claim', 'reward:'.DAILY_ZEN_REWARD);
 
+    // Get server timestamp for frontend synchronization
+    $serverStmt = $pdo->query("SELECT UNIX_TIMESTAMP(NOW()) as server_time");
+    $serverRow = $serverStmt->fetch();
+    $serverTime = (int)$serverRow['server_time'];
+
     // Return actual remaining time (24h from now)
     jsonOut(array(
       'success'=>true,
       'message'=>'Daily Zen claimed successfully!',
       'reward_amount'=>DAILY_ZEN_REWARD,
-      'seconds_until_next_claim'=>COOLDOWN_SECONDS
+      'seconds_until_next_claim'=>COOLDOWN_SECONDS,
+      'server_time'=>$serverTime
     ));
   }
 
