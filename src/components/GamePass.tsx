@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,82 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+// Confetti Particle Component
+const ConfettiParticle = ({ delay, x, color }: { delay: number; x: number; color: string }) => (
+  <motion.div
+    className="absolute w-2 h-2 rounded-full pointer-events-none"
+    style={{ backgroundColor: color, left: `${x}%` }}
+    initial={{ y: 0, opacity: 1, scale: 1, rotate: 0 }}
+    animate={{
+      y: [0, -80, -60],
+      opacity: [1, 1, 0],
+      scale: [1, 1.2, 0.5],
+      rotate: [0, 180, 360],
+      x: [0, (Math.random() - 0.5) * 100],
+    }}
+    transition={{
+      duration: 0.8,
+      delay: delay,
+      ease: "easeOut",
+    }}
+  />
+);
+
+const ConfettiBurst = ({ show, onComplete }: { show: boolean; onComplete: () => void }) => {
+  const colors = ["#06b6d4", "#f59e0b", "#a855f7", "#22c55e", "#ef4444", "#3b82f6"];
+  
+  useEffect(() => {
+    if (show) {
+      const timer = setTimeout(onComplete, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [show, onComplete]);
+
+  if (!show) return null;
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-50">
+      {Array.from({ length: 20 }).map((_, i) => (
+        <ConfettiParticle
+          key={i}
+          delay={i * 0.02}
+          x={30 + Math.random() * 40}
+          color={colors[Math.floor(Math.random() * colors.length)]}
+        />
+      ))}
+    </div>
+  );
+};
+
+// Sparkle burst effect
+const SparkleEffect = ({ show }: { show: boolean }) => {
+  if (!show) return null;
+  
+  return (
+    <motion.div
+      className="absolute inset-0 pointer-events-none z-40"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: [0, 1, 0] }}
+      transition={{ duration: 0.5 }}
+    >
+      {[...Array(8)].map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute left-1/2 top-1/2 w-1 h-1 bg-amber-400 rounded-full"
+          initial={{ x: 0, y: 0, opacity: 1 }}
+          animate={{
+            x: Math.cos((i * Math.PI * 2) / 8) * 50,
+            y: Math.sin((i * Math.PI * 2) / 8) * 50,
+            opacity: 0,
+            scale: [1, 2, 0],
+          }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        />
+      ))}
+    </motion.div>
+  );
+};
 
 // Calculate time until next month reset
 const getSeasonResetTime = () => {
@@ -212,11 +288,16 @@ export const GamePass = () => {
   const [userZen, setUserZen] = useState(0);
   const [zenCostPerDay, setZenCostPerDay] = useState(100000);
   const [zenSkipConfirm, setZenSkipConfirm] = useState<ZenSkipConfirm | null>(null);
+  const [claimAnimation, setClaimAnimation] = useState<{ day: number; tier: "free" | "elite" } | null>(null);
 
   const handleCharacterSelect = (roleId: number | null, name: string | null) => {
     setSelectedRoleId(roleId);
     setSelectedCharacterName(name);
   };
+
+  const clearClaimAnimation = useCallback(() => {
+    setClaimAnimation(null);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setTimeLeft(getSeasonResetTime()), 1000);
@@ -259,7 +340,10 @@ export const GamePass = () => {
           setClaimedDays({ free: data.claimed_days?.free || [], elite: data.claimed_days?.elite || [] });
           if (data.current_day) setCurrentDay(data.current_day);
           if (data.user_zen !== undefined) setUserZen(data.user_zen);
-          if (data.zen_cost_per_day) setZenCostPerDay(data.zen_cost_per_day);
+          // Only update zenCostPerDay if it's a positive number
+          if (data.zen_cost_per_day && data.zen_cost_per_day > 0) {
+            setZenCostPerDay(data.zen_cost_per_day);
+          }
           if (data.rewards?.length > 0) setRewards(convertApiRewards(data.rewards));
         }
       } catch { /* Silent */ }
@@ -311,10 +395,13 @@ export const GamePass = () => {
       const data = await response.json();
       
       if (data.success) {
+        // Trigger confetti animation
+        setClaimAnimation({ day, tier });
+        
         setClaimedDays(prev => ({ ...prev, [tier]: [...prev[tier], day] }));
         if (data.user_zen !== undefined) setUserZen(data.user_zen);
         const zenMsg = data.zen_spent ? ` (-${data.zen_spent.toLocaleString()} Zen)` : "";
-        toast.success("Reward claimed!", {
+        toast.success("🎉 Reward claimed!", {
           description: `Sent to ${selectedCharacterName || "your character"}!${zenMsg}`,
         });
       } else {
@@ -533,8 +620,13 @@ export const GamePass = () => {
             const freeAvailable = (isPast || isCurrentDay) && !freeClaimed;
             const eliteAvailable = (isPast || isCurrentDay) && !eliteClaimed && hasElitePass;
             
-            const daysAhead = Math.max(0, day - currentDay);
+            // Calculate Zen cost only for future days
+            const daysAhead = isFuture ? (day - currentDay) : 0;
             const zenCost = daysAhead * zenCostPerDay;
+            const showZenSkip = isFuture && !freeClaimed && user && zenCost > 0;
+
+            const isAnimatingFree = claimAnimation?.day === day && claimAnimation?.tier === "free";
+            const isAnimatingElite = claimAnimation?.day === day && claimAnimation?.tier === "elite";
 
             return (
               <motion.div
@@ -567,6 +659,10 @@ export const GamePass = () => {
                       ${isCurrentDay && hasElitePass && !eliteClaimed ? rarityStyles[eliteRarity].glow : ""}
                     `}
                   >
+                    {/* Confetti Effect */}
+                    <ConfettiBurst show={isAnimatingElite} onComplete={clearClaimAnimation} />
+                    <SparkleEffect show={isAnimatingElite} />
+
                     {/* Elite Badge */}
                     <div className="absolute top-1 left-1 z-10">
                       <div className="p-1 rounded-md bg-amber-500/90 shadow-lg">
@@ -583,11 +679,20 @@ export const GamePass = () => {
 
                     {/* Claimed Overlay */}
                     {eliteClaimed && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/30 backdrop-blur-sm">
-                        <div className="p-2 rounded-full bg-emerald-500/60 border-2 border-emerald-400">
+                      <motion.div
+                        initial={isAnimatingElite ? { scale: 0 } : { scale: 1 }}
+                        animate={{ scale: 1 }}
+                        className="absolute inset-0 flex items-center justify-center bg-emerald-500/30 backdrop-blur-sm"
+                      >
+                        <motion.div
+                          initial={isAnimatingElite ? { scale: 0, rotate: -180 } : { scale: 1, rotate: 0 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: "spring", stiffness: 200 }}
+                          className="p-2 rounded-full bg-emerald-500/60 border-2 border-emerald-400"
+                        >
                           <Check className="h-5 w-5 text-white" />
-                        </div>
-                      </div>
+                        </motion.div>
+                      </motion.div>
                     )}
 
                     {/* Content */}
@@ -609,20 +714,24 @@ export const GamePass = () => {
 
                   {/* Free Reward */}
                   <motion.button
-                    whileHover={(freeAvailable || (isFuture && user)) ? { scale: 1.05, y: -2 } : {}}
-                    whileTap={(freeAvailable || (isFuture && user)) ? { scale: 0.98 } : {}}
+                    whileHover={(freeAvailable || showZenSkip) ? { scale: 1.05, y: -2 } : {}}
+                    whileTap={(freeAvailable || showZenSkip) ? { scale: 0.98 } : {}}
                     onClick={() => !freeClaimed && (freeAvailable || isFuture) && claimReward(day, false)}
                     disabled={loading || freeClaimed || (!freeAvailable && !isFuture)}
                     className={`
                       relative w-full aspect-[4/5] rounded-xl border-2 overflow-hidden transition-all duration-300
                       bg-gradient-to-br ${rarityStyles[freeRarity].bg} ${rarityStyles[freeRarity].border}
                       ${freeAvailable ? `cursor-pointer hover:${rarityStyles[freeRarity].glow}` : ""}
-                      ${isFuture && user ? "cursor-pointer hover:border-amber-400/50" : ""}
+                      ${showZenSkip ? "cursor-pointer hover:border-amber-400/50" : ""}
                       ${freeClaimed ? "opacity-60" : ""}
                       ${isFuture && !user ? "opacity-40" : ""}
                       ${isCurrentDay && !freeClaimed ? rarityStyles[freeRarity].glow : ""}
                     `}
                   >
+                    {/* Confetti Effect */}
+                    <ConfettiBurst show={isAnimatingFree} onComplete={clearClaimAnimation} />
+                    <SparkleEffect show={isAnimatingFree} />
+
                     {/* Free Badge */}
                     <div className="absolute top-1 left-1 z-10">
                       <div className="p-1 rounded-md bg-primary/80 shadow-lg">
@@ -630,23 +739,35 @@ export const GamePass = () => {
                       </div>
                     </div>
 
-                    {/* Zen Skip Badge */}
-                    {isFuture && !freeClaimed && user && (
+                    {/* Zen Skip Badge - Only show for future days with cost > 0 */}
+                    {showZenSkip && (
                       <div className="absolute top-1 right-1 z-10">
                         <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500/90 text-black text-[9px] font-bold shadow-lg">
                           <Unlock className="h-2.5 w-2.5" />
-                          {(zenCost / 1000).toFixed(0)}k
+                          {zenCost >= 1000000 
+                            ? `${(zenCost / 1000000).toFixed(1)}M`
+                            : `${(zenCost / 1000).toFixed(0)}k`
+                          }
                         </div>
                       </div>
                     )}
 
                     {/* Claimed Overlay */}
                     {freeClaimed && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/30 backdrop-blur-sm">
-                        <div className="p-2 rounded-full bg-emerald-500/60 border-2 border-emerald-400">
+                      <motion.div
+                        initial={isAnimatingFree ? { scale: 0 } : { scale: 1 }}
+                        animate={{ scale: 1 }}
+                        className="absolute inset-0 flex items-center justify-center bg-emerald-500/30 backdrop-blur-sm"
+                      >
+                        <motion.div
+                          initial={isAnimatingFree ? { scale: 0, rotate: -180 } : { scale: 1, rotate: 0 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: "spring", stiffness: 200 }}
+                          className="p-2 rounded-full bg-emerald-500/60 border-2 border-emerald-400"
+                        >
                           <Check className="h-5 w-5 text-white" />
-                        </div>
-                      </div>
+                        </motion.div>
+                      </motion.div>
                     )}
 
                     {/* Content */}
