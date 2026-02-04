@@ -18,7 +18,7 @@ import { format } from "date-fns";
 
 interface Order {
   id: number;
-  product_id: number;
+  product_id: number | null;
   product_name: string | null;
   item_id: number;
   quantity: number;
@@ -26,6 +26,8 @@ interface Order {
   status: "pending" | "completed" | "failed" | "refunded";
   delivered_at: string | null;
   created_at: string;
+  order_type: "product" | "bundle";
+  bundle_id: number | null;
 }
 
 interface OrdersResponse {
@@ -163,15 +165,17 @@ export function OrderHistory() {
                 {orders.map((order) => {
                   const status = statusConfig[order.status];
                   const StatusIcon = status.icon;
+                  const isBundle = order.order_type === "bundle";
 
                   return (
                     <div
-                      key={order.id}
+                      key={`${order.order_type}-${order.id}`}
                       className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                     >
-                    {/* Product Icon */}
+                    {/* Product/Bundle Icon */}
                       <div className="h-14 w-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0 text-2xl">
-                        {order.item_id === -1 ? "💎" : 
+                        {isBundle ? "🎉" :
+                         order.item_id === -1 ? "💎" : 
                          order.item_id === -2 ? "🪙" : 
                          order.item_id === -3 ? "⚡" : "🎁"}
                       </div>
@@ -180,11 +184,18 @@ export function OrderHistory() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="font-medium truncate">
-                              {order.product_name || `Order #${order.id}`}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium truncate">
+                                {order.product_name || `Order #${order.id}`}
+                              </p>
+                              {isBundle && (
+                                <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
+                                  Bundle
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground">
-                              Qty: {order.quantity} • {formatPrice(order)}
+                              {isBundle ? formatPrice(order) : `Qty: ${order.quantity} • ${formatPrice(order)}`}
                             </p>
                           </div>
                           <Badge variant="outline" className={status.className}>

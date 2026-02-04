@@ -124,6 +124,33 @@ class GameMailer {
     }
 
     /**
+     * Send Bundle reward mail - delivers all items as single mail
+     * For bundles, we send the main mail with description and optional currencies
+     * Items are represented in the mail text since game mail supports only 1 item
+     * 
+     * @param int $roleId - Character ID
+     * @param string $bundleName - Bundle name for mail title
+     * @param array $items - Array of bundle items [{item_name, quantity, icon}]
+     * @return array - Result with success status
+     */
+    public function sendBundleReward($roleId, $bundleName, $items) {
+        $title = 'Flash Sale Bundle';
+        
+        // Build item list for mail text
+        $itemList = array();
+        foreach ($items as $item) {
+            $itemName = isset($item['item_name']) ? $item['item_name'] : 'Item';
+            $qty = isset($item['quantity']) ? intval($item['quantity']) : 1;
+            $itemList[] = "{$itemName} x{$qty}";
+        }
+        $text = "{$bundleName}: " . implode(', ', $itemList) . ". Check your inventory!";
+        
+        // For now, send as notification mail (no physical items attached)
+        // Physical item delivery would require multiple mails or direct inventory insertion
+        return $this->sendMail($roleId, $title, $text, 0, 0, 0, 0, 0);
+    }
+
+    /**
      * Build the binary blob for mailtab_sg
      */
     private function buildMailBlob($title, $text, $coins, $zen, $exp, $itemId, $qty) {

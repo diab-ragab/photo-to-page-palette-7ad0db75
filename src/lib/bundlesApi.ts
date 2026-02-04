@@ -146,6 +146,25 @@ export const bundlesApi = {
     if (!data.success) throw new Error(data.message || "Failed to initiate purchase");
     return { url: data.url, order_id: data.order_id };
   },
+
+  // Public: Cancel bundle order and restore stock
+  async cancelOrder(sessionId: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE}/bundle_cancel.php`, {
+        method: "POST",
+        credentials: "include",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ sessionId }),
+      });
+      const data = await response.json();
+      if (!data.success) {
+        console.warn("Bundle cancel response:", data.message);
+      }
+    } catch (err) {
+      // Silent fail - stock restoration is best-effort
+      console.warn("Bundle cancel failed:", err);
+    }
+  },
 };
 
 // Icon options for bundle items

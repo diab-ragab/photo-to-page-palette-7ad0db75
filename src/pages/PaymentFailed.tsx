@@ -1,14 +1,25 @@
+import { useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { motion } from "framer-motion";
 import { XCircle, RefreshCw, ShoppingBag } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/SEO";
+import { bundlesApi } from "@/lib/bundlesApi";
 
 const PaymentFailed = () => {
   const { t } = useLanguage();
+  const [searchParams] = useSearchParams();
+
+  // Restore bundle stock on payment failure/cancellation
+  useEffect(() => {
+    const sessionId = searchParams.get("session_id");
+    if (sessionId) {
+      bundlesApi.cancelOrder(sessionId);
+    }
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
