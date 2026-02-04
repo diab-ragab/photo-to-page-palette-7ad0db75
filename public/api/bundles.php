@@ -77,10 +77,20 @@ try {
       item_name VARCHAR(100) NOT NULL,
       quantity INT NOT NULL DEFAULT 1,
       icon VARCHAR(50) DEFAULT 'GIFT',
+      item_id INT DEFAULT 0,
+      item_quantity INT DEFAULT 1,
       sort_order INT DEFAULT 0,
       INDEX idx_bundle (bundle_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8
   ");
+  
+  // Add item_id and item_quantity columns if not exist (for upgrades)
+  try {
+    $pdo->exec("ALTER TABLE flash_bundle_items ADD COLUMN item_id INT DEFAULT 0 AFTER icon");
+  } catch (Exception $e) {}
+  try {
+    $pdo->exec("ALTER TABLE flash_bundle_items ADD COLUMN item_quantity INT DEFAULT 1 AFTER item_id");
+  } catch (Exception $e) {}
 } catch (Exception $e) {
   // Tables may already exist
 }
@@ -145,13 +155,13 @@ switch ($action) {
       
       // Get items for each bundle
       foreach ($bundles as $k => $bundle) {
-        $stmt2 = $pdo->prepare("
-          SELECT item_name, quantity, icon FROM flash_bundle_items
-          WHERE bundle_id = ?
-          ORDER BY sort_order ASC
-        ");
-        $stmt2->execute(array($bundle['id']));
-        $items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+      $stmt2 = $pdo->prepare("
+        SELECT item_name, quantity, icon, item_id, item_quantity FROM flash_bundle_items
+        WHERE bundle_id = ?
+        ORDER BY sort_order ASC
+      ");
+      $stmt2->execute(array($bundle['id']));
+      $items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
         
         // Map icons
         foreach ($items as $i => $item) {
@@ -233,19 +243,21 @@ switch ($action) {
       $bundleId = $pdo->lastInsertId();
       
       // Insert items
-      foreach ($items as $idx => $item) {
-        $itemName = isset($item['item_name']) ? trim($item['item_name']) : '';
-        $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
-        $icon = isset($item['icon']) ? strtoupper(trim($item['icon'])) : 'GIFT';
-        
-        if ($itemName !== '') {
-          $stmt2 = $pdo->prepare("
-            INSERT INTO flash_bundle_items (bundle_id, item_name, quantity, icon, sort_order)
-            VALUES (?, ?, ?, ?, ?)
-          ");
-          $stmt2->execute(array($bundleId, $itemName, $quantity, $icon, $idx));
-        }
+    foreach ($items as $idx => $item) {
+      $itemName = isset($item['item_name']) ? trim($item['item_name']) : '';
+      $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
+      $icon = isset($item['icon']) ? strtoupper(trim($item['icon'])) : 'GIFT';
+      $gameItemId = isset($item['item_id']) ? intval($item['item_id']) : 0;
+      $gameItemQty = isset($item['item_quantity']) ? intval($item['item_quantity']) : 1;
+      
+      if ($itemName !== '') {
+        $stmt2 = $pdo->prepare("
+          INSERT INTO flash_bundle_items (bundle_id, item_name, quantity, icon, item_id, item_quantity, sort_order)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt2->execute(array($bundleId, $itemName, $quantity, $icon, $gameItemId, $gameItemQty, $idx));
       }
+    }
       
       $pdo->commit();
       jsonOut(array('success' => true, 'bundle_id' => $bundleId));
@@ -300,19 +312,21 @@ switch ($action) {
       // Delete old items and re-insert
       $pdo->prepare("DELETE FROM flash_bundle_items WHERE bundle_id = ?")->execute(array($id));
       
-      foreach ($items as $idx => $item) {
-        $itemName = isset($item['item_name']) ? trim($item['item_name']) : '';
-        $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
-        $icon = isset($item['icon']) ? strtoupper(trim($item['icon'])) : 'GIFT';
-        
-        if ($itemName !== '') {
-          $stmt2 = $pdo->prepare("
-            INSERT INTO flash_bundle_items (bundle_id, item_name, quantity, icon, sort_order)
-            VALUES (?, ?, ?, ?, ?)
-          ");
-          $stmt2->execute(array($id, $itemName, $quantity, $icon, $idx));
-        }
+    foreach ($items as $idx => $item) {
+      $itemName = isset($item['item_name']) ? trim($item['item_name']) : '';
+      $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
+      $icon = isset($item['icon']) ? strtoupper(trim($item['icon'])) : 'GIFT';
+      $gameItemId = isset($item['item_id']) ? intval($item['item_id']) : 0;
+      $gameItemQty = isset($item['item_quantity']) ? intval($item['item_quantity']) : 1;
+      
+      if ($itemName !== '') {
+        $stmt2 = $pdo->prepare("
+          INSERT INTO flash_bundle_items (bundle_id, item_name, quantity, icon, item_id, item_quantity, sort_order)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt2->execute(array($id, $itemName, $quantity, $icon, $gameItemId, $gameItemQty, $idx));
       }
+    }
       
       $pdo->commit();
       jsonOut(array('success' => true));
@@ -529,6 +543,99 @@ switch ($action) {
     error_log("BUNDLE_ORDER_CREATED order={$orderId} user={$userId} bundle={$bundleId} session=" . $stripeData['id']);
     
     jsonOut(array('success' => true, 'url' => $stripeData['url'], 'order_id' => $orderId));
+    break;
+
+  // ADMIN: List bundle orders
+  case 'list_bundle_orders':
+    $auth = requireAdmin();
+    if (!$auth['success']) {
+      jsonFail(403, 'Admin access required');
+    }
+    
+    $page = max(1, isset($_GET['page']) ? (int)$_GET['page'] : 1);
+    $limit = min(50, max(5, isset($_GET['limit']) ? (int)$_GET['limit'] : 15));
+    $offset = ($page - 1) * $limit;
+    $status = isset($_GET['status']) ? $_GET['status'] : '';
+    
+    $where = "1=1";
+    $params = array();
+    
+    if ($status !== '' && in_array($status, array('pending', 'completed', 'failed', 'refunded'))) {
+      $where .= " AND bo.status = ?";
+      $params[] = $status;
+    }
+    
+    // Count total
+    $countSql = "SELECT COUNT(*) FROM bundle_orders bo WHERE {$where}";
+    $stmt = $pdo->prepare($countSql);
+    $stmt->execute($params);
+    $total = (int)$stmt->fetchColumn();
+    
+    // Get orders with bundle and user info
+    $sql = "
+      SELECT 
+        bo.*,
+        fb.name as bundle_name,
+        u.name as username
+      FROM bundle_orders bo
+      LEFT JOIN flash_bundles fb ON fb.id = bo.bundle_id
+      LEFT JOIN users u ON u.id = bo.user_id
+      WHERE {$where}
+      ORDER BY bo.created_at DESC
+      LIMIT {$offset}, {$limit}
+    ";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    jsonOut(array(
+      'success' => true,
+      'orders' => $orders,
+      'total' => $total,
+      'page' => $page,
+      'pages' => (int)ceil($total / $limit)
+    ));
+    break;
+    
+  // ADMIN: Update bundle order status
+  case 'update_order_status':
+    $auth = requireAdmin();
+    if (!$auth['success']) {
+      jsonFail(403, 'Admin access required');
+    }
+    
+    $orderId = isset($input['id']) ? (int)$input['id'] : 0;
+    $newStatus = isset($input['status']) ? trim($input['status']) : '';
+    
+    if (!$orderId) {
+      jsonFail(400, 'Order ID required');
+    }
+    
+    $allowedStatuses = array('pending', 'completed', 'failed', 'refunded');
+    if (!in_array($newStatus, $allowedStatuses)) {
+      jsonFail(400, 'Invalid status');
+    }
+    
+    try {
+      $deliveredAt = ($newStatus === 'completed') ? ", delivered_at = NOW()" : "";
+      $stmt = $pdo->prepare("UPDATE bundle_orders SET status = ? {$deliveredAt} WHERE id = ?");
+      $stmt->execute(array($newStatus, $orderId));
+      
+      // If marking as failed/refunded, restore stock
+      if ($newStatus === 'failed' || $newStatus === 'refunded') {
+        $stmt = $pdo->prepare("SELECT bundle_id, status FROM bundle_orders WHERE id = ?");
+        $stmt->execute(array($orderId));
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($order && $order['bundle_id']) {
+          $pdo->prepare("UPDATE flash_bundles SET stock = stock + 1 WHERE id = ? AND stock IS NOT NULL")->execute(array($order['bundle_id']));
+        }
+      }
+      
+      jsonOut(array('success' => true));
+    } catch (Exception $e) {
+      jsonFail(500, 'Failed to update order');
+    }
     break;
 
   default:

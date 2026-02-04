@@ -18,6 +18,8 @@ export interface BundleItem {
   quantity: number;
   icon: string;
   icon_emoji?: string;
+  item_id?: number;       // Game item ID (0 = display only, >0 = real item, -1 = zen, -2 = coins, -3 = exp)
+  item_quantity?: number; // Quantity of game item to deliver
   sort_order?: number;
 }
 

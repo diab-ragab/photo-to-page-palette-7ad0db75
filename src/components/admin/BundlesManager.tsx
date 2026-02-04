@@ -36,11 +36,11 @@ const BundleForm = ({ bundle, onSave, onCancel }: BundleFormProps) => {
   const [stock, setStock] = useState(bundle?.stock?.toString() || "");
   const [isActive, setIsActive] = useState(bundle?.is_active ?? true);
   const [items, setItems] = useState<BundleItem[]>(
-    bundle?.items?.length ? bundle.items : [{ item_name: "", quantity: 1, icon: "GIFT" }]
+    bundle?.items?.length ? bundle.items : [{ item_name: "", quantity: 1, icon: "GIFT", item_id: 0, item_quantity: 1 }]
   );
 
   const addItem = () => {
-    setItems([...items, { item_name: "", quantity: 1, icon: "GIFT" }]);
+    setItems([...items, { item_name: "", quantity: 1, icon: "GIFT", item_id: 0, item_quantity: 1 }]);
   };
 
   const removeItem = (index: number) => {
@@ -200,7 +200,7 @@ const BundleForm = ({ bundle, onSave, onCancel }: BundleFormProps) => {
           </div>
           
           {items.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+            <div key={idx} className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
               <Select value={item.icon} onValueChange={(v) => updateItem(idx, "icon", v)}>
                 <SelectTrigger className="w-20">
                   <SelectValue>
@@ -220,19 +220,46 @@ const BundleForm = ({ bundle, onSave, onCancel }: BundleFormProps) => {
               </Select>
               
               <Input
-                className="flex-1"
-                placeholder="Item name (e.g., 500K Zen)"
+                className="flex-1 min-w-[150px]"
+                placeholder="Display name (e.g., 500K Zen)"
                 value={item.item_name}
                 onChange={(e) => updateItem(idx, "item_name", e.target.value)}
               />
               
               <Input
-                className="w-20"
+                className="w-16"
                 type="number"
                 min="1"
+                title="Display quantity"
                 value={item.quantity}
                 onChange={(e) => updateItem(idx, "quantity", parseInt(e.target.value) || 1)}
               />
+
+              <div className="flex items-center gap-1 border-l pl-2 ml-1">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-muted-foreground">Game Item ID</span>
+                  <Input
+                    className="w-20 h-8 text-xs"
+                    type="number"
+                    placeholder="0"
+                    title="Item ID: 0=none, >0=item, -1=zen, -2=coins, -3=exp"
+                    value={item.item_id || 0}
+                    onChange={(e) => updateItem(idx, "item_id", parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-muted-foreground">Qty</span>
+                  <Input
+                    className="w-16 h-8 text-xs"
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    title="Quantity to deliver"
+                    value={item.item_quantity || 1}
+                    onChange={(e) => updateItem(idx, "item_quantity", parseInt(e.target.value) || 1)}
+                  />
+                </div>
+              </div>
               
               <Button
                 type="button"
