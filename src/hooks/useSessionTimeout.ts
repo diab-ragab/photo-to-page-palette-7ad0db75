@@ -5,12 +5,55 @@ import { useToast } from "@/hooks/use-toast";
 const DEFAULT_SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const REMEMBER_ME_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const WARNING_BEFORE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes warning before timeout
+const SERVER_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // Refresh server session every 5 minutes
 
 interface UseSessionTimeoutOptions {
   enabled?: boolean;
   onTimeout?: () => void;
   onWarning?: () => void;
 }
+
+// Refresh server-side session to prevent expiration
+const refreshServerSession = async (): Promise<boolean> => {
+  try {
+    const sessionToken = localStorage.getItem("woi_session_token") || "";
+    if (!sessionToken) return false;
+
+    const response = await fetch("https://woiendgame.online/api/auth.php?action=refresh_session", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session-Token": sessionToken,
+        "Authorization": `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ session_token: sessionToken }),
+    });
+
+    if (!response.ok) {
+      console.warn("[Session] Server refresh failed:", response.status);
+      return false;
+    }
+
+    const data = await response.json();
+    
+    // Update CSRF token if provided
+    if (data.csrf_token) {
+      localStorage.setItem("woi_csrf_token", data.csrf_token);
+    }
+    
+    // Update session token if rotated
+    if (data.session_token) {
+      localStorage.setItem("woi_session_token", data.session_token);
+    }
+
+    console.log("[Session] Server session refreshed successfully");
+    return true;
+  } catch (error) {
+    console.error("[Session] Failed to refresh server session:", error);
+    return false;
+  }
+};
 
 export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
   const { enabled = true, onTimeout, onWarning } = options;
@@ -22,6 +65,8 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
+  const lastServerRefreshRef = useRef<number>(Date.now());
+  const serverRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showWarning, setShowWarning] = useState(false);
   const [remainingTime, setRemainingTime] = useState(0);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -38,6 +83,10 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
       countdownRef.current = null;
+    }
+    if (serverRefreshIntervalRef.current) {
+      clearInterval(serverRefreshIntervalRef.current);
+      serverRefreshIntervalRef.current = null;
     }
   }, []);
 
@@ -80,7 +129,20 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     
     lastActivityRef.current = Date.now();
     setShowWarning(false);
-    clearAllTimers();
+    
+    // Clear existing timers (except server refresh interval)
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    if (warningRef.current) {
+      clearTimeout(warningRef.current);
+      warningRef.current = null;
+    }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
 
     // Set warning timer (fires 2 minutes before timeout)
     warningRef.current = setTimeout(() => {
@@ -91,21 +153,68 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     timeoutRef.current = setTimeout(() => {
       handleTimeout();
     }, sessionTimeoutMs);
-  }, [isLoggedIn, enabled, clearAllTimers, handleWarning, handleTimeout, sessionTimeoutMs]);
+  }, [isLoggedIn, enabled, handleWarning, handleTimeout, sessionTimeoutMs]);
 
-  const extendSession = useCallback(() => {
+  const extendSession = useCallback(async () => {
     setShowWarning(false);
-    resetTimer();
     
-    const extendMessage = rememberMe 
-      ? "Your session has been extended for another 7 days."
-      : "Your session has been extended for another 30 minutes.";
+    // Refresh server session immediately
+    const success = await refreshServerSession();
     
-    toast({
-      title: "Session Extended",
-      description: extendMessage,
-    });
-  }, [resetTimer, toast, rememberMe]);
+    if (success) {
+      resetTimer();
+      lastServerRefreshRef.current = Date.now();
+      
+      const extendMessage = rememberMe 
+        ? "Your session has been extended for another 7 days."
+        : "Your session has been extended for another 30 minutes.";
+      
+      toast({
+        title: "Session Extended",
+        description: extendMessage,
+      });
+    } else {
+      toast({
+        title: "Session Refresh Failed",
+        description: "Please log in again.",
+        variant: "destructive",
+      });
+      logout();
+    }
+  }, [resetTimer, toast, rememberMe, logout]);
+
+  // Set up server-side session refresh interval
+  useEffect(() => {
+    if (!isLoggedIn || !enabled) {
+      if (serverRefreshIntervalRef.current) {
+        clearInterval(serverRefreshIntervalRef.current);
+        serverRefreshIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Refresh server session periodically if user is active
+    serverRefreshIntervalRef.current = setInterval(async () => {
+      const timeSinceLastActivity = Date.now() - lastActivityRef.current;
+      const timeSinceLastRefresh = Date.now() - lastServerRefreshRef.current;
+      
+      // Only refresh if user was active in the last 5 minutes
+      if (timeSinceLastActivity < SERVER_REFRESH_INTERVAL_MS && 
+          timeSinceLastRefresh >= SERVER_REFRESH_INTERVAL_MS) {
+        const success = await refreshServerSession();
+        if (success) {
+          lastServerRefreshRef.current = Date.now();
+        }
+      }
+    }, SERVER_REFRESH_INTERVAL_MS);
+
+    return () => {
+      if (serverRefreshIntervalRef.current) {
+        clearInterval(serverRefreshIntervalRef.current);
+        serverRefreshIntervalRef.current = null;
+      }
+    };
+  }, [isLoggedIn, enabled]);
 
   // Set up activity listeners
   useEffect(() => {
