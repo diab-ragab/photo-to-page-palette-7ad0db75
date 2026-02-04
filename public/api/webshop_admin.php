@@ -2,49 +2,32 @@
 /**
  * api/webshop_admin.php
  * Admin Webshop Management API - Simplified Schema
- * PHP 5.3+ / MySQL 5.1+ compatible
+ * PHP 5.x compatible - Uses centralized session_helper.php
  * 
- * Products: id, name, item_id, item_quantity
+ * Products: id, name, item_id, item_quantity, price_real
  * Orders: id, user_id, product_id, quantity, total_real, status, stripe_*, delivered_at, created_at, updated_at
  */
 
-ini_set('display_errors', '0');
-ini_set('log_errors', '1');
-error_reporting(E_ALL);
-if (ob_get_level() === 0) { ob_start(); }
+// ---------- Bootstrap (CORS, DB, helpers) ----------
+require_once __DIR__ . '/bootstrap.php';
 
-// ---------- PHP 5.3 random_bytes fallback ----------
-if (!function_exists('random_bytes')) {
-    function random_bytes($length) {
-        $bytes = '';
-        for ($i = 0; $i < $length; $i++) {
-            $bytes .= chr(mt_rand(0, 255));
-        }
-        return $bytes;
-    }
-}
-$RID = bin2hex(random_bytes(6));
+// ---------- Session Helper (Auth) ----------
+require_once __DIR__ . '/session_helper.php';
 
-// ---------- Helpers ----------
-function json_response($data) {
-    global $RID;
-    while (ob_get_level()) { ob_end_clean(); }
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(array_merge($data, array('rid' => $RID)));
-    exit;
+// ---------- Read input once ----------
+$method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
+$action = isset($_GET['action']) ? $_GET['action'] : '';
+$rawInput = file_get_contents('php://input');
+$input = array();
+if ($rawInput) {
+    $decoded = json_decode($rawInput, true);
+    if (is_array($decoded)) $input = $decoded;
 }
 
-function json_fail($code, $msg) {
-    global $RID;
-    error_log("RID={$RID} code={$code} msg={$msg}");
-    while (ob_get_level()) { ob_end_clean(); }
-    if (function_exists('http_response_code')) http_response_code($code);
-    else header("HTTP/1.1 {$code} Error");
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(array('success' => false, 'message' => $msg, 'rid' => $RID));
-    exit;
-}
+// ---------- Require admin for all actions ----------
+$adminUser = requireAdmin();
 
+// ---------- Sanitize helper ----------
 function sanitize($input, $maxLen = 255) {
     $s = trim((string)$input);
     $s = strip_tags($s);
@@ -53,84 +36,10 @@ function sanitize($input, $maxLen = 255) {
     return substr($s, 0, $maxLen);
 }
 
-// ---------- Security headers ----------
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('Cache-Control: no-store');
-
-// ---------- CORS ----------
-$allowedOrigins = array(
-    'https://woiendgame.online',
-    'https://www.woiendgame.online',
-    'https://woiendgame.lovable.app',
-    'http://localhost:5173',
-    'http://localhost:3000',
-);
-$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
-$isLovableOrigin = is_string($origin) &&
-    preg_match('/^https:\/\/[a-z0-9-]+\.(lovableproject\.com|lovable\.app)$/i', $origin);
-
-if ($origin && (in_array($origin, $allowedOrigins, true) || $isLovableOrigin)) {
-    header("Access-Control-Allow-Origin: {$origin}");
-    header("Vary: Origin");
-    header("Access-Control-Allow-Credentials: true");
-}
-header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Accept, X-Session-Token, Authorization');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    if (function_exists('http_response_code')) http_response_code(204);
-    else header("HTTP/1.1 204 No Content");
-    exit;
-}
-
-// ---------- DB ----------
-$DBHost     = getenv('DB_HOST') ? getenv('DB_HOST') : '192.168.1.88';
-$DBUser     = getenv('DB_USER') ? getenv('DB_USER') : 'root';
-$DBPassword = getenv('DB_PASS') ? getenv('DB_PASS') : 'root';
-$DBName     = getenv('DB_NAME') ? getenv('DB_NAME') : 'shengui';
-
-try {
-    $pdo = new PDO("mysql:host={$DBHost};dbname={$DBName};charset=utf8", $DBUser, $DBPassword, array(
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ));
-} catch (Exception $e) {
-    json_fail(503, 'Service temporarily unavailable');
-}
-
-// ---------- Auth ----------
-function getSessionToken() {
-    $auth = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : '';
-    if (stripos($auth, 'Bearer ') === 0) return trim(substr($auth, 7));
-    return isset($_SERVER['HTTP_X_SESSION_TOKEN']) ? trim($_SERVER['HTTP_X_SESSION_TOKEN']) : '';
-}
-
-function requireAdmin($pdo) {
-    $token = getSessionToken();
-    if ($token === '') json_fail(401, 'Authentication required');
-
-    $stmt = $pdo->prepare("SELECT user_id FROM user_sessions WHERE session_token = ? AND expires_at > NOW() LIMIT 1");
-    $stmt->execute(array($token));
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) json_fail(401, 'Session expired or invalid');
-
-    $userId = (int)$row['user_id'];
-    $stmt = $pdo->prepare("SELECT 1 FROM user_roles WHERE user_id = ? AND role = 'admin' LIMIT 1");
-    $stmt->execute(array($userId));
-    if (!$stmt->fetch()) json_fail(403, 'Admin access required');
-
-    return $userId;
-}
-
-// Skip auth if sessions system not installed
-$skipAuth = false;
-try { $pdo->query("SELECT 1 FROM user_sessions LIMIT 1"); }
-catch (Exception $e) { $skipAuth = true; }
-if (!$skipAuth) { requireAdmin($pdo); }
-
 // ---------- Tables (Simplified Schema) ----------
-function ensureTables($pdo) {
+function ensureTables() {
+    $pdo = getDB();
+    
     // Simplified products table: id, name, item_id, item_quantity, price_real
     $pdo->exec("CREATE TABLE IF NOT EXISTS webshop_products (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -175,20 +84,10 @@ function ensureTables($pdo) {
         KEY idx_ip_endpoint_time (ip_address, endpoint, request_time)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 }
-ensureTables($pdo);
+ensureTables();
 
-// ---------- Input ----------
-$method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
-$action = isset($_GET['action']) ? $_GET['action'] : '';
-$input = array();
-
-if ($method === 'POST' || $method === 'DELETE') {
-    $raw = file_get_contents('php://input');
-    if ($raw) {
-        $decoded = json_decode($raw, true);
-        if (is_array($decoded)) $input = $decoded;
-    }
-}
+// ---------- Get PDO instance ----------
+$pdo = getDB();
 
 // ---------- Router ----------
 switch ($action) {
@@ -219,7 +118,7 @@ switch ($action) {
         $stmt->execute($params);
         $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        json_response(array(
+        jsonResponse(array(
             'success' => true,
             'products' => $products,
             'total' => $total,
@@ -230,21 +129,21 @@ switch ($action) {
 
     case 'get_product': {
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if ($id <= 0) json_fail(400, 'Invalid product ID');
+        if ($id <= 0) jsonFail(400, 'Invalid product ID');
 
         $stmt = $pdo->prepare("SELECT * FROM webshop_products WHERE id = ? LIMIT 1");
         $stmt->execute(array($id));
         $product = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$product) json_fail(404, 'Product not found');
+        if (!$product) jsonFail(404, 'Product not found');
 
-        json_response(array('success' => true, 'product' => $product));
+        jsonResponse(array('success' => true, 'product' => $product));
     }
 
     case 'add_product': {
-        if ($method !== 'POST') json_fail(405, 'Method not allowed');
+        if ($method !== 'POST') jsonFail(405, 'Method not allowed');
 
         $name = sanitize(isset($input['name']) ? $input['name'] : '', 200);
-        if ($name === '') json_fail(400, 'Product name required');
+        if ($name === '') jsonFail(400, 'Product name required');
 
         $itemId = isset($input['item_id']) ? (int)$input['item_id'] : 0;
         $itemQty = isset($input['item_quantity']) ? (int)$input['item_quantity'] : 1;
@@ -254,14 +153,14 @@ switch ($action) {
         $stmt = $pdo->prepare("INSERT INTO webshop_products (name, item_id, item_quantity, price_real) VALUES (?, ?, ?, ?)");
         $stmt->execute(array($name, $itemId, $itemQty, $priceReal));
 
-        json_response(array('success' => true, 'id' => (int)$pdo->lastInsertId(), 'message' => 'Product created'));
+        jsonResponse(array('success' => true, 'id' => (int)$pdo->lastInsertId(), 'message' => 'Product created'));
     }
 
     case 'update_product': {
-        if ($method !== 'POST') json_fail(405, 'Method not allowed');
+        if ($method !== 'POST') jsonFail(405, 'Method not allowed');
 
         $id = isset($input['id']) ? (int)$input['id'] : 0;
-        if ($id <= 0) json_fail(400, 'Invalid product ID');
+        if ($id <= 0) jsonFail(400, 'Invalid product ID');
 
         $updates = array();
         $params = array();
@@ -285,28 +184,28 @@ switch ($action) {
             $params[] = (float)$input['price_real'];
         }
 
-        if (!count($updates)) json_fail(400, 'No fields to update');
+        if (!count($updates)) jsonFail(400, 'No fields to update');
 
         $params[] = $id;
         $sql = "UPDATE webshop_products SET " . implode(", ", $updates) . " WHERE id = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
 
-        json_response(array('success' => true, 'message' => 'Product updated'));
+        jsonResponse(array('success' => true, 'message' => 'Product updated'));
     }
 
     case 'delete_product': {
-        if ($method !== 'POST' && $method !== 'DELETE') json_fail(405, 'Method not allowed');
+        if ($method !== 'POST' && $method !== 'DELETE') jsonFail(405, 'Method not allowed');
 
         $id = 0;
         if (isset($input['id'])) $id = (int)$input['id'];
         elseif (isset($_GET['id'])) $id = (int)$_GET['id'];
-        if ($id <= 0) json_fail(400, 'Invalid product ID');
+        if ($id <= 0) jsonFail(400, 'Invalid product ID');
 
         $stmt = $pdo->prepare("DELETE FROM webshop_products WHERE id = ?");
         $stmt->execute(array($id));
 
-        json_response(array('success' => true, 'message' => 'Product deleted'));
+        jsonResponse(array('success' => true, 'message' => 'Product deleted'));
     }
 
     // ========== ORDERS ==========
@@ -332,10 +231,19 @@ switch ($action) {
         $stmt->execute($params);
         $total = (int)$stmt->fetchColumn();
 
+        // Detect username column (name or login)
+        $usernameCol = 'name';
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+            if (in_array('login', $cols) && !in_array('name', $cols)) {
+                $usernameCol = 'login';
+            }
+        } catch (Exception $e) {}
+
         // Join with users and products for display names
         $sql = "
             SELECT o.*,
-                   u.name as username,
+                   u.{$usernameCol} as username,
                    p.name as product_name
             FROM webshop_orders o
             LEFT JOIN users u ON u.ID = o.user_id
@@ -348,7 +256,7 @@ switch ($action) {
         $stmt->execute($params);
         $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        json_response(array(
+        jsonResponse(array(
             'success' => true,
             'orders' => $orders,
             'total' => $total,
@@ -358,15 +266,15 @@ switch ($action) {
     }
 
     case 'update_order': {
-        if ($method !== 'POST') json_fail(405, 'Method not allowed');
+        if ($method !== 'POST') jsonFail(405, 'Method not allowed');
 
         $id = isset($input['id']) ? (int)$input['id'] : 0;
         $status = isset($input['status']) ? trim($input['status']) : '';
 
-        if ($id <= 0) json_fail(400, 'Invalid order ID');
+        if ($id <= 0) jsonFail(400, 'Invalid order ID');
 
         $validStatuses = array('pending', 'completed', 'failed', 'refunded');
-        if (!in_array($status, $validStatuses, true)) json_fail(400, 'Invalid status');
+        if (!in_array($status, $validStatuses, true)) jsonFail(400, 'Invalid status');
 
         $now = date('Y-m-d H:i:s');
 
@@ -378,18 +286,27 @@ switch ($action) {
             $stmt->execute(array($status, $now, $id));
         }
 
-        if ($stmt->rowCount() === 0) json_fail(404, 'Order not found');
+        if ($stmt->rowCount() === 0) jsonFail(404, 'Order not found');
 
-        json_response(array('success' => true, 'message' => 'Order status updated'));
+        jsonResponse(array('success' => true, 'message' => 'Order status updated'));
     }
 
     case 'get_order': {
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if ($id <= 0) json_fail(400, 'Invalid order ID');
+        if ($id <= 0) jsonFail(400, 'Invalid order ID');
+
+        // Detect username column
+        $usernameCol = 'name';
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+            if (in_array('login', $cols) && !in_array('name', $cols)) {
+                $usernameCol = 'login';
+            }
+        } catch (Exception $e) {}
 
         $stmt = $pdo->prepare("
             SELECT o.*,
-                   u.name as username,
+                   u.{$usernameCol} as username,
                    p.name as product_name
             FROM webshop_orders o
             LEFT JOIN users u ON u.ID = o.user_id
@@ -399,11 +316,11 @@ switch ($action) {
         ");
         $stmt->execute(array($id));
         $order = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$order) json_fail(404, 'Order not found');
+        if (!$order) jsonFail(404, 'Order not found');
 
-        json_response(array('success' => true, 'order' => $order));
+        jsonResponse(array('success' => true, 'order' => $order));
     }
 
     default:
-        json_fail(400, 'Invalid action');
+        jsonFail(400, 'Invalid action');
 }
