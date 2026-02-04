@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { 
   Send, 
   Bell, 
@@ -15,10 +16,13 @@ import {
   Gift,
   Flame,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  Zap,
+  Timer,
+  Settings2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { notificationsApi } from '@/lib/notificationsApi';
+import { notificationsApi, autoNotificationSettingsApi, AutoNotificationSettings } from '@/lib/notificationsApi';
 import { useAuth } from '@/contexts/AuthContext';
 
 type NotificationType = 'announcement' | 'event' | 'reward' | 'streak' | 'maintenance';
@@ -76,8 +80,55 @@ export const PushNotificationManager = () => {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  
+  // Auto-notification settings state
+  const [autoSettings, setAutoSettings] = useState<AutoNotificationSettings>({
+    daily_zen_enabled: false,
+    spin_wheel_enabled: false,
+    vote_streak_enabled: false,
+    gamepass_enabled: false,
+  });
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   const selectedTemplate = templates.find(t => t.type === notificationType) || templates[0];
+
+  // Load auto-notification settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await autoNotificationSettingsApi.get();
+        setAutoSettings(settings);
+      } catch {
+        // Use defaults
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const handleToggleAutoSetting = async (key: keyof AutoNotificationSettings) => {
+    const newSettings = { ...autoSettings, [key]: !autoSettings[key] };
+    setAutoSettings(newSettings);
+    setSavingSettings(true);
+    
+    try {
+      const success = await autoNotificationSettingsApi.update(newSettings);
+      if (success) {
+        toast.success(`Auto-notification ${newSettings[key] ? 'enabled' : 'disabled'}`);
+      } else {
+        // Revert on failure
+        setAutoSettings(autoSettings);
+        toast.error('Failed to update settings');
+      }
+    } catch {
+      setAutoSettings(autoSettings);
+      toast.error('Failed to update settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   const handleSend = async () => {
     if (!title.trim() || !message.trim()) {
@@ -279,6 +330,100 @@ export const PushNotificationManager = () => {
         </CardContent>
       </Card>
 
+      {/* Auto-Send Settings */}
+      <Card className="bg-gradient-to-br from-card via-card to-purple-950/10 border-purple-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5 text-purple-400" />
+            Auto-Send Notifications
+          </CardTitle>
+          <CardDescription>
+            Automatically notify all users when rewards become available
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {loadingSettings ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Daily Zen */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-amber-500/20">
+                    <Zap className="h-4 w-4 text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Daily Zen Ready</p>
+                    <p className="text-xs text-muted-foreground">Notify when daily zen reward resets</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={autoSettings.daily_zen_enabled}
+                  onCheckedChange={() => handleToggleAutoSetting('daily_zen_enabled')}
+                  disabled={savingSettings}
+                />
+              </div>
+
+              {/* Spin Wheel */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-cyan-500/20">
+                    <Timer className="h-4 w-4 text-cyan-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Spin Wheel Available</p>
+                    <p className="text-xs text-muted-foreground">Notify when free spin is ready</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={autoSettings.spin_wheel_enabled}
+                  onCheckedChange={() => handleToggleAutoSetting('spin_wheel_enabled')}
+                  disabled={savingSettings}
+                />
+              </div>
+
+              {/* Vote Streak */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-orange-500/20">
+                    <Flame className="h-4 w-4 text-orange-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Vote Streak Reminder</p>
+                    <p className="text-xs text-muted-foreground">Remind users to maintain their streak</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={autoSettings.vote_streak_enabled}
+                  onCheckedChange={() => handleToggleAutoSetting('vote_streak_enabled')}
+                  disabled={savingSettings}
+                />
+              </div>
+
+              {/* Game Pass */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-green-500/20">
+                    <Gift className="h-4 w-4 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Game Pass Rewards</p>
+                    <p className="text-xs text-muted-foreground">Notify when new daily reward unlocks</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={autoSettings.gamepass_enabled}
+                  onCheckedChange={() => handleToggleAutoSetting('gamepass_enabled')}
+                  disabled={savingSettings}
+                />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Info */}
       <Card className="bg-muted/20 border-border/30">
         <CardContent className="py-4">
@@ -289,6 +434,7 @@ export const PushNotificationManager = () => {
               <ul className="space-y-1 list-disc list-inside">
                 <li>Notifications are saved to the database and shown in the notification bell</li>
                 <li>Users with browser notifications enabled will receive push alerts</li>
+                <li>Auto-send creates notifications when rewards reset (daily at midnight server time)</li>
                 <li>Use sparingly to avoid notification fatigue</li>
               </ul>
             </div>

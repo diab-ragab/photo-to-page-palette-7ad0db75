@@ -11,6 +11,13 @@ export interface Notification {
   is_active: number;
 }
 
+export interface AutoNotificationSettings {
+  daily_zen_enabled: boolean;
+  spin_wheel_enabled: boolean;
+  vote_streak_enabled: boolean;
+  gamepass_enabled: boolean;
+}
+
 export const notificationsApi = {
   async getAll(): Promise<Notification[]> {
     try {
@@ -62,6 +69,43 @@ export const notificationsApi = {
       return result.success;
     } catch {
       // Silent fail - don't expose errors in production
+      return false;
+    }
+  },
+};
+
+export const autoNotificationSettingsApi = {
+  async get(): Promise<AutoNotificationSettings> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/notifications.php?action=auto_settings`);
+      if (!response.ok) throw new Error('Failed to fetch settings');
+      const data = await response.json();
+      return {
+        daily_zen_enabled: !!data.daily_zen_enabled,
+        spin_wheel_enabled: !!data.spin_wheel_enabled,
+        vote_streak_enabled: !!data.vote_streak_enabled,
+        gamepass_enabled: !!data.gamepass_enabled,
+      };
+    } catch {
+      return {
+        daily_zen_enabled: false,
+        spin_wheel_enabled: false,
+        vote_streak_enabled: false,
+        gamepass_enabled: false,
+      };
+    }
+  },
+
+  async update(settings: AutoNotificationSettings): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/notifications.php?action=update_auto_settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      const result = await response.json();
+      return result.success;
+    } catch {
       return false;
     }
   },
