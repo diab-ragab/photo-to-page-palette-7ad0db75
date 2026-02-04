@@ -12,19 +12,18 @@ $rid = substr(bin2hex(random_bytes(6)), 0, 12);
 try {
     $pdo = getDB();
 
-    // Top Voters - from vote_log or user_currency (order by total_votes)
+    // Top Voters - from vote_log (use username column directly, no JOIN needed)
     $topVoters = [];
     try {
-        // Try to get from vote aggregation
+        // Get vote counts directly from vote_log.username
         $stmt = $pdo->query("
             SELECT 
-                u.login as username, 
+                vl.username as username, 
                 COUNT(vl.id) as value,
                 COALESCE(uc.vip_points, 0) as vip_points
             FROM vote_log vl
-            JOIN users u ON vl.user_id = u.ID
-            LEFT JOIN user_currency uc ON uc.user_id = u.ID
-            GROUP BY u.ID, u.login
+            LEFT JOIN user_currency uc ON uc.user_id = vl.user_id
+            GROUP BY vl.user_id, vl.username
             ORDER BY value DESC
             LIMIT 10
         ");
