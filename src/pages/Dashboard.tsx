@@ -15,6 +15,7 @@ import { DailyZenReward } from "@/components/DailyZenReward";
 import { AchievementsCard } from "@/components/AchievementsCard";
 import { PlayerStatsCard } from "@/components/PlayerStatsCard";
 import { LuckyWheel } from "@/components/LuckyWheel";
+import { UpcomingEvents, EventsCalendar } from "@/components/EventsCalendar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -39,7 +40,8 @@ import {
   BarChart3,
   ShoppingBag,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  Calendar
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -228,7 +230,7 @@ const Dashboard = () => {
 
         {/* Tab Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-5 h-auto p-1 mb-4 md:mb-6 bg-muted/50 sticky top-16 md:top-20 z-40 backdrop-blur-md">
+          <TabsList className="w-full grid grid-cols-6 h-auto p-1 mb-4 md:mb-6 bg-muted/50 sticky top-16 md:top-20 z-40 backdrop-blur-md">
             <TabsTrigger value="rewards" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
               <Gift className="h-4 w-4" />
               <span className="hidden xs:inline">Rewards</span>
@@ -236,6 +238,10 @@ const Dashboard = () => {
             <TabsTrigger value="spin" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
               <Sparkles className="h-4 w-4" />
               <span className="hidden xs:inline">Spin</span>
+            </TabsTrigger>
+            <TabsTrigger value="events" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden xs:inline">Events</span>
             </TabsTrigger>
             <TabsTrigger value="progress" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
               <Trophy className="h-4 w-4" />
@@ -334,6 +340,14 @@ const Dashboard = () => {
                 vipPoints={voteData.vipPoints}
                 zen={userZen}
               />
+            </div>
+          </TabsContent>
+
+          {/* Events Tab */}
+          <TabsContent value="events" className="mt-0 space-y-4 md:space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+              <EventsCalendar />
+              <UpcomingEvents />
             </div>
           </TabsContent>
 
