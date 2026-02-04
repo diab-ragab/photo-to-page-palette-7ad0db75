@@ -19,7 +19,8 @@ import { ServerStatsCard } from "@/components/admin/ServerStatsCard";
 import { SettingsManager } from "@/components/admin/SettingsManager";
 import { AchievementsManager } from "@/components/admin/AchievementsManager";
 import { SpinWheelManager } from "@/components/admin/SpinWheelManager";
-import { 
+import { EventsManager } from "@/components/admin/EventsManager";
+import {
   Shield,
   Users, 
   Vote, 
@@ -36,7 +37,8 @@ import {
   Receipt,
   Settings,
   Trophy,
-  Sparkles
+  Sparkles,
+  Calendar
 } from "lucide-react";
 
 interface LastOrder {
@@ -285,7 +287,7 @@ export default function AdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 md:grid-cols-10 mb-6 h-auto gap-1">
+          <TabsList className="grid w-full grid-cols-6 md:grid-cols-11 mb-6 h-auto gap-1">
             <TabsTrigger value="overview" className="gap-2 py-2">
               <Server className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -312,7 +314,11 @@ export default function AdminDashboard() {
             </TabsTrigger>
             <TabsTrigger value="spinwheel" className="gap-2 py-2">
               <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Spin Wheel</span>
+              <span className="hidden sm:inline">Spin</span>
+            </TabsTrigger>
+            <TabsTrigger value="events" className="gap-2 py-2">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden sm:inline">Events</span>
             </TabsTrigger>
             <TabsTrigger value="webshop" className="gap-2 py-2">
               <ShoppingBag className="h-4 w-4" />
@@ -534,6 +540,11 @@ export default function AdminDashboard() {
           {/* Spin Wheel Tab */}
           <TabsContent value="spinwheel">
             <SpinWheelManager />
+          </TabsContent>
+
+          {/* Events Tab */}
+          <TabsContent value="events">
+            <EventsManager />
           </TabsContent>
 
           {/* Webshop Tab */}
