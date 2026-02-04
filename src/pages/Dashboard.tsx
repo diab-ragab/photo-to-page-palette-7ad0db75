@@ -19,8 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserWallet } from "@/components/UserWallet";
 import { VoteRewardsCard } from "@/components/VoteRewardsCard";
+import { motion } from "framer-motion";
 import { 
   User, 
   Coins, 
@@ -28,50 +30,30 @@ import {
   Vote, 
   ShieldAlert, 
   Award,
-  TrendingUp,
   Gift,
   ArrowRightLeft,
   CheckCircle2,
-  Flame
+  Flame,
+  Sparkles,
+  Trophy,
+  BarChart3,
+  ShoppingBag,
+  LogOut,
+  ChevronRight
 } from "lucide-react";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isLoggedIn, isAdmin, logout } = useAuth();
   const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites, streakData } = useVoteSystem();
-  const [serverStats, setServerStats] = useState({
-    players: 0,
-    accounts: 0,
-    uptime: ""
-  });
   const [userZen, setUserZen] = useState(0);
+  const [activeTab, setActiveTab] = useState("rewards");
 
   useEffect(() => {
     if (!isLoggedIn) {
       navigate("/");
     }
   }, [isLoggedIn, navigate]);
-
-  // Fetch server stats
-  useEffect(() => {
-    const fetchServerStats = async () => {
-      try {
-        const response = await fetch("https://woiendgame.online/api/server-status.php");
-        const data = await response.json();
-        setServerStats({
-          players: data.players || 0,
-          accounts: data.accounts || 0,
-          uptime: data.uptime || ""
-        });
-      } catch {
-        // Silent fail - don't expose errors in production
-      }
-    };
-
-    fetchServerStats();
-    const interval = setInterval(fetchServerStats, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Fetch user's Zen from database
   useEffect(() => {
@@ -93,7 +75,7 @@ const Dashboard = () => {
     fetchUserCurrency();
   }, [user?.username]);
 
-  // Calculate VIP progress (example: 1000 points = VIP 1, 5000 = VIP 2, etc.)
+  // Calculate VIP progress
   const getVipLevel = (points: number) => {
     if (points >= 10000) return { level: 3, name: "VIP III", color: "text-yellow-400" };
     if (points >= 5000) return { level: 2, name: "VIP II", color: "text-purple-400" };
@@ -114,6 +96,34 @@ const Dashboard = () => {
 
   if (!isLoggedIn) return null;
 
+  // Compact stat card component for mobile
+  const StatCard = ({ 
+    icon: Icon, 
+    label, 
+    value, 
+    subLabel, 
+    gradient 
+  }: { 
+    icon: any; 
+    label: string; 
+    value: string | number; 
+    subLabel?: string;
+    gradient: string;
+  }) => (
+    <div className={`relative p-3 rounded-xl bg-gradient-to-br ${gradient} border border-white/10`}>
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-background/80 backdrop-blur-sm">
+          <Icon className="h-4 w-4 md:h-5 md:w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] md:text-xs text-white/70 truncate">{label}</p>
+          <p className="text-base md:text-lg font-bold text-white truncate">{value}</p>
+          {subLabel && <p className="text-[10px] text-white/60 truncate">{subLabel}</p>}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SEO 
@@ -122,241 +132,218 @@ const Dashboard = () => {
       />
       <Navbar />
       
-      <main className="container mx-auto px-4 py-8 pt-24 md:pt-28">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-display text-primary mb-2">
-              Welcome back, {user?.username}!
-            </h1>
-            <p className="text-muted-foreground">
-              Manage your account and collect your daily rewards
-            </p>
+      <main className="container mx-auto px-3 md:px-4 py-4 pt-20 md:pt-24 pb-24 md:pb-8">
+        {/* Compact Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between gap-3 mb-4 md:mb-6"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center flex-shrink-0">
+              <span className="text-lg md:text-xl font-bold text-primary-foreground">
+                {user?.username?.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg md:text-2xl font-display text-foreground truncate">
+                {user?.username}
+              </h1>
+              <div className={`text-xs md:text-sm font-medium ${vipInfo.color}`}>
+                {vipInfo.name}
+              </div>
+            </div>
           </div>
           
-          {/* Admin Dashboard Switch */}
-          {isAdmin && (
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                onClick={() => navigate("/admin")}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-destructive/30 hover:border-destructive hover:bg-destructive/10 hidden sm:flex"
+              >
+                <ShieldAlert className="h-4 w-4 text-destructive" />
+                <span className="hidden md:inline">Admin</span>
+              </Button>
+            )}
             <Button
-              onClick={() => navigate("/admin")}
-              variant="outline"
-              className="group gap-2 border-destructive/30 hover:border-destructive hover:bg-destructive/10"
+              onClick={() => { logout(); navigate("/"); }}
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
             >
-              <ShieldAlert className="h-4 w-4 text-destructive" />
-              <span>Admin Dashboard</span>
-              <ArrowRightLeft className="h-4 w-4 text-muted-foreground group-hover:text-destructive transition-colors" />
+              <LogOut className="h-4 w-4" />
             </Button>
-          )}
-        </div>
+          </div>
+        </motion.div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* Coins Card */}
-          <div className="group relative p-[1px] rounded-xl bg-gradient-to-br from-yellow-500/50 via-transparent to-yellow-500/50 hover:from-yellow-500 hover:to-amber-500 transition-all duration-500">
-            <Card className="relative bg-card rounded-xl overflow-hidden transition-all duration-300 group-hover:translate-y-[-2px] group-hover:shadow-lg group-hover:shadow-yellow-500/20">
-              <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <CardHeader className="relative flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Vote Coins
-                </CardTitle>
-                <div className="p-2 rounded-lg bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors duration-300">
-                  <Coins className="h-5 w-5 text-yellow-500 group-hover:scale-110 transition-transform duration-300" />
+        {/* Quick Stats - Horizontal scroll on mobile */}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-4 md:mb-6"
+        >
+          <StatCard 
+            icon={Coins}
+            label="Vote Coins"
+            value={voteData.coins.toLocaleString()}
+            gradient="from-yellow-500/20 to-amber-600/20"
+          />
+          <StatCard 
+            icon={Crown}
+            label="VIP Points"
+            value={voteData.vipPoints.toLocaleString()}
+            subLabel={vipInfo.name}
+            gradient="from-purple-500/20 to-pink-600/20"
+          />
+          <StatCard 
+            icon={Vote}
+            label="Total Votes"
+            value={voteData.totalVotes}
+            gradient="from-green-500/20 to-emerald-600/20"
+          />
+          <StatCard 
+            icon={Flame}
+            label="Streak"
+            value={`${streakData.current} 🔥`}
+            subLabel={`${streakData.multiplier}x bonus`}
+            gradient="from-orange-500/20 to-red-600/20"
+          />
+        </motion.div>
+
+        {/* Mobile Admin Button */}
+        {isAdmin && (
+          <Button
+            onClick={() => navigate("/admin")}
+            variant="outline"
+            className="w-full mb-4 gap-2 border-destructive/30 hover:border-destructive hover:bg-destructive/10 sm:hidden"
+          >
+            <ShieldAlert className="h-4 w-4 text-destructive" />
+            <span>Admin Dashboard</span>
+            <ChevronRight className="h-4 w-4 ml-auto" />
+          </Button>
+        )}
+
+        {/* Tab Navigation */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full grid grid-cols-5 h-auto p-1 mb-4 md:mb-6 bg-muted/50 sticky top-16 md:top-20 z-40 backdrop-blur-md">
+            <TabsTrigger value="rewards" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
+              <Gift className="h-4 w-4" />
+              <span className="hidden xs:inline">Rewards</span>
+            </TabsTrigger>
+            <TabsTrigger value="spin" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden xs:inline">Spin</span>
+            </TabsTrigger>
+            <TabsTrigger value="progress" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
+              <Trophy className="h-4 w-4" />
+              <span className="hidden xs:inline">Progress</span>
+            </TabsTrigger>
+            <TabsTrigger value="stats" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden xs:inline">Stats</span>
+            </TabsTrigger>
+            <TabsTrigger value="shop" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
+              <ShoppingBag className="h-4 w-4" />
+              <span className="hidden xs:inline">Shop</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Rewards Tab */}
+          <TabsContent value="rewards" className="mt-0 space-y-4 md:space-y-6">
+            {/* Daily Rewards Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <DailyZenReward onClaim={(amount) => setUserZen((prev) => prev + amount)} />
+              <VoteStreakCard streakData={streakData} />
+            </div>
+
+            {/* Vote Section */}
+            <Card className="bg-card border-primary/20">
+              <CardHeader className="pb-3 md:pb-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <CardTitle className="flex items-center gap-2 text-base md:text-xl">
+                      <Gift className="h-4 w-4 md:h-5 md:w-5 text-primary flex-shrink-0" />
+                      <span className="truncate">Vote Rewards</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs md:text-sm mt-1">
+                      Vote to earn coins and VIP points
+                    </CardDescription>
+                  </div>
+                  {totalSites > 0 && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted/50 rounded-full flex-shrink-0">
+                      {availableVotes === 0 ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                      ) : (
+                        <Vote className="h-3.5 w-3.5 text-primary" />
+                      )}
+                      <span className="text-xs font-medium">
+                        {totalSites - availableVotes}/{totalSites}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
-              <CardContent className="relative">
-                <div className="text-2xl font-bold text-foreground">{voteData.coins.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground mt-1">Spend in the shop</p>
-              </CardContent>
-            </Card>
-          </div>
+              <CardContent className="pt-0">
+                {sitesLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-[120px] rounded-xl" />
+                    ))}
+                  </div>
+                ) : voteSites.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground text-sm">
+                    No vote sites configured yet.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {voteSites.map((site) => (
+                      <VoteSiteCard
+                        key={site.id}
+                        site={site}
+                        onVote={submitVote}
+                        loading={loading}
+                      />
+                    ))}
+                  </div>
+                )}
 
-          {/* VIP Points Card */}
-          <div className="group relative p-[1px] rounded-xl bg-gradient-to-br from-purple-500/50 via-transparent to-purple-500/50 hover:from-purple-500 hover:to-pink-500 transition-all duration-500">
-            <Card className="relative bg-card rounded-xl overflow-hidden transition-all duration-300 group-hover:translate-y-[-2px] group-hover:shadow-lg group-hover:shadow-purple-500/20">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <CardHeader className="relative flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  VIP Points
-                </CardTitle>
-                <div className="p-2 rounded-lg bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors duration-300">
-                  <Crown className={`h-5 w-5 ${vipInfo.color} group-hover:scale-110 transition-transform duration-300`} />
-                </div>
-              </CardHeader>
-              <CardContent className="relative">
-                <div className="text-2xl font-bold text-foreground">{voteData.vipPoints.toLocaleString()}</div>
-                <p className={`text-xs mt-1 ${vipInfo.color}`}>{vipInfo.name}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Total Votes Card */}
-          <div className="group relative p-[1px] rounded-xl bg-gradient-to-br from-green-500/50 via-transparent to-green-500/50 hover:from-green-500 hover:to-emerald-500 transition-all duration-500">
-            <Card className="relative bg-card rounded-xl overflow-hidden transition-all duration-300 group-hover:translate-y-[-2px] group-hover:shadow-lg group-hover:shadow-green-500/20">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <CardHeader className="relative flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Votes
-                </CardTitle>
-                <div className="p-2 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors duration-300">
-                  <Vote className="h-5 w-5 text-green-500 group-hover:scale-110 transition-transform duration-300" />
-                </div>
-              </CardHeader>
-              <CardContent className="relative">
-                <div className="text-2xl font-bold text-foreground">{voteData.totalVotes}</div>
-                <p className="text-xs text-muted-foreground mt-1">All-time votes</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Vote Streak Card */}
-          <div className="group relative p-[1px] rounded-xl bg-gradient-to-br from-orange-500/50 via-transparent to-orange-500/50 hover:from-orange-500 hover:to-red-500 transition-all duration-500">
-            <Card className="relative bg-card rounded-xl overflow-hidden transition-all duration-300 group-hover:translate-y-[-2px] group-hover:shadow-lg group-hover:shadow-orange-500/20">
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <CardHeader className="relative flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Vote Streak
-                </CardTitle>
-                <div className="p-2 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors duration-300">
-                  <Flame className="h-5 w-5 text-orange-500 group-hover:scale-110 transition-transform duration-300" />
-                </div>
-              </CardHeader>
-              <CardContent className="relative">
-                <div className="text-2xl font-bold text-foreground">{streakData.current} 🔥</div>
-                <p className="text-xs mt-1" style={{ color: streakData.tier.color }}>
-                  {streakData.tier.name} • {streakData.multiplier}x bonus
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Vote Section */}
-          <Card className="lg:col-span-2 bg-card border-primary/20">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    <Gift className="h-5 w-5 text-primary" />
-                    Vote Rewards
-                  </CardTitle>
-                  <CardDescription>
-                    Vote on multiple sites to earn coins and VIP points
-                  </CardDescription>
-                </div>
-                {/* Vote Progress */}
-                {totalSites > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-full">
-                    {availableVotes === 0 ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Vote className="h-4 w-4 text-primary" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {totalSites - availableVotes}/{totalSites} voted
+                {!sitesLoading && availableVotes === 0 && totalSites > 0 && (
+                  <div className="flex items-center justify-center gap-2 p-3 mt-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span className="text-green-500 font-medium text-sm">
+                      All sites voted! Check back later.
                     </span>
                   </div>
                 )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Vote Sites Grid */}
-              {sitesLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-[140px] rounded-xl" />
-                  ))}
-                </div>
-              ) : voteSites.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No vote sites configured yet.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {voteSites.map((site) => (
-                    <VoteSiteCard
-                      key={site.id}
-                      site={site}
-                      onVote={submitVote}
-                      loading={loading}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* All Voted Message */}
-              {!sitesLoading && availableVotes === 0 && totalSites > 0 && (
-                <div className="flex items-center justify-center gap-2 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span className="text-green-500 font-medium">
-                    All sites voted! Check back later.
-                  </span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Sidebar: Wallet, Streak, Rewards & Profile */}
-          <div className="space-y-6">
-            {/* Daily Zen Reward */}
-            <DailyZenReward onClaim={(amount) => setUserZen((prev) => prev + amount)} />
-
-            {/* Lucky Spin Wheel */}
-            <LuckyWheel />
-
-            {/* Vote Streak Card */}
-            <VoteStreakCard streakData={streakData} />
-
-            {/* User Wallet */}
-            <UserWallet 
-              coins={voteData.coins} 
-              vipPoints={voteData.vipPoints}
-              zen={userZen}
-            />
-
-            {/* Vote Rewards Summary */}
-            <VoteRewardsCard sites={voteSites} loading={sitesLoading} />
-
-            {/* Profile Card */}
-            <Card className="bg-card border-primary/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <User className="h-5 w-5 text-primary" />
-                  Profile
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
-                    <span className="text-2xl font-bold text-primary-foreground">
-                      {user?.username?.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-lg">{user?.username}</div>
-                    <div className="text-sm text-muted-foreground">{user?.email}</div>
-                    <div className={`text-sm font-medium ${vipInfo.color}`}>{vipInfo.name}</div>
-                  </div>
-                </div>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => {
-                    logout();
-                    navigate("/");
-                  }}
-                >
-                  Sign Out
-                </Button>
               </CardContent>
             </Card>
 
+            {/* Vote Rewards Summary */}
+            <VoteRewardsCard sites={voteSites} loading={sitesLoading} />
+          </TabsContent>
+
+          {/* Spin Tab */}
+          <TabsContent value="spin" className="mt-0 space-y-4 md:space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+              <LuckyWheel />
+              <UserWallet 
+                coins={voteData.coins} 
+                vipPoints={voteData.vipPoints}
+                zen={userZen}
+              />
+            </div>
+          </TabsContent>
+
+          {/* Progress Tab */}
+          <TabsContent value="progress" className="mt-0 space-y-4 md:space-y-6">
             {/* VIP Progress Card */}
             <Card className="bg-card border-primary/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Award className="h-5 w-5 text-purple-400" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <Award className="h-4 w-4 md:h-5 md:w-5 text-purple-400" />
                   VIP Progress
                 </CardTitle>
               </CardHeader>
@@ -365,7 +352,7 @@ const Dashboard = () => {
                   <div className="flex justify-between text-sm">
                     <span className={vipInfo.color}>{vipInfo.name}</span>
                     {vipInfo.level < 3 && (
-                      <span className="text-muted-foreground">
+                      <span className="text-muted-foreground text-xs">
                         {voteData.vipPoints.toLocaleString()} / {vipProgress.next.toLocaleString()}
                       </span>
                     )}
@@ -378,43 +365,108 @@ const Dashboard = () => {
                   )}
                 </div>
 
-                <div className="space-y-2 pt-2 border-t border-border">
-                  <div className="text-xs font-medium text-muted-foreground mb-2">VIP Benefits:</div>
-                  <div className="space-y-1 text-xs">
-                    <div className={vipInfo.level >= 1 ? "text-foreground" : "text-muted-foreground/50"}>
-                      • VIP I: +10% shop discount
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border">
+                  {[
+                    { level: 1, name: "VIP I", benefit: "+10% shop discount" },
+                    { level: 2, name: "VIP II", benefit: "+20% shop discount" },
+                    { level: 3, name: "VIP III", benefit: "+30% + exclusive items" },
+                  ].map((tier) => (
+                    <div 
+                      key={tier.level}
+                      className={`p-2.5 rounded-lg text-center text-xs ${
+                        vipInfo.level >= tier.level 
+                          ? "bg-primary/10 border border-primary/30" 
+                          : "bg-muted/30 text-muted-foreground"
+                      }`}
+                    >
+                      <div className="font-medium">{tier.name}</div>
+                      <div className="text-[10px] mt-0.5 opacity-80">{tier.benefit}</div>
                     </div>
-                    <div className={vipInfo.level >= 2 ? "text-foreground" : "text-muted-foreground/50"}>
-                      • VIP II: +20% shop discount
-                    </div>
-                    <div className={vipInfo.level >= 3 ? "text-foreground" : "text-muted-foreground/50"}>
-                      • VIP III: +30% shop discount + exclusive items
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Player Stats Card */}
-            <PlayerStatsCard />
-
-            {/* Order History */}
-            <OrderHistory />
-
             {/* Achievements */}
             <AchievementsCard />
-          </div>
-        </div>
 
-        {/* Game Pass Section */}
-        <div className="mt-8">
-          <GamePass />
-        </div>
+            {/* Game Pass */}
+            <GamePass />
+          </TabsContent>
 
-        {/* Leaderboards Section */}
-        <div className="mt-8">
-          <Leaderboards />
-        </div>
+          {/* Stats Tab */}
+          <TabsContent value="stats" className="mt-0 space-y-4 md:space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+              <PlayerStatsCard />
+              
+              {/* Profile Card */}
+              <Card className="bg-card border-primary/20">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                    <User className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+                    Profile
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+                      <span className="text-xl md:text-2xl font-bold text-primary-foreground">
+                        {user?.username?.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-base md:text-lg truncate">{user?.username}</div>
+                      <div className="text-xs md:text-sm text-muted-foreground truncate">{user?.email}</div>
+                      <div className={`text-xs md:text-sm font-medium ${vipInfo.color}`}>{vipInfo.name}</div>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => navigate("/shop")}
+                  >
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    Visit Shop
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Leaderboards */}
+            <Leaderboards />
+          </TabsContent>
+
+          {/* Shop Tab */}
+          <TabsContent value="shop" className="mt-0 space-y-4 md:space-y-6">
+            <UserWallet 
+              coins={voteData.coins} 
+              vipPoints={voteData.vipPoints}
+              zen={userZen}
+            />
+            
+            <OrderHistory />
+
+            <Card className="bg-gradient-to-br from-primary/10 to-purple-600/10 border-primary/20">
+              <CardContent className="flex flex-col items-center justify-center py-8 gap-4">
+                <div className="p-4 rounded-full bg-primary/20">
+                  <ShoppingBag className="h-8 w-8 text-primary" />
+                </div>
+                <div className="text-center">
+                  <h3 className="font-semibold text-lg">Ready to Shop?</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Use your coins to purchase exclusive items
+                  </p>
+                </div>
+                <Button onClick={() => navigate("/shop")} className="gap-2">
+                  <ShoppingBag className="h-4 w-4" />
+                  Go to Shop
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
 
       <Footer />
