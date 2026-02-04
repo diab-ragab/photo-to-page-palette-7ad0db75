@@ -13,6 +13,7 @@ import { VoteStreakCard } from "@/components/VoteStreakCard";
 import { OrderHistory } from "@/components/OrderHistory";
 import { DailyZenReward } from "@/components/DailyZenReward";
 import { AchievementsCard } from "@/components/AchievementsCard";
+import { PlayerStatsCard } from "@/components/PlayerStatsCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -389,6 +390,9 @@ const Dashboard = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Player Stats Card */}
+            <PlayerStatsCard />
 
             {/* Order History */}
             <OrderHistory />
