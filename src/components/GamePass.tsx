@@ -1,10 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { CharacterSelector } from "@/components/shop/CharacterSelector";
@@ -15,19 +13,16 @@ import {
   Coins,
   Star,
   Sparkles,
-  ShoppingBag,
   Check,
   ChevronLeft,
   ChevronRight,
-  Gem,
-  Sword,
-  Shield,
-  Zap,
   Clock,
   Calendar,
   History,
   User,
   Unlock,
+  Zap,
+  Trophy,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -98,14 +93,6 @@ interface PassReward {
   };
 }
 
-interface PassStatus {
-  status: "not_started" | "active" | "ended";
-  currentDay: number;
-  totalDays: number;
-  startDate: string;
-  endDate: string;
-}
-
 interface ZenSkipConfirm {
   day: number;
   zenCost: number;
@@ -115,8 +102,6 @@ interface ZenSkipConfirm {
 // Convert API rewards to PassReward format
 const convertApiRewards = (apiRewards: ApiReward[]): PassReward[] => {
   const rewards: PassReward[] = [];
-  
-  // Group by day
   const rewardsByDay: Record<number, { free?: ApiReward; elite?: ApiReward }> = {};
   
   apiRewards.forEach(reward => {
@@ -130,7 +115,6 @@ const convertApiRewards = (apiRewards: ApiReward[]): PassReward[] => {
     }
   });
   
-  // Create PassReward for each day
   for (let day = 1; day <= 30; day++) {
     const dayRewards = rewardsByDay[day];
     
@@ -170,68 +154,58 @@ const convertApiRewards = (apiRewards: ApiReward[]): PassReward[] => {
   return rewards;
 };
 
-// No fallback static rewards - only show DB rewards
-
-const rarityColors: Record<Rarity, string> = {
-  common: "border-muted-foreground/40 bg-gradient-to-br from-muted/30 to-muted/10",
-  uncommon: "border-green-500/60 bg-gradient-to-br from-green-500/20 to-green-900/10",
-  rare: "border-cyan-500/60 bg-gradient-to-br from-cyan-500/20 to-cyan-900/10",
-  epic: "border-purple-500/60 bg-gradient-to-br from-purple-500/20 to-purple-900/10",
-  legendary: "border-amber-400/70 bg-gradient-to-br from-amber-500/25 to-orange-900/15",
+const rarityStyles: Record<Rarity, { border: string; bg: string; glow: string; text: string }> = {
+  common: {
+    border: "border-slate-400/40",
+    bg: "from-slate-500/20 to-slate-700/10",
+    glow: "",
+    text: "text-slate-300",
+  },
+  uncommon: {
+    border: "border-emerald-500/50",
+    bg: "from-emerald-500/25 to-emerald-900/10",
+    glow: "shadow-[0_0_20px_rgba(16,185,129,0.25)]",
+    text: "text-emerald-400",
+  },
+  rare: {
+    border: "border-cyan-400/60",
+    bg: "from-cyan-500/30 to-cyan-900/10",
+    glow: "shadow-[0_0_25px_rgba(34,211,238,0.3)]",
+    text: "text-cyan-300",
+  },
+  epic: {
+    border: "border-purple-500/60",
+    bg: "from-purple-500/30 to-purple-900/10",
+    glow: "shadow-[0_0_25px_rgba(168,85,247,0.35)]",
+    text: "text-purple-400",
+  },
+  legendary: {
+    border: "border-amber-400/70",
+    bg: "from-amber-500/35 to-orange-900/15",
+    glow: "shadow-[0_0_30px_rgba(251,191,36,0.4)]",
+    text: "text-amber-300",
+  },
 };
 
-const rarityGlow: Record<Rarity, string> = {
-  common: "",
-  uncommon: "shadow-[0_0_12px_rgba(34,197,94,0.25)]",
-  rare: "shadow-[0_0_15px_rgba(6,182,212,0.3)]",
-  epic: "shadow-[0_0_15px_rgba(168,85,247,0.3)]",
-  legendary: "shadow-[0_0_20px_rgba(251,191,36,0.4)] animate-[pulse_2s_ease-in-out_infinite]",
-};
-
-// Icon map: convert text codes to emojis
 const iconMap: Record<string, string> = {
-  "GIFT": "🎁",
-  "GEM": "💎",
-  "CROWN": "👑",
-  "TROPHY": "🏆",
-  "STAR": "⭐",
-  "COIN": "💰",
-  "FIRE": "🔥",
-  "BOLT": "⚡",
-  "HEART": "❤️",
-  "TARGET": "🎯",
-  "GAME": "🎮",
-  "DICE": "🎲",
-  "MEDAL": "🎖️",
-  "GOLD": "🥇",
-  "SILVER": "🥈",
-  "BRONZE": "🥉",
-  "SPARKLE": "💫",
-  "RAINBOW": "🌈",
-  "CLOVER": "🍀",
-  "ORB": "🔮",
-  "SWORD": "🗡️",
-  "SHIELD": "🛡️",
-  "POTION": "🧪",
-  "SCROLL": "📜",
+  "GIFT": "🎁", "GEM": "💎", "CROWN": "👑", "TROPHY": "🏆", "STAR": "⭐",
+  "COIN": "💰", "FIRE": "🔥", "BOLT": "⚡", "HEART": "❤️", "TARGET": "🎯",
+  "GAME": "🎮", "DICE": "🎲", "MEDAL": "🎖️", "GOLD": "🥇", "SILVER": "🥈",
+  "BRONZE": "🥉", "SPARKLE": "💫", "RAINBOW": "🌈", "CLOVER": "🍀", "ORB": "🔮",
+  "SWORD": "🗡️", "SHIELD": "🛡️", "POTION": "🧪", "SCROLL": "📜",
 };
 
-const getIconDisplay = (icon: string): string => {
-  // If it's already an emoji or not in the map, return as is
-  if (iconMap[icon]) return iconMap[icon];
-  return icon;
-};
+const getIconDisplay = (icon: string): string => iconMap[icon] || icon;
 
 export const GamePass = () => {
   const { user } = useAuth();
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [hasElitePass, setHasElitePass] = useState(false);
   const [claimedDays, setClaimedDays] = useState<{ free: number[]; elite: number[] }>({ free: [], elite: [] });
   const [currentDay, setCurrentDay] = useState(1);
-  const [scrollPosition, setScrollPosition] = useState(0);
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(getSeasonResetTime());
   const [rewards, setRewards] = useState<PassReward[]>([]);
-  const [passStatus, setPassStatus] = useState<PassStatus | null>(null);
   const [isLoadingRewards, setIsLoadingRewards] = useState(true);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
@@ -244,157 +218,110 @@ export const GamePass = () => {
     setSelectedCharacterName(name);
   };
 
-  // Update countdown every second
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(getSeasonResetTime());
-    }, 1000);
-
+    const timer = setInterval(() => setTimeLeft(getSeasonResetTime()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch rewards from API - public endpoint
   useEffect(() => {
     const fetchRewards = async () => {
       setIsLoadingRewards(true);
       try {
-        const response = await fetch(
-          "https://woiendgame.online/api/gamepass.php?action=rewards"
-        );
+        const response = await fetch("https://woiendgame.online/api/gamepass.php?action=rewards");
         const data = await response.json();
-        
-        if (data.success && data.rewards && data.rewards.length > 0) {
+        if (data.success && data.rewards?.length > 0) {
           setRewards(convertApiRewards(data.rewards));
           if (data.current_day) setCurrentDay(data.current_day);
         }
-      } catch {
-        // Silent fail - rewards will be empty
-      } finally {
-        setIsLoadingRewards(false);
-      }
+      } catch { /* Silent */ }
+      finally { setIsLoadingRewards(false); }
     };
-
     fetchRewards();
   }, []);
 
-  // Fetch user pass status from PHP backend (also loads rewards)
   useEffect(() => {
     const fetchUserPassStatus = async () => {
       if (!user) return;
-      
       const sessionToken = localStorage.getItem("woi_session_token") || "";
-      
       try {
-        const response = await fetch(
-          `https://woiendgame.online/api/gamepass.php?action=status`,
-          {
-            method: "GET",
-            credentials: "include",
-            headers: {
-              "Accept": "application/json",
-              "X-Session-Token": sessionToken,
-              "Authorization": `Bearer ${sessionToken}`,
-            },
-          }
-        );
+        const response = await fetch("https://woiendgame.online/api/gamepass.php?action=status", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Accept": "application/json",
+            "X-Session-Token": sessionToken,
+            "Authorization": `Bearer ${sessionToken}`,
+          },
+        });
         const data = await response.json();
-        
         if (data.success) {
           setHasElitePass(data.is_premium || false);
-          // Store claimed days by tier
-          setClaimedDays({
-            free: data.claimed_days?.free || [],
-            elite: data.claimed_days?.elite || [],
-          });
+          setClaimedDays({ free: data.claimed_days?.free || [], elite: data.claimed_days?.elite || [] });
           if (data.current_day) setCurrentDay(data.current_day);
           if (data.user_zen !== undefined) setUserZen(data.user_zen);
           if (data.zen_cost_per_day) setZenCostPerDay(data.zen_cost_per_day);
-          
-          // Also update rewards from status response
-          if (data.rewards && data.rewards.length > 0) {
-            setRewards(convertApiRewards(data.rewards));
-          }
+          if (data.rewards?.length > 0) setRewards(convertApiRewards(data.rewards));
         }
-      } catch {
-        // Silent fail - no claimed days to show
-      }
+      } catch { /* Silent */ }
     };
-
     fetchUserPassStatus();
   }, [user]);
 
+  // Scroll to current day on mount
+  useEffect(() => {
+    if (scrollRef.current && currentDay > 3) {
+      const cardWidth = 140;
+      const scrollTo = (currentDay - 2) * cardWidth;
+      scrollRef.current.scrollTo({ left: scrollTo, behavior: "smooth" });
+    }
+  }, [currentDay, rewards.length]);
+
   const claimReward = async (day: number, isElite: boolean, payWithZen: boolean = false) => {
     const tier = isElite ? "elite" : "free";
-    const isClaimed = claimedDays[tier].includes(day);
-    
-    if (isClaimed) return;
+    if (claimedDays[tier].includes(day)) return;
     if (isElite && !hasElitePass) return;
     
-    // For future days in free tier, show Zen confirmation
     if (!isElite && day > currentDay && !payWithZen) {
       const daysAhead = day - currentDay;
       const zenCost = daysAhead * zenCostPerDay;
       const reward = rewards.find(r => r.day === day);
-      setZenSkipConfirm({
-        day,
-        zenCost,
-        rewardName: reward?.freeReward.name || "Reward",
-      });
+      setZenSkipConfirm({ day, zenCost, rewardName: reward?.freeReward.name || "Reward" });
       return;
     }
     
-    // Require character selection
     if (!selectedRoleId) {
-      toast.error("Select a character", {
-        description: "Please select a character to receive the reward.",
-      });
+      toast.error("Select a character", { description: "Please select a character to receive the reward." });
       return;
     }
 
     const sessionToken = localStorage.getItem("woi_session_token") || "";
-
     setLoading(true);
     try {
       const response = await fetch("https://woiendgame.online/api/gamepass.php?action=claim", {
         method: "POST",
         credentials: "include",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
           "X-Session-Token": sessionToken,
           "Authorization": `Bearer ${sessionToken}`,
         },
-        body: JSON.stringify({
-          day,
-          tier: isElite ? "elite" : "free",
-          roleId: selectedRoleId,
-          payWithZen: payWithZen,
-        }),
+        body: JSON.stringify({ day, tier, roleId: selectedRoleId, payWithZen }),
       });
-
       const data = await response.json();
       
       if (data.success) {
-        setClaimedDays(prev => ({
-          ...prev,
-          [tier]: [...prev[tier], day],
-        }));
-        if (data.user_zen !== undefined) {
-          setUserZen(data.user_zen);
-        }
+        setClaimedDays(prev => ({ ...prev, [tier]: [...prev[tier], day] }));
+        if (data.user_zen !== undefined) setUserZen(data.user_zen);
         const zenMsg = data.zen_spent ? ` (-${data.zen_spent.toLocaleString()} Zen)` : "";
         toast.success("Reward claimed!", {
-          description: `Sent to ${selectedCharacterName || "your character"}!${zenMsg} Check your in-game mailbox.`,
+          description: `Sent to ${selectedCharacterName || "your character"}!${zenMsg}`,
         });
       } else {
-        toast.error("Failed to claim reward", {
-          description: data.error || "Please try again later.",
-        });
+        toast.error("Failed to claim", { description: data.error || "Please try again." });
       }
     } catch {
-      toast.error("Failed to claim reward", {
-        description: "Could not connect to server. Please try again.",
-      });
+      toast.error("Connection error");
     } finally {
       setLoading(false);
     }
@@ -407,415 +334,425 @@ export const GamePass = () => {
     }
   };
 
-  const scrollLeft = () => {
-    setScrollPosition(Math.max(0, scrollPosition - 4));
+  const scroll = (direction: "left" | "right") => {
+    if (scrollRef.current) {
+      const scrollAmount = 420;
+      scrollRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
   };
 
-  const scrollRight = () => {
-    setScrollPosition(Math.min(24, scrollPosition + 4));
-  };
-
-  const visibleRewards = rewards.slice(scrollPosition, scrollPosition + 6);
   const progressPercent = (currentDay / 30) * 100;
+  const totalFreeClaimed = claimedDays.free.length;
+  const totalEliteClaimed = claimedDays.elite.length;
 
   return (
-    <Card className="relative bg-gradient-to-br from-card via-card to-card/80 border-primary/30 overflow-hidden backdrop-blur-sm">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 pointer-events-none" />
-      <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-      
-      <CardHeader className="pb-4 relative z-10">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-3 text-2xl font-bold">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30">
-                <Gift className="h-6 w-6 text-primary" />
-              </div>
-              <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">Game Pass</span>
-              {hasElitePass && (
-                <Badge className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-bold shadow-[0_0_15px_rgba(251,191,36,0.4)] animate-[pulse_3s_ease-in-out_infinite]">
-                  <Crown className="h-3 w-3 mr-1" />
-                  Elite
-                </Badge>
-              )}
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-2 ml-[52px]">
-              Claim daily rewards for 30 days. Elite Pass unlocks premium rewards!
-            </p>
-          </div>
+    <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-background via-card to-background">
+      {/* Ambient Background */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-purple-500/10 rounded-full blur-[80px]" />
+        <div className="absolute top-1/2 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-[60px]" />
+      </div>
 
-          {!hasElitePass && (
-            <Button
-              className="relative bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-600 hover:via-yellow-500 hover:to-amber-600 text-black font-bold shadow-[0_0_20px_rgba(251,191,36,0.3)] hover:shadow-[0_0_30px_rgba(251,191,36,0.5)] transition-all duration-300 hover:scale-105"
-              onClick={() => {
-                toast.info("Visit the Shop to purchase Elite Pass", {
-                  action: {
-                    label: "Go to Shop",
-                    onClick: () => window.location.href = "/shop",
-                  },
-                });
-              }}
-            >
-              <Crown className="h-4 w-4 mr-2" />
-              Upgrade to Elite
-              <Sparkles className="h-4 w-4 ml-2 animate-pulse" />
-            </Button>
-          )}
-        </div>
-
-        {/* Season Timer */}
-        <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-primary/10 via-background/50 to-purple-500/10 border border-primary/20 backdrop-blur-sm">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-primary/20 border border-primary/30">
-                  <Calendar className="h-4 w-4 text-primary" />
+      {/* Header */}
+      <div className="relative z-10 p-6 pb-4">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          {/* Title & Season */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary to-cyan-500 rounded-xl blur-lg opacity-50" />
+                <div className="relative p-3 rounded-xl bg-gradient-to-br from-primary/30 to-cyan-500/20 border border-primary/40 backdrop-blur-sm">
+                  <Trophy className="h-7 w-7 text-primary" />
                 </div>
-                <span className="text-sm font-medium">
-                  Season: <span className="text-primary font-bold">{getSeasonName()}</span>
-                </span>
               </div>
-              <Button variant="ghost" size="sm" asChild className="text-xs h-7 px-3 hover:bg-primary/10 hover:text-primary transition-colors">
-                <Link to="/seasons">
-                  <History className="h-3 w-3 mr-1" />
-                  Upcoming Seasons
-                </Link>
-              </Button>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Game Pass</h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="text-xs border-primary/30 bg-primary/10 text-primary">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {getSeasonName()}
+                  </Badge>
+                  {hasElitePass && (
+                    <Badge className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-bold text-xs animate-pulse">
+                      <Crown className="h-3 w-3 mr-1" />
+                      Elite Active
+                    </Badge>
+                  )}
+                </div>
+              </div>
             </div>
             
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
-                <span className="text-xs text-muted-foreground font-medium">Resets in:</span>
+            {/* Stats Row */}
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+                <Gift className="h-4 w-4 text-primary" />
+                <span className="text-muted-foreground">Free:</span>
+                <span className="font-bold text-foreground">{totalFreeClaimed}/30</span>
               </div>
-              <div className="flex gap-1.5">
+              {hasElitePass && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                  <Crown className="h-4 w-4 text-amber-400" />
+                  <span className="text-amber-300/70">Elite:</span>
+                  <span className="font-bold text-amber-300">{totalEliteClaimed}/30</span>
+                </div>
+              )}
+              {user && userZen > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+                  <Coins className="h-4 w-4 text-cyan-400" />
+                  <span className="font-bold text-cyan-300">{userZen.toLocaleString()}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Timer & Actions */}
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
+              <span className="text-muted-foreground">Resets in</span>
+              <div className="flex gap-1">
                 {[
-                  { value: timeLeft.days, label: "days" },
-                  { value: timeLeft.hours.toString().padStart(2, '0'), label: "hrs" },
-                  { value: timeLeft.minutes.toString().padStart(2, '0'), label: "min" },
-                  { value: timeLeft.seconds.toString().padStart(2, '0'), label: "sec" },
-                ].map((item, i) => (
-                  <div key={i} className="bg-background/90 border border-primary/20 px-2.5 py-1.5 rounded-lg text-center min-w-[44px] backdrop-blur-sm">
-                    <span className="text-sm font-bold bg-gradient-to-b from-primary to-primary/70 bg-clip-text text-transparent">{item.value}</span>
-                    <span className="text-[10px] text-muted-foreground block font-medium">{item.label}</span>
+                  { v: timeLeft.days, l: "d" },
+                  { v: String(timeLeft.hours).padStart(2, "0"), l: "h" },
+                  { v: String(timeLeft.minutes).padStart(2, "0"), l: "m" },
+                  { v: String(timeLeft.seconds).padStart(2, "0"), l: "s" },
+                ].map((t, i) => (
+                  <div key={i} className="px-2 py-1 rounded-md bg-muted/80 border border-border/50 font-mono text-sm font-bold">
+                    {t.v}<span className="text-muted-foreground text-xs">{t.l}</span>
                   </div>
                 ))}
               </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" asChild className="text-xs hover:bg-primary/10 hover:text-primary">
+                <Link to="/seasons">
+                  <History className="h-3 w-3 mr-1" />
+                  Past Seasons
+                </Link>
+              </Button>
+              {!hasElitePass && (
+                <Button
+                  size="sm"
+                  className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-600 hover:to-amber-600 text-black font-bold shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all hover:scale-105"
+                  onClick={() => toast.info("Visit the Shop to purchase Elite Pass", { action: { label: "Go to Shop", onClick: () => window.location.href = "/shop" } })}
+                >
+                  <Crown className="h-4 w-4 mr-1" />
+                  Upgrade to Elite
+                  <Sparkles className="h-4 w-4 ml-1" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
         {/* Progress Bar */}
-        <div className="mt-6 space-y-3">
+        <div className="mt-6 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground font-medium">
-              Day <span className="text-foreground font-bold">{currentDay}</span> of 30
+            <span className="text-muted-foreground">
+              Day <span className="font-bold text-foreground">{currentDay}</span> of 30
             </span>
-            <span className="text-primary font-bold">{Math.round(progressPercent)}% Complete</span>
+            <span className="font-bold text-primary">{Math.round(progressPercent)}%</span>
           </div>
-          <div className="relative">
-            <Progress value={progressPercent} className="h-3 bg-muted/50" />
-            <div 
-              className="absolute top-0 left-0 h-3 rounded-full bg-gradient-to-r from-primary via-cyan-400 to-primary opacity-50 blur-sm"
+          <div className="relative h-2 rounded-full bg-muted/50 overflow-hidden">
+            <motion.div
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary via-cyan-400 to-primary"
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercent}%` }}
+              transition={{ duration: 1, ease: "easeOut" }}
+            />
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary/50 via-cyan-400/50 to-primary/50 blur-sm"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
         </div>
 
-        {/* Character Selector - Only show when logged in */}
+        {/* Character Selector */}
         {user && (
-          <div className="mt-6 p-4 rounded-xl bg-gradient-to-br from-muted/40 via-muted/20 to-muted/40 border border-border/50 backdrop-blur-sm">
+          <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border/50 backdrop-blur-sm">
             <div className="flex items-center gap-2 mb-3">
-              <div className="p-1.5 rounded-md bg-primary/20 border border-primary/30">
-                <User className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-sm font-bold">Reward Delivery</span>
+              <User className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Deliver Rewards To</span>
               {selectedCharacterName && (
-                <Badge variant="outline" className="ml-auto border-primary/30 text-primary">
+                <Badge variant="outline" className="ml-auto text-xs border-primary/40 text-primary bg-primary/10">
+                  <Zap className="h-3 w-3 mr-1" />
                   {selectedCharacterName}
                 </Badge>
               )}
             </div>
-            <CharacterSelector 
-              onSelect={handleCharacterSelect}
-              selectedRoleId={selectedRoleId}
-            />
+            <CharacterSelector onSelect={handleCharacterSelect} selectedRoleId={selectedRoleId} />
           </div>
         )}
-      </CardHeader>
+      </div>
 
-      <CardContent className="pt-0 relative z-10">
-        {/* Navigation */}
-        <div className="flex items-center justify-between mb-6">
+      {/* Pass Track */}
+      <div className="relative z-10 pb-6">
+        {/* Navigation Buttons */}
+        <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
           <Button
             variant="outline"
             size="icon"
-            onClick={scrollLeft}
-            disabled={scrollPosition === 0}
-            className="shrink-0 border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all disabled:opacity-30"
+            onClick={() => scroll("left")}
+            className="h-10 w-10 rounded-full bg-background/90 border-primary/30 hover:bg-primary/20 hover:border-primary shadow-lg backdrop-blur-sm"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-5 w-5" />
           </Button>
-
-          <div className="flex-1 mx-4 text-center">
-            <span className="text-sm font-medium text-muted-foreground">
-              Days <span className="text-foreground font-bold">{scrollPosition + 1}</span> - <span className="text-foreground font-bold">{Math.min(scrollPosition + 6, 30)}</span>
-            </span>
-          </div>
-
+        </div>
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
           <Button
             variant="outline"
             size="icon"
-            onClick={scrollRight}
-            disabled={scrollPosition >= 24}
-            className="shrink-0 border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all disabled:opacity-30"
+            onClick={() => scroll("right")}
+            className="h-10 w-10 rounded-full bg-background/90 border-primary/30 hover:bg-primary/20 hover:border-primary shadow-lg backdrop-blur-sm"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
 
-        {/* Pass Rows */}
-        <div className="space-y-4">
-          {/* Elite Pass Row */}
-          <div className="relative p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-amber-500/10 border border-amber-500/20">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-1.5 rounded-md bg-gradient-to-br from-amber-500/30 to-yellow-500/20 border border-amber-500/40">
-                <Crown className="h-4 w-4 text-amber-400" />
-              </div>
-              <span className="text-sm font-bold bg-gradient-to-r from-amber-400 to-yellow-300 bg-clip-text text-transparent">Elite Pass</span>
-              {!hasElitePass && (
-                <Badge variant="outline" className="ml-2 border-amber-500/30 text-amber-500/70 text-xs">
-                  <Lock className="h-2.5 w-2.5 mr-1" />
-                  Locked
-                </Badge>
-              )}
-            </div>
-            <div className="flex gap-2 overflow-hidden">
-              <AnimatePresence mode="popLayout">
-                {visibleRewards.map((reward, index) => {
-                  const day = reward.day;
-                  const isClaimed = claimedDays.elite.includes(day);
-                  const isAvailable = day <= currentDay && !isClaimed && hasElitePass;
-                  const isLocked = !hasElitePass;
-                  const rarity = reward.eliteReward.rarity || "common";
+        {/* Scrollable Track */}
+        <div
+          ref={scrollRef}
+          className="flex gap-3 overflow-x-auto px-14 py-4 scrollbar-hide scroll-smooth"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {rewards.map((reward, index) => {
+            const day = reward.day;
+            const isCurrentDay = day === currentDay;
+            const isPast = day < currentDay;
+            const isFuture = day > currentDay;
+            
+            const freeRarity = reward.freeReward.rarity || "common";
+            const eliteRarity = reward.eliteReward.rarity || "rare";
+            const freeClaimed = claimedDays.free.includes(day);
+            const eliteClaimed = claimedDays.elite.includes(day);
+            const freeAvailable = (isPast || isCurrentDay) && !freeClaimed;
+            const eliteAvailable = (isPast || isCurrentDay) && !eliteClaimed && hasElitePass;
+            
+            const daysAhead = Math.max(0, day - currentDay);
+            const zenCost = daysAhead * zenCostPerDay;
 
-                  return (
-                    <motion.div
-                      key={`elite-${day}`}
-                      initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.8, y: -10 }}
-                      transition={{ delay: index * 0.05, type: "spring", stiffness: 200 }}
-                      className="flex-1 min-w-[80px]"
-                    >
-                      <button
-                        onClick={() => isAvailable && claimReward(day, true)}
-                        disabled={!isAvailable || loading}
-                        className={`
-                          w-full aspect-square rounded-xl border-2 flex flex-col items-center justify-center
-                          transition-all duration-300 relative overflow-hidden backdrop-blur-sm
-                          ${rarityColors[rarity]} ${rarityGlow[rarity]}
-                          ${isAvailable ? "hover:scale-110 cursor-pointer hover:border-amber-400 hover:shadow-[0_0_25px_rgba(251,191,36,0.4)]" : ""}
-                          ${isClaimed ? "opacity-60" : ""}
-                          ${isLocked ? "grayscale opacity-30" : ""}
-                          group
-                        `}
-                      >
-                        {isLocked && (
-                          <Lock className="absolute top-1.5 right-1.5 h-3 w-3 text-muted-foreground/50" />
-                        )}
-                        {isClaimed && (
-                          <div className="absolute inset-0 bg-green-500/30 backdrop-blur-sm flex items-center justify-center">
-                            <div className="p-1.5 rounded-full bg-green-500/50 border border-green-400">
-                              <Check className="h-5 w-5 text-green-300" />
-                            </div>
-                          </div>
-                        )}
-                        {isAvailable && !isClaimed && (
-                          <div className="absolute inset-0 bg-gradient-to-t from-amber-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                        )}
-                        <span className="text-2xl mb-1 drop-shadow-lg group-hover:scale-110 transition-transform">{getIconDisplay(reward.eliteReward.icon)}</span>
-                        <span className="text-[10px] text-muted-foreground text-center px-1 line-clamp-1 font-medium">
-                          {reward.eliteReward.name}
-                        </span>
-                      </button>
-                      <div className="text-center text-xs text-muted-foreground mt-1.5 font-medium">
-                        Day {day}
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
-          </div>
-
-          {/* Free Pass Row */}
-          <div className="relative p-4 rounded-xl bg-gradient-to-r from-primary/10 via-cyan-500/5 to-primary/10 border border-primary/20">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/30 to-cyan-500/20 border border-primary/40">
-                <Gift className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-sm font-bold text-primary">Free Pass</span>
-              {user && userZen > 0 && (
-                <Badge variant="outline" className="ml-auto border-primary/30 text-primary text-xs">
-                  <Coins className="h-3 w-3 mr-1" />
-                  {userZen.toLocaleString()} Zen
-                </Badge>
-              )}
-            </div>
-            <div className="flex gap-2 overflow-hidden">
-              <AnimatePresence mode="popLayout">
-                {visibleRewards.map((reward, index) => {
-                  const day = reward.day;
-                  const isClaimed = claimedDays.free.includes(day);
-                  const isAvailable = day <= currentDay && !isClaimed;
-                  const isFuture = day > currentDay && !isClaimed;
-                  const rarity = reward.freeReward.rarity || "common";
-                  const daysAhead = day - currentDay;
-                  const zenCost = daysAhead * zenCostPerDay;
-                  const canAffordSkip = userZen >= zenCost;
-
-                  return (
-                    <motion.div
-                      key={`free-${day}`}
-                      initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.8, y: -10 }}
-                      transition={{ delay: index * 0.05, type: "spring", stiffness: 200 }}
-                      className="flex-1 min-w-[80px]"
-                    >
-                      <button
-                        onClick={() => {
-                          if (isClaimed) return;
-                          if (isAvailable) {
-                            claimReward(day, false);
-                          } else if (isFuture && user) {
-                            // Show Zen skip confirmation
-                            claimReward(day, false);
-                          }
-                        }}
-                        disabled={loading || isClaimed || (!isAvailable && !isFuture)}
-                        className={`
-                          w-full aspect-square rounded-xl border-2 flex flex-col items-center justify-center
-                          transition-all duration-300 relative overflow-hidden backdrop-blur-sm
-                          ${rarityColors[rarity]} ${rarityGlow[rarity]}
-                          ${isAvailable ? "hover:scale-110 cursor-pointer hover:border-primary hover:shadow-[0_0_25px_rgba(6,182,212,0.4)]" : ""}
-                          ${isFuture && user && canAffordSkip ? "hover:scale-105 cursor-pointer hover:border-amber-400/60" : ""}
-                          ${isClaimed ? "opacity-60" : ""}
-                          ${isFuture && !user ? "opacity-30" : ""}
-                          group
-                        `}
-                      >
-                        {isFuture && !isClaimed && (
-                          <div className="absolute top-1 right-1 flex items-center gap-0.5 bg-background/80 rounded-full px-1 py-0.5">
-                            <Unlock className="h-2.5 w-2.5 text-amber-400" />
-                          </div>
-                        )}
-                        {isClaimed && (
-                          <div className="absolute inset-0 bg-green-500/30 backdrop-blur-sm flex items-center justify-center">
-                            <div className="p-1.5 rounded-full bg-green-500/50 border border-green-400">
-                              <Check className="h-5 w-5 text-green-300" />
-                            </div>
-                          </div>
-                        )}
-                        {isAvailable && !isClaimed && (
-                          <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                        )}
-                        {isFuture && user && !isClaimed && (
-                          <div className="absolute inset-0 bg-gradient-to-t from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                        )}
-                        <span className="text-2xl mb-1 drop-shadow-lg group-hover:scale-110 transition-transform">{getIconDisplay(reward.freeReward.icon)}</span>
-                        <span className="text-[10px] text-muted-foreground text-center px-1 line-clamp-1 font-medium">
-                          {reward.freeReward.name}
-                        </span>
-                        {isFuture && !isClaimed && user && (
-                          <span className="text-[8px] text-amber-400/80 font-medium mt-0.5">
-                            {(zenCost / 1000).toFixed(0)}k Zen
-                          </span>
-                        )}
-                      </button>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Jump */}
-        <div className="mt-6 flex items-center justify-center gap-2 flex-wrap">
-          {[1, 7, 14, 21, 30].map((milestone) => {
-            const isActive = scrollPosition <= milestone - 1 && scrollPosition + 6 > milestone;
             return (
-              <Button
-                key={milestone}
-                variant={isActive ? "default" : "outline"}
-                size="sm"
-                onClick={() => setScrollPosition(Math.max(0, milestone - 3))}
-                className={`
-                  text-xs font-medium transition-all duration-300
-                  ${isActive 
-                    ? "bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90 shadow-[0_0_15px_rgba(6,182,212,0.3)]" 
-                    : "border-primary/30 hover:bg-primary/10 hover:border-primary/50"
-                  }
-                `}
+              <motion.div
+                key={day}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.02 }}
+                className={`flex-shrink-0 w-32 ${isCurrentDay ? "scale-105" : ""}`}
               >
-                {milestone === 30 ? (
-                  <><Star className="h-3 w-3 mr-1" /> Final</>
-                ) : (
-                  `Day ${milestone}`
+                {/* Day Indicator */}
+                <div className={`text-center mb-2 ${isCurrentDay ? "text-primary font-bold" : "text-muted-foreground"}`}>
+                  <div className="text-xs uppercase tracking-wider">Day</div>
+                  <div className={`text-lg font-bold ${isCurrentDay ? "text-primary" : ""}`}>{day}</div>
+                </div>
+
+                {/* Reward Stack */}
+                <div className="relative space-y-2">
+                  {/* Elite Reward */}
+                  <motion.button
+                    whileHover={eliteAvailable ? { scale: 1.05, y: -2 } : {}}
+                    whileTap={eliteAvailable ? { scale: 0.98 } : {}}
+                    onClick={() => eliteAvailable && claimReward(day, true)}
+                    disabled={!eliteAvailable || loading}
+                    className={`
+                      relative w-full aspect-[4/5] rounded-xl border-2 overflow-hidden transition-all duration-300
+                      bg-gradient-to-br ${rarityStyles[eliteRarity].bg} ${rarityStyles[eliteRarity].border}
+                      ${eliteAvailable ? `cursor-pointer hover:${rarityStyles[eliteRarity].glow}` : ""}
+                      ${!hasElitePass ? "grayscale opacity-40" : ""}
+                      ${eliteClaimed ? "opacity-60" : ""}
+                      ${isCurrentDay && hasElitePass && !eliteClaimed ? rarityStyles[eliteRarity].glow : ""}
+                    `}
+                  >
+                    {/* Elite Badge */}
+                    <div className="absolute top-1 left-1 z-10">
+                      <div className="p-1 rounded-md bg-amber-500/90 shadow-lg">
+                        <Crown className="h-3 w-3 text-black" />
+                      </div>
+                    </div>
+
+                    {/* Lock Overlay */}
+                    {!hasElitePass && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                        <Lock className="h-6 w-6 text-muted-foreground/50" />
+                      </div>
+                    )}
+
+                    {/* Claimed Overlay */}
+                    {eliteClaimed && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/30 backdrop-blur-sm">
+                        <div className="p-2 rounded-full bg-emerald-500/60 border-2 border-emerald-400">
+                          <Check className="h-5 w-5 text-white" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Content */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                      <span className="text-3xl drop-shadow-lg">{getIconDisplay(reward.eliteReward.icon)}</span>
+                      <span className={`text-[10px] mt-1 text-center line-clamp-2 font-medium ${rarityStyles[eliteRarity].text}`}>
+                        {reward.eliteReward.name}
+                      </span>
+                    </div>
+
+                    {/* Available Glow */}
+                    {eliteAvailable && !eliteClaimed && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-amber-500/30 via-transparent to-transparent animate-pulse" />
+                    )}
+                  </motion.button>
+
+                  {/* Connector Line */}
+                  <div className="absolute left-1/2 -translate-x-1/2 w-0.5 h-2 bg-gradient-to-b from-border to-transparent" />
+
+                  {/* Free Reward */}
+                  <motion.button
+                    whileHover={(freeAvailable || (isFuture && user)) ? { scale: 1.05, y: -2 } : {}}
+                    whileTap={(freeAvailable || (isFuture && user)) ? { scale: 0.98 } : {}}
+                    onClick={() => !freeClaimed && (freeAvailable || isFuture) && claimReward(day, false)}
+                    disabled={loading || freeClaimed || (!freeAvailable && !isFuture)}
+                    className={`
+                      relative w-full aspect-[4/5] rounded-xl border-2 overflow-hidden transition-all duration-300
+                      bg-gradient-to-br ${rarityStyles[freeRarity].bg} ${rarityStyles[freeRarity].border}
+                      ${freeAvailable ? `cursor-pointer hover:${rarityStyles[freeRarity].glow}` : ""}
+                      ${isFuture && user ? "cursor-pointer hover:border-amber-400/50" : ""}
+                      ${freeClaimed ? "opacity-60" : ""}
+                      ${isFuture && !user ? "opacity-40" : ""}
+                      ${isCurrentDay && !freeClaimed ? rarityStyles[freeRarity].glow : ""}
+                    `}
+                  >
+                    {/* Free Badge */}
+                    <div className="absolute top-1 left-1 z-10">
+                      <div className="p-1 rounded-md bg-primary/80 shadow-lg">
+                        <Gift className="h-3 w-3 text-white" />
+                      </div>
+                    </div>
+
+                    {/* Zen Skip Badge */}
+                    {isFuture && !freeClaimed && user && (
+                      <div className="absolute top-1 right-1 z-10">
+                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500/90 text-black text-[9px] font-bold shadow-lg">
+                          <Unlock className="h-2.5 w-2.5" />
+                          {(zenCost / 1000).toFixed(0)}k
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Claimed Overlay */}
+                    {freeClaimed && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/30 backdrop-blur-sm">
+                        <div className="p-2 rounded-full bg-emerald-500/60 border-2 border-emerald-400">
+                          <Check className="h-5 w-5 text-white" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Content */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                      <span className="text-3xl drop-shadow-lg">{getIconDisplay(reward.freeReward.icon)}</span>
+                      <span className={`text-[10px] mt-1 text-center line-clamp-2 font-medium ${rarityStyles[freeRarity].text}`}>
+                        {reward.freeReward.name}
+                      </span>
+                    </div>
+
+                    {/* Available Glow */}
+                    {freeAvailable && !freeClaimed && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary/30 via-transparent to-transparent animate-pulse" />
+                    )}
+                  </motion.button>
+                </div>
+
+                {/* Current Day Marker */}
+                {isCurrentDay && (
+                  <div className="mt-2 flex justify-center">
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/20 border border-primary/40 text-primary">
+                      <Star className="h-3 w-3 fill-primary" />
+                      <span className="text-[10px] font-bold uppercase">Today</span>
+                    </div>
+                  </div>
                 )}
-              </Button>
+              </motion.div>
             );
           })}
         </div>
-      </CardContent>
 
-      {/* Zen Skip Confirmation Dialog */}
+        {/* Quick Jump Pills */}
+        <div className="flex justify-center gap-2 mt-4 px-6 flex-wrap">
+          {[1, 7, 14, 21, 30].map((milestone) => (
+            <Button
+              key={milestone}
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (scrollRef.current) {
+                  const cardWidth = 140;
+                  scrollRef.current.scrollTo({ left: (milestone - 2) * cardWidth, behavior: "smooth" });
+                }
+              }}
+              className={`
+                text-xs font-medium rounded-full px-4
+                ${currentDay === milestone ? "bg-primary/20 text-primary border border-primary/40" : "hover:bg-muted/50"}
+              `}
+            >
+              {milestone === 30 ? (
+                <><Trophy className="h-3 w-3 mr-1 text-amber-400" /> Final</>
+              ) : (
+                `Day ${milestone}`
+              )}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Zen Skip Dialog */}
       <AlertDialog open={zenSkipConfirm !== null} onOpenChange={(open) => !open && setZenSkipConfirm(null)}>
-        <AlertDialogContent className="border-primary/30">
+        <AlertDialogContent className="border-primary/30 bg-card/95 backdrop-blur-xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Unlock className="h-5 w-5 text-amber-400" />
+            <AlertDialogTitle className="flex items-center gap-2 text-lg">
+              <div className="p-2 rounded-lg bg-amber-500/20 border border-amber-500/30">
+                <Unlock className="h-5 w-5 text-amber-400" />
+              </div>
               Unlock Reward Early
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>
-                Unlock <span className="font-bold text-foreground">{zenSkipConfirm?.rewardName}</span> for 
-                Day {zenSkipConfirm?.day} early by paying Zen.
-              </p>
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
-                <span className="text-sm font-medium">Cost:</span>
-                <span className="font-bold text-amber-400">
-                  {zenSkipConfirm?.zenCost.toLocaleString()} Zen
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Your Balance:</span>
-                <span className={userZen >= (zenSkipConfirm?.zenCost || 0) ? "text-green-400" : "text-destructive"}>
-                  {userZen.toLocaleString()} Zen
-                </span>
-              </div>
-              {userZen < (zenSkipConfirm?.zenCost || 0) && (
-                <p className="text-destructive text-sm">
-                  Insufficient Zen balance. You need {((zenSkipConfirm?.zenCost || 0) - userZen).toLocaleString()} more Zen.
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p className="text-muted-foreground">
+                  Skip ahead and unlock <span className="font-bold text-foreground">{zenSkipConfirm?.rewardName}</span> for Day {zenSkipConfirm?.day}.
                 </p>
-              )}
+                <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-600/10 border border-amber-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Cost</span>
+                    <span className="text-xl font-bold text-amber-400">{zenSkipConfirm?.zenCost.toLocaleString()} Zen</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-sm px-2">
+                  <span className="text-muted-foreground">Your Balance</span>
+                  <span className={userZen >= (zenSkipConfirm?.zenCost || 0) ? "text-emerald-400 font-bold" : "text-destructive font-bold"}>
+                    {userZen.toLocaleString()} Zen
+                  </span>
+                </div>
+                {userZen < (zenSkipConfirm?.zenCost || 0) && (
+                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm">
+                    You need {((zenSkipConfirm?.zenCost || 0) - userZen).toLocaleString()} more Zen.
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogCancel className="border-border/50">Cancel</AlertDialogCancel>
+            <AlertDialogAction
               onClick={handleConfirmZenSkip}
               disabled={userZen < (zenSkipConfirm?.zenCost || 0) || loading}
-              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-bold"
+              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-bold shadow-lg shadow-amber-500/25"
             >
               {loading ? "Processing..." : "Unlock Now"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </div>
   );
 };
