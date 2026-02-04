@@ -34,6 +34,18 @@ export interface StreakData {
   multiplier: number;
 }
 
+// Server time offset (server_time - local_time) in seconds
+let serverTimeOffset = 0;
+
+export function getServerTimeOffset(): number {
+  return serverTimeOffset;
+}
+
+export function setServerTimeOffset(serverTimestamp: number): void {
+  const localNow = Math.floor(Date.now() / 1000);
+  serverTimeOffset = serverTimestamp - localNow;
+}
+
 export const useVoteSystem = () => {
   const { user, isLoggedIn } = useAuth();
   const { toast } = useToast();
@@ -88,6 +100,11 @@ export const useVoteSystem = () => {
       });
 
       if (result.success) {
+        // Sync server time offset for accurate countdown
+        if (result.server_time) {
+          setServerTimeOffset(result.server_time);
+        }
+
         setVoteData({
           coins: result.coins || 0,
           vipPoints: result.vip_points || 0,

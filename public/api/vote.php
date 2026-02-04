@@ -331,12 +331,16 @@ try {
         } catch (Exception $e) {}
       }
 
+      // Include server time for client-side synchronization
+      $serverTime = time();
+
       jsonOut([
         'success' => true,
         'coins' => $coins,
         'vip_points' => $vipPoints,
         'total_votes' => $totalVotes,
         'site_statuses' => $siteStatuses,
+        'server_time' => $serverTime,
         'streak' => [
           'current' => $currentStreak,
           'longest' => $longestStreak,
