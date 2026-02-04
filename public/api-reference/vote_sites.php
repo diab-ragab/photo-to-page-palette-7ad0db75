@@ -1,169 +1,87 @@
 <?php
+/**
+ * vote_sites.php - Vote Sites Management API
+ * PHP 5.x / MySQL 5.1+ compatible
+ */
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/session_helper.php';
 
 header('Content-Type: application/json');
 
 $pdo = getDB();
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
 
-// Read JSON body once (php://input is a stream and can be consumed only once)
+// Read JSON body once
 $__rawBody = file_get_contents('php://input');
-$__jsonInput = json_decode($__rawBody ?: '', true);
-if (!is_array($__jsonInput)) $__jsonInput = [];
+$__jsonInput = json_decode($__rawBody ? $__rawBody : '', true);
+if (!is_array($__jsonInput)) $__jsonInput = array();
 
-// Support clients sending { action: "..." } in JSON body
-if ($action === '' && isset($__jsonInput['action'])) {
+// Get action from query string or JSON body
+$action = '';
+if (isset($_GET['action'])) {
+    $action = $_GET['action'];
+} elseif (isset($_POST['action'])) {
+    $action = $_POST['action'];
+} elseif (isset($__jsonInput['action'])) {
     $action = (string)$__jsonInput['action'];
-}
-
-// Token-based auth helper (same as check_admin.php)
-function getSessionToken(): string {
-    $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    if (stripos($auth, 'Bearer ') === 0) return trim(substr($auth, 7));
-    
-    $hdr = $_SERVER['HTTP_X_SESSION_TOKEN'] ?? '';
-    if ($hdr) return trim($hdr);
-    
-    if (!empty($_GET['sessionToken'])) return trim((string)$_GET['sessionToken']);
-    if (!empty($_COOKIE['sessionToken'])) return trim((string)$_COOKIE['sessionToken']);
-    
-    return '';
-}
-
-// Helper to check admin for write operations using token-based auth
-function requireAdminForWrite() {
-    global $pdo;
-    
-    $sessionToken = getSessionToken();
-    if ($sessionToken === '') {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Not authenticated']);
-        exit;
-    }
-    
-    // Get user from session token
-    $stmt = $pdo->prepare("
-        SELECT us.user_id, u.name
-        FROM user_sessions us
-        JOIN users u ON u.ID = us.user_id
-        WHERE us.session_token = ? AND us.expires_at > NOW()
-        LIMIT 1
-    ");
-    $stmt->execute([$sessionToken]);
-    $session = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$session) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Session expired or invalid']);
-        exit;
-    }
-    
-    $userId = (int)$session['user_id'];
-    $username = (string)$session['name'];
-    
-    // Check admin role
-    $stmt = $pdo->prepare("SELECT role FROM user_roles WHERE user_id = ?");
-    $stmt->execute([$userId]);
-    $roles = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-    
-    $isAdmin = in_array('admin', $roles, true) || in_array('gm', $roles, true);
-    
-    // Also check bootstrap admin from config
-    if (!$isAdmin) {
-        $cfg = function_exists('getConfig') ? (array)getConfig() : [];
-        $sec = $cfg['security'] ?? [];
-        $adminIds = is_array($sec['admin_user_ids'] ?? null) ? $sec['admin_user_ids'] : (is_array($cfg['admin_user_ids'] ?? null) ? $cfg['admin_user_ids'] : []);
-        $adminNames = is_array($sec['admin_usernames'] ?? null) ? $sec['admin_usernames'] : (is_array($cfg['admin_usernames'] ?? null) ? $cfg['admin_usernames'] : []);
-        $isAdmin = in_array($userId, $adminIds, true) || in_array($username, $adminNames, true);
-    }
-    
-    if (!$isAdmin) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Admin access required']);
-        exit;
-    }
-    
-    return $userId;
-}
-
-// Ensure vote_sites table exists
-try {
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS vote_sites (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            url VARCHAR(500) NOT NULL,
-            image_url VARCHAR(500) DEFAULT NULL,
-            coins_reward INT NOT NULL DEFAULT 50,
-            vip_reward INT NOT NULL DEFAULT 25,
-            cooldown_hours INT NOT NULL DEFAULT 12,
-            is_active TINYINT(1) NOT NULL DEFAULT 1,
-            sort_order INT NOT NULL DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-} catch (Exception $e) {
-    // Table may already exist
 }
 
 switch ($action) {
     case 'list':
-        // Get active sites only (public)
+        // Get active sites only (public - no auth required)
         $stmt = $pdo->query("SELECT * FROM vote_sites WHERE is_active = 1 ORDER BY sort_order ASC, id ASC");
         $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode(['success' => true, 'sites' => $sites]);
+        echo json_encode(array('success' => true, 'sites' => $sites));
         break;
 
     case 'list_all':
-        // Get all sites including inactive (admin)
+        // Get all sites including inactive (admin only)
+        requireAdmin();
         $stmt = $pdo->query("SELECT * FROM vote_sites ORDER BY sort_order ASC, id ASC");
         $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode(['success' => true, 'sites' => $sites]);
+        echo json_encode(array('success' => true, 'sites' => $sites));
         break;
 
     case 'add':
-        requireAdminForWrite();
-
+        requireAdmin();
         $input = $__jsonInput;
         
-        $name = trim($input['name'] ?? '');
-        $url = trim($input['url'] ?? '');
-        $image_url = trim($input['image_url'] ?? '') ?: null;
-        $coins_reward = (int)($input['coins_reward'] ?? 50);
-        $vip_reward = (int)($input['vip_reward'] ?? 25);
-        $cooldown_hours = (int)($input['cooldown_hours'] ?? 12);
+        $name = isset($input['name']) ? trim($input['name']) : '';
+        $url = isset($input['url']) ? trim($input['url']) : '';
+        $image_url = isset($input['image_url']) && trim($input['image_url']) !== '' ? trim($input['image_url']) : null;
+        $coins_reward = isset($input['coins_reward']) ? (int)$input['coins_reward'] : 50;
+        $vip_reward = isset($input['vip_reward']) ? (int)$input['vip_reward'] : 25;
+        $cooldown_hours = isset($input['cooldown_hours']) ? (int)$input['cooldown_hours'] : 12;
         $is_active = isset($input['is_active']) ? ($input['is_active'] ? 1 : 0) : 1;
-        $sort_order = (int)($input['sort_order'] ?? 0);
+        $sort_order = isset($input['sort_order']) ? (int)$input['sort_order'] : 0;
         
-        if (empty($name) || empty($url)) {
-            echo json_encode(['success' => false, 'error' => 'Name and URL are required']);
+        if ($name === '' || $url === '') {
+            echo json_encode(array('success' => false, 'error' => 'Name and URL are required'));
             exit;
         }
         
+        $now = date('Y-m-d H:i:s');
         $stmt = $pdo->prepare("
-            INSERT INTO vote_sites (name, url, image_url, coins_reward, vip_reward, cooldown_hours, is_active, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO vote_sites (name, url, image_url, coins_reward, vip_reward, cooldown_hours, is_active, sort_order, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$name, $url, $image_url, $coins_reward, $vip_reward, $cooldown_hours, $is_active, $sort_order]);
+        $stmt->execute(array($name, $url, $image_url, $coins_reward, $vip_reward, $cooldown_hours, $is_active, $sort_order, $now));
         
-        echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
+        echo json_encode(array('success' => true, 'id' => $pdo->lastInsertId()));
         break;
 
     case 'update':
-        requireAdminForWrite();
-
+        requireAdmin();
         $input = $__jsonInput;
-        $id = (int)($input['id'] ?? 0);
+        $id = isset($input['id']) ? (int)$input['id'] : 0;
         
-        if (!$id) {
-            echo json_encode(['success' => false, 'error' => 'ID is required']);
+        if ($id <= 0) {
+            echo json_encode(array('success' => false, 'error' => 'ID is required'));
             exit;
         }
         
-        $updates = [];
-        $params = [];
+        $updates = array();
+        $params = array();
         
         if (isset($input['name'])) {
             $updates[] = "name = ?";
@@ -175,7 +93,8 @@ switch ($action) {
         }
         if (array_key_exists('image_url', $input)) {
             $updates[] = "image_url = ?";
-            $params[] = trim($input['image_url']) ?: null;
+            $val = isset($input['image_url']) ? trim($input['image_url']) : '';
+            $params[] = $val !== '' ? $val : null;
         }
         if (isset($input['coins_reward'])) {
             $updates[] = "coins_reward = ?";
@@ -198,8 +117,8 @@ switch ($action) {
             $params[] = (int)$input['sort_order'];
         }
         
-        if (empty($updates)) {
-            echo json_encode(['success' => false, 'error' => 'No fields to update']);
+        if (count($updates) === 0) {
+            echo json_encode(array('success' => false, 'error' => 'No fields to update'));
             exit;
         }
         
@@ -208,26 +127,25 @@ switch ($action) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         
-        echo json_encode(['success' => true]);
+        echo json_encode(array('success' => true));
         break;
 
     case 'delete':
-        requireAdminForWrite();
-
+        requireAdmin();
         $input = $__jsonInput;
-        $id = (int)($input['id'] ?? 0);
+        $id = isset($input['id']) ? (int)$input['id'] : 0;
         
-        if (!$id) {
-            echo json_encode(['success' => false, 'error' => 'ID is required']);
+        if ($id <= 0) {
+            echo json_encode(array('success' => false, 'error' => 'ID is required'));
             exit;
         }
         
         $stmt = $pdo->prepare("DELETE FROM vote_sites WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt->execute(array($id));
         
-        echo json_encode(['success' => true]);
+        echo json_encode(array('success' => true));
         break;
 
     default:
-        echo json_encode(['success' => false, 'error' => 'Invalid action']);
+        echo json_encode(array('success' => false, 'error' => 'Invalid action'));
 }
