@@ -1,97 +1,208 @@
+# WOI Dashboard Enhancement Plan
 
-# Fix Order and Game Pass Fulfillment - Syntax Fix and Verification
+## Overview
+Major dashboard upgrade with new features and admin controls for all systems.
 
-## Problem Identified
-There's a **PHP syntax error** in `payment_confirm.php` that's causing the "Unexpected token '<'" error. The script is crashing before it can output JSON, which breaks the entire order confirmation flow.
+---
 
-### Root Cause
-Line 113-114 is missing a closing brace. The code structure is:
-```php
-if ($orderId <= 0) {           // Opens block
-    ...
-    if ($webshopOrder) {       // Opens nested block  
-        ...
-    }                          // MISSING - should close nested block
-}                              // Line 113 - only one brace here
+## 🏆 Phase 1: Achievements System
+**Priority: High**
+
+### Database Schema
+```sql
+-- Achievement definitions (admin configurable)
+CREATE TABLE achievements (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  icon VARCHAR(20) DEFAULT 'TROPHY',
+  category ENUM('voting', 'purchases', 'gameplay', 'social', 'events') DEFAULT 'gameplay',
+  requirement_type ENUM('count', 'streak', 'level', 'spend', 'custom') NOT NULL,
+  requirement_value INT DEFAULT 1,
+  reward_coins INT DEFAULT 0,
+  reward_vip INT DEFAULT 0,
+  rarity ENUM('common', 'uncommon', 'rare', 'epic', 'legendary') DEFAULT 'common',
+  is_hidden TINYINT(1) DEFAULT 0,
+  is_active TINYINT(1) DEFAULT 1,
+  sort_order INT DEFAULT 0,
+  created_at DATETIME NOT NULL
+);
+
+-- User unlocked achievements
+CREATE TABLE user_achievements (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  achievement_id INT NOT NULL,
+  unlocked_at DATETIME NOT NULL,
+  claimed TINYINT(1) DEFAULT 0,
+  UNIQUE KEY unique_user_achievement (user_id, achievement_id)
+);
 ```
 
-This causes PHP to throw a parse error, outputting HTML error text instead of JSON.
+### Preset Achievements
+- First Vote, 7-Day Streak, 30-Day Streak (voting)
+- First Purchase, Big Spender (purchases)
+- Level 50, Level 100 (gameplay)
+- Game Pass Complete (events)
+
+### Components
+- `AchievementsCard.tsx` - Dashboard widget showing recent/progress
+- `AchievementsModal.tsx` - Full achievements gallery
+- `admin/AchievementsManager.tsx` - Admin CRUD
+
+### API
+- `achievements.php` - List, unlock, claim rewards
 
 ---
 
-## Fix Required
+## 📊 Phase 2: Player Stats Card
+**Priority: High**
 
-### Fix 1: Correct the missing brace in `payment_confirm.php`
-**Line 113** - Add the missing closing brace:
+### Features
+- Total votes, streak record, VIP level
+- Total purchases, Zen spent
+- Character count, highest level
+- Account age, last login
+- Shareable card with download as image
 
-```php
-// BEFORE (broken):
-            error_log("RID={$RID} FOUND_ORDER_BY_SESSION session={$sessionId} order={$orderId}");
-            }
-    }
-}
+### Components
+- `PlayerStatsCard.tsx` - Visual stats display
+- `ShareableStatsCard.tsx` - Downloadable version
 
-// AFTER (fixed):
-            error_log("RID={$RID} FOUND_ORDER_BY_SESSION session={$sessionId} order={$orderId}");
-            }
-        }
-    }
-}
+### API
+- `player_stats.php` - Aggregate user statistics
+
+---
+
+## 🎡 Phase 3: Lucky Spin Wheel
+**Priority: High**
+
+### Database Schema
+```sql
+-- Wheel segments (admin configurable)
+CREATE TABLE spin_wheel_segments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  label VARCHAR(100) NOT NULL,
+  reward_type ENUM('coins', 'zen', 'vip', 'item', 'nothing') NOT NULL,
+  reward_value INT DEFAULT 0,
+  item_id INT DEFAULT NULL,
+  probability DECIMAL(5,2) NOT NULL, -- percentage weight
+  color VARCHAR(20) DEFAULT '#06b6d4',
+  icon VARCHAR(20) DEFAULT 'GIFT',
+  is_active TINYINT(1) DEFAULT 1,
+  sort_order INT DEFAULT 0
+);
+
+-- Spin history/cooldown
+CREATE TABLE user_spins (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  segment_id INT NOT NULL,
+  reward_type VARCHAR(20) NOT NULL,
+  reward_value INT NOT NULL,
+  spun_at DATETIME NOT NULL,
+  INDEX idx_user_spun (user_id, spun_at)
+);
+
+-- Spin settings
+CREATE TABLE spin_settings (
+  setting_key VARCHAR(50) PRIMARY KEY,
+  setting_value VARCHAR(255) NOT NULL
+);
+-- Keys: spins_per_day, cooldown_hours, vip_bonus_spins
 ```
 
----
+### Components
+- `LuckyWheel.tsx` - Animated spin wheel with canvas/CSS
+- `admin/SpinWheelManager.tsx` - Segment CRUD, settings
 
-## Verification After Fix
-
-Once the syntax is fixed, the flow will work as follows:
-
-### Order Flow
-1. User adds items to cart → clicks checkout
-2. `stripe_checkout.php` creates `pending` order records with `stripe_session_id`
-3. Stripe redirects to PaymentSuccess page after payment
-4. `payment_confirm.php` is called with `sessionId`
-5. Script finds pending orders by `stripe_session_id` → marks as `completed`
-6. `fulfillOrder()` uses `GameMailer` to send items to in-game mailbox
-
-### Game Pass Flow
-1. User opens Game Pass → clicks claim on a day
-2. `gamepass.php?action=claim` verifies eligibility
-3. `getUserRoleId()` fetches player's character ID
-4. `GameMailer->sendGamePassReward()` inserts into `mailtab_sg`
-5. Record added to `user_gamepass_claims` to prevent re-claiming
+### API
+- `spin_wheel.php` - Get segments, spin, history
 
 ---
 
-## Technical Details
+## 📅 Phase 4: Events Calendar
+**Priority: Medium**
 
-### Mail Delivery System
-The `GameMailer` class builds a binary blob for the `mailtab_sg` table:
-- Uses the exact blob format your game server expects
-- Supports: Coins, Zen, EXP, and physical items with quantities
-- Works with both mysqli and PDO connections
+### Database Schema
+```sql
+CREATE TABLE events (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(100) NOT NULL,
+  description TEXT,
+  event_type ENUM('double_xp', 'double_drops', 'sale', 'maintenance', 'update', 'custom') NOT NULL,
+  start_date DATETIME NOT NULL,
+  end_date DATETIME NOT NULL,
+  banner_url VARCHAR(500),
+  is_active TINYINT(1) DEFAULT 1,
+  created_at DATETIME NOT NULL
+);
+```
 
-### Character Resolution
-`getUserRoleId($pdo, $userId)` resolves:
-1. `users.name` (account name) from web user ID
-2. First active character from `basetab_sg WHERE AccountID = ? AND IsDel = 0`
-3. Returns `RoleID` for mail delivery
+### Components
+- `EventsCalendar.tsx` - Monthly calendar view
+- `UpcomingEvents.tsx` - Dashboard widget
+- `admin/EventsManager.tsx` - Event CRUD
 
-### Fallback for Missing Characters
-If no character exists, order is saved to `pending_deliveries` table for later processing.
+### API
+- `events.php` - List, CRUD
 
 ---
 
-## Files to Modify
+## 🎨 Phase 5: Dashboard Layout Redesign
+**Priority: Medium**
 
-| File | Change |
-|------|--------|
-| `public/api-reference/payment_confirm.php` | Fix missing brace on line 113 |
+### User Dashboard
+- Responsive grid with widget cards
+- Collapsible sidebar on mobile
+- Quick stats bar at top
+- Customizable widget order (optional)
+
+### Mobile Optimizations
+- Touch-friendly buttons
+- Swipe gestures for tabs
+- Bottom navigation bar
+- Optimized card layouts
 
 ---
 
-## After Implementation
+## 🔔 Phase 6: Push Notifications
+**Priority: Low**
 
-1. Upload the fixed `payment_confirm.php` to your server
-2. Test by making a purchase - order should appear in Order History
-3. Test Game Pass claim - reward should arrive in game mailbox
-4. Check server logs for `MAIL_SENT` entries to confirm delivery
+### Features
+- Browser notification permission request
+- Notify on: streak expiring, reward ready, event starting
+- Admin can send push to all users
+
+### Implementation
+- Service worker for push
+- Notification preferences in settings
+
+---
+
+## Admin Dashboard Updates
+
+Add new tabs for:
+1. **Achievements** - Create/edit achievements, view unlock stats
+2. **Spin Wheel** - Configure segments, probabilities, settings
+3. **Events** - Calendar event management
+
+---
+
+## Implementation Order
+
+1. ⬜ Achievements System (backend + admin + user UI)
+2. ⬜ Player Stats Card
+3. ⬜ Lucky Spin Wheel
+4. ⬜ Dashboard Layout Redesign
+5. ⬜ Events Calendar
+6. ⬜ Push Notifications
+
+---
+
+## Notes
+- All features controlled via Admin Dashboard
+- Mobile-first responsive design
+- Consistent with existing gaming aesthetic
+- PHP/MySQL backend (no Supabase)
