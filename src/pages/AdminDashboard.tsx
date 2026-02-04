@@ -17,6 +17,7 @@ import { WebshopManager } from "@/components/admin/WebshopManager";
 import { OrdersManager } from "@/components/admin/OrdersManager";
 import { ServerStatsCard } from "@/components/admin/ServerStatsCard";
 import { SettingsManager } from "@/components/admin/SettingsManager";
+import { AchievementsManager } from "@/components/admin/AchievementsManager";
 import { 
   Shield, 
   Users, 
@@ -32,7 +33,8 @@ import {
   UserCheck,
   Swords,
   Receipt,
-  Settings
+  Settings,
+  Trophy
 } from "lucide-react";
 
 interface LastOrder {
@@ -281,7 +283,7 @@ export default function AdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 mb-6 h-auto gap-1">
+          <TabsList className="grid w-full grid-cols-5 md:grid-cols-9 mb-6 h-auto gap-1">
             <TabsTrigger value="overview" className="gap-2 py-2">
               <Server className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -301,6 +303,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="gamepass" className="gap-2 py-2">
               <Gift className="h-4 w-4" />
               <span className="hidden sm:inline">Game Pass</span>
+            </TabsTrigger>
+            <TabsTrigger value="achievements" className="gap-2 py-2">
+              <Trophy className="h-4 w-4" />
+              <span className="hidden sm:inline">Achievements</span>
             </TabsTrigger>
             <TabsTrigger value="webshop" className="gap-2 py-2">
               <ShoppingBag className="h-4 w-4" />
@@ -512,6 +518,11 @@ export default function AdminDashboard() {
           {/* Game Pass Tab */}
           <TabsContent value="gamepass">
             <GamePassRewardsManager username={user?.username} />
+          </TabsContent>
+
+          {/* Achievements Tab */}
+          <TabsContent value="achievements">
+            <AchievementsManager />
           </TabsContent>
 
           {/* Webshop Tab */}
