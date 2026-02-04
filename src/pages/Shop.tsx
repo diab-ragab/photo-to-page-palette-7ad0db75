@@ -3,10 +3,12 @@ import { Footer } from "@/components/Footer";
 import { ShopHero } from "@/components/shop/ShopHero";
 import { ShopCategories } from "@/components/shop/ShopCategories";
 import { ShopProducts } from "@/components/shop/ShopProducts";
+import { LimitedTimeBundles } from "@/components/shop/LimitedTimeBundles";
+import { CurrencyTopUp } from "@/components/shop/CurrencyTopUp";
 import { SEO } from "@/components/SEO";
 import { useState } from "react";
 
-export type ShopCategory = "all" | "fashion" | "pets" | "currency" | "passes";
+export type ShopCategory = "all" | "fashion" | "pets" | "currency" | "passes" | "bundles";
 
 const Shop = () => {
   const [selectedCategory, setSelectedCategory] = useState<ShopCategory>("all");
@@ -38,11 +40,24 @@ const Shop = () => {
       />
       <Navbar />
       <ShopHero />
-      <ShopCategories 
-        selectedCategory={selectedCategory} 
-        onSelectCategory={setSelectedCategory} 
-      />
-      <ShopProducts selectedCategory={selectedCategory} />
+      
+      {/* Flash Sales Section */}
+      <section className="container mx-auto px-4 py-8">
+        <LimitedTimeBundles />
+      </section>
+      
+      {/* Currency Top-Up Section */}
+      <section className="container mx-auto px-4 py-8 border-t border-border">
+        <CurrencyTopUp />
+      </section>
+      
+      <div className="border-t border-border">
+        <ShopCategories 
+          selectedCategory={selectedCategory} 
+          onSelectCategory={setSelectedCategory} 
+        />
+        <ShopProducts selectedCategory={selectedCategory} />
+      </div>
       <Footer />
     </div>
   );

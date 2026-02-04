@@ -16,6 +16,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
@@ -84,6 +85,7 @@ const App = () => (
                   <ScrollToTop />
                   <RecentPurchases />
                   <SessionTimeoutWarning />
+                  <PWAInstallPrompt />
                 </BrowserRouter>
               </TooltipProvider>
             </CartProvider>
