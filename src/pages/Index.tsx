@@ -9,6 +9,7 @@ import { UpdateRoad } from "@/components/UpdateRoad";
 import { Footer } from "@/components/Footer";
 import { ConsentPopup } from "@/components/ConsentPopup";
 import { SEO } from "@/components/SEO";
+import { FeaturedEventsBanner } from "@/components/FeaturedEventsBanner";
 
 const Index = () => {
   const structuredData = {
@@ -35,6 +36,7 @@ const Index = () => {
         structuredData={structuredData}
       />
       <Navbar />
+      <FeaturedEventsBanner />
       <HeroSection />
       <ClassSelection />
       <Features />
