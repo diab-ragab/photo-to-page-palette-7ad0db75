@@ -23,7 +23,15 @@ export const notificationsApi = {
     try {
       const response = await fetch(`${API_BASE_URL}/notifications.php?action=list`);
       if (!response.ok) throw new Error('Failed to fetch notifications');
-      return await response.json();
+      const data = await response.json();
+      // Handle both old format (array) and new format ({ success, notifications })
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (data && Array.isArray(data.notifications)) {
+        return data.notifications;
+      }
+      return [];
     } catch {
       // Silent fail - don't expose errors in production
       return [];
@@ -80,11 +88,13 @@ export const autoNotificationSettingsApi = {
       const response = await fetch(`${API_BASE_URL}/notifications.php?action=auto_settings`);
       if (!response.ok) throw new Error('Failed to fetch settings');
       const data = await response.json();
+      // Handle new format { success, settings } or old format (direct object)
+      const settings = data.settings || data;
       return {
-        daily_zen_enabled: !!data.daily_zen_enabled,
-        spin_wheel_enabled: !!data.spin_wheel_enabled,
-        vote_streak_enabled: !!data.vote_streak_enabled,
-        gamepass_enabled: !!data.gamepass_enabled,
+        daily_zen_enabled: !!settings.daily_zen_enabled,
+        spin_wheel_enabled: !!settings.spin_wheel_enabled,
+        vote_streak_enabled: !!settings.vote_streak_enabled,
+        gamepass_enabled: !!settings.gamepass_enabled,
       };
     } catch {
       return {
