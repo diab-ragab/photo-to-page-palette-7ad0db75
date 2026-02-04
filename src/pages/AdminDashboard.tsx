@@ -21,6 +21,7 @@ import { SettingsManager } from "@/components/admin/SettingsManager";
 import { AchievementsManager } from "@/components/admin/AchievementsManager";
 import { SpinWheelManager } from "@/components/admin/SpinWheelManager";
 import { EventsManager } from "@/components/admin/EventsManager";
+import { ChangelogManager } from "@/components/admin/ChangelogManager";
 import {
   Shield,
   Users, 
@@ -40,7 +41,8 @@ import {
   Trophy,
   Sparkles,
   Calendar,
-  Send
+  Send,
+  ScrollText
 } from "lucide-react";
 
 interface LastOrder {
@@ -289,7 +291,7 @@ export default function AdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6 md:grid-cols-11 mb-6 h-auto gap-1">
+          <TabsList className="grid w-full grid-cols-6 md:grid-cols-12 mb-6 h-auto gap-1">
             <TabsTrigger value="overview" className="gap-2 py-2">
               <Server className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -321,6 +323,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="events" className="gap-2 py-2">
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Events</span>
+            </TabsTrigger>
+            <TabsTrigger value="changelog" className="gap-2 py-2">
+              <ScrollText className="h-4 w-4" />
+              <span className="hidden sm:inline">Changelog</span>
             </TabsTrigger>
             <TabsTrigger value="webshop" className="gap-2 py-2">
               <ShoppingBag className="h-4 w-4" />
@@ -547,6 +553,11 @@ export default function AdminDashboard() {
           {/* Events Tab */}
           <TabsContent value="events">
             <EventsManager />
+          </TabsContent>
+
+          {/* Changelog Tab */}
+          <TabsContent value="changelog">
+            <ChangelogManager />
           </TabsContent>
 
           {/* Webshop Tab */}
