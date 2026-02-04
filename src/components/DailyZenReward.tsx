@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { checkDailyZenStatus, claimDailyZen, formatCountdown } from '@/lib/dailyZenApi';
@@ -33,7 +33,9 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [csrfToken, setCsrfToken] = useState<string>('');
-
+  
+  // Track when the countdown should end (based on server time)
+  const countdownEndTimeRef = useRef<number>(0);
   // Fetch status on mount
   const fetchStatus = useCallback(async () => {
     if (!isLoggedIn) {
@@ -50,7 +52,18 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCanClaim(status.can_claim);
         setHasClaimed(status.has_claimed);
         setRewardAmount(status.reward_amount);
-        setCountdown(status.seconds_until_next_claim);
+        
+        // Set countdown and calculate end time
+        const serverSeconds = status.seconds_until_next_claim;
+        setCountdown(serverSeconds);
+        
+        // Store when the countdown should end (local time + server seconds)
+        if (serverSeconds > 0) {
+          countdownEndTimeRef.current = Date.now() + (serverSeconds * 1000);
+        } else {
+          countdownEndTimeRef.current = 0;
+        }
+        
         if (status.csrf_token) {
           setCsrfToken(status.csrf_token);
           sessionStorage.setItem('csrf_token', status.csrf_token);
@@ -69,23 +82,25 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
     fetchStatus();
   }, [fetchStatus]);
 
-  // Countdown timer
+  // Countdown timer - uses stored end time for accuracy
   useEffect(() => {
-    if (countdown <= 0 || canClaim) return;
+    if (canClaim || countdownEndTimeRef.current === 0) return;
 
     const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          // Reset is ready, refresh status
-          fetchStatus();
-          return 0;
-        }
-        return prev - 1;
-      });
+      const now = Date.now();
+      const remaining = Math.max(0, Math.floor((countdownEndTimeRef.current - now) / 1000));
+      
+      setCountdown(remaining);
+      
+      if (remaining <= 0) {
+        // Reset is ready, refresh status
+        countdownEndTimeRef.current = 0;
+        fetchStatus();
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [countdown, canClaim, fetchStatus]);
+  }, [canClaim, fetchStatus]);
 
   // Handle claim
   const handleClaim = async () => {
@@ -101,7 +116,11 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCanClaim(false);
         setHasClaimed(true);
         setShowSuccess(true);
-        setCountdown(result.seconds_until_next_claim || 86400);
+        
+        // Set countdown with server-synced seconds
+        const serverSeconds = result.seconds_until_next_claim || 86400;
+        setCountdown(serverSeconds);
+        countdownEndTimeRef.current = Date.now() + (serverSeconds * 1000);
         
         toast.success(`🎉 Claimed ${(result.reward_amount || rewardAmount).toLocaleString()} Zen!`);
         

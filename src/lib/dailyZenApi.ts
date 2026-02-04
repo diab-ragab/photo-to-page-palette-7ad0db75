@@ -3,9 +3,11 @@
  * 
  * Handles device fingerprinting and secure API communication
  * for the daily Zen reward system with enhanced anti-abuse.
+ * 
+ * Uses server time synchronization to ensure accurate countdown display.
  */
 
-import { generateFingerprint, getDetailedFingerprint } from './fingerprint';
+import { getDetailedFingerprint } from './fingerprint';
 
 const API_BASE = 'https://woiendgame.online/api';
 
@@ -15,6 +17,7 @@ interface DailyZenStatus {
   has_claimed: boolean;
   reward_amount: number;
   seconds_until_next_claim: number;
+  server_time?: number;
   csrf_token?: string;
   error?: string;
 }
@@ -24,14 +27,53 @@ interface ClaimResult {
   message?: string;
   reward_amount?: number;
   seconds_until_next_claim?: number;
+  server_time?: number;
   error?: string;
 }
 
 // Store CSRF token from status check
 let csrfToken = '';
 
+// Server time offset (server_time - local_time) in seconds
+let serverTimeOffset = 0;
+
 export function setCsrfToken(token: string) {
   csrfToken = token;
+}
+
+/**
+ * Calculate the corrected remaining seconds based on server time offset
+ * This ensures the countdown is accurate regardless of client clock
+ */
+export function getCorrectedRemainingSeconds(
+  serverSecondsRemaining: number,
+  serverTimestamp: number
+): number {
+  if (!serverTimestamp || serverSecondsRemaining <= 0) {
+    return serverSecondsRemaining;
+  }
+  
+  // Calculate server time offset
+  const localNow = Math.floor(Date.now() / 1000);
+  serverTimeOffset = serverTimestamp - localNow;
+  
+  // The server told us X seconds remaining at server_time
+  // Calculate when it will be ready: server_time + seconds_remaining
+  const readyAt = serverTimestamp + serverSecondsRemaining;
+  
+  // Calculate remaining from current local time adjusted for offset
+  const correctedLocalNow = localNow + serverTimeOffset;
+  const remaining = readyAt - correctedLocalNow;
+  
+  return Math.max(0, remaining);
+}
+
+/**
+ * Get the current server-adjusted remaining time
+ * Used for countdown updates
+ */
+export function getServerAdjustedTime(): number {
+  return Math.floor(Date.now() / 1000) + serverTimeOffset;
 }
 
 /**
@@ -89,6 +131,14 @@ export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
       setCsrfToken(data.csrf_token);
     }
     
+    // Calculate corrected remaining time based on server time
+    if (data.success && data.server_time && data.seconds_until_next_claim > 0) {
+      data.seconds_until_next_claim = getCorrectedRemainingSeconds(
+        data.seconds_until_next_claim,
+        data.server_time
+      );
+    }
+    
     return data;
   } catch (error) {
     console.error('[DailyZen] Status check failed:', error);
@@ -134,6 +184,15 @@ export async function claimDailyZen(): Promise<ClaimResult> {
     });
     
     const data = await response.json();
+    
+    // Calculate corrected remaining time based on server time
+    if (data.success && data.server_time && data.seconds_until_next_claim) {
+      data.seconds_until_next_claim = getCorrectedRemainingSeconds(
+        data.seconds_until_next_claim,
+        data.server_time
+      );
+    }
+    
     return data;
   } catch (error) {
     console.error('[DailyZen] Claim failed:', error);
@@ -150,9 +209,12 @@ export async function claimDailyZen(): Promise<ClaimResult> {
 export function formatCountdown(seconds: number): string {
   if (seconds <= 0) return '00:00:00';
   
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
+  // Clamp to max 24 hours to prevent display errors
+  const clampedSeconds = Math.min(seconds, 86400);
+  
+  const hours = Math.floor(clampedSeconds / 3600);
+  const minutes = Math.floor((clampedSeconds % 3600) / 60);
+  const secs = Math.floor(clampedSeconds % 60);
   
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
