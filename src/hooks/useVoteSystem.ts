@@ -77,7 +77,8 @@ export const useVoteSystem = () => {
         canVote: false, // Can't vote without login
         lastVoteTime: null,
         nextVoteTime: null,
-        timeRemaining: null
+        timeRemaining: null,
+        secondsRemaining: null
       })));
       setSitesLoading(false);
       return;
@@ -135,12 +136,16 @@ export const useVoteSystem = () => {
           const lastVoteTime = status?.last_vote_time || null;
           const hasVotedBefore = !!lastVoteTime;
 
+          // Use server-calculated seconds_remaining for accurate countdown
+          const secondsRemaining = status?.seconds_remaining ?? null;
+
           return {
             ...site,
             canVote: hasVotedBefore ? status?.can_vote === true : true,
             lastVoteTime,
             nextVoteTime: status?.next_vote_time || null,
             timeRemaining: status?.time_remaining || null,
+            secondsRemaining,
           };
         });
 
@@ -153,7 +158,8 @@ export const useVoteSystem = () => {
           canVote: true, // Allow voting, server will validate
           lastVoteTime: null,
           nextVoteTime: null,
-          timeRemaining: null
+          timeRemaining: null,
+          secondsRemaining: null
         })));
       }
     } catch (err) {
@@ -165,7 +171,8 @@ export const useVoteSystem = () => {
         canVote: true, // Allow voting, server will validate
         lastVoteTime: null,
         nextVoteTime: null,
-        timeRemaining: null
+        timeRemaining: null,
+        secondsRemaining: null
       })));
     } finally {
       setSitesLoading(false);

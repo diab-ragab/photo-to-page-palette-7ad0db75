@@ -3,7 +3,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Clock, Coins, Crown, CheckCircle2 } from "lucide-react";
 import type { VoteSiteStatus } from "@/lib/voteSitesApi";
-import { getServerTimeOffset } from "@/hooks/useVoteSystem";
 
 interface VoteSiteCardProps {
   site: VoteSiteStatus;
@@ -17,25 +16,26 @@ export const VoteSiteCard = ({ site, onVote, loading }: VoteSiteCardProps) => {
   // Store the calculated end time (when vote becomes available) to prevent drift
   const countdownEndTimeRef = useRef<number | null>(null);
 
-  // Calculate time remaining using server-synchronized time
+  // Calculate time remaining using server-provided seconds_remaining
   useEffect(() => {
-    if (site.canVote || !site.lastVoteTime) {
+    // If can vote or no cooldown data, no timer needed
+    if (site.canVote) {
       setTimeRemaining(null);
       countdownEndTimeRef.current = null;
       return;
     }
 
-    // Calculate the end time once when lastVoteTime changes
-    // Use server time offset to ensure accuracy
-    const serverOffset = getServerTimeOffset();
-    const lastVote = new Date(site.lastVoteTime).getTime();
-    const cooldownMs = site.cooldown_hours * 60 * 60 * 1000;
-    const nextVoteTime = lastVote + cooldownMs;
-    
-    // Adjust for server time offset (convert to local reference)
-    // Server offset = server_time - local_time
-    // So local_end_time = server_end_time - (server_offset * 1000)
-    countdownEndTimeRef.current = nextVoteTime - (serverOffset * 1000);
+    // Use server-calculated seconds_remaining for accurate countdown
+    const serverSeconds = site.secondsRemaining;
+    if (serverSeconds === null || serverSeconds === undefined || serverSeconds <= 0) {
+      setTimeRemaining(null);
+      countdownEndTimeRef.current = null;
+      return;
+    }
+
+    // Calculate end time: current local time + server-provided remaining seconds
+    // This is accurate because server already calculated the remaining time
+    countdownEndTimeRef.current = Date.now() + (serverSeconds * 1000);
 
     const updateTimer = () => {
       if (!countdownEndTimeRef.current) {
@@ -52,9 +52,12 @@ export const VoteSiteCard = ({ site, onVote, loading }: VoteSiteCardProps) => {
         return;
       }
 
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      // Clamp to max cooldown (12 hours) to prevent display errors
+      const clampedDiff = Math.min(diff, site.cooldown_hours * 60 * 60 * 1000);
+      
+      const hours = Math.floor(clampedDiff / (1000 * 60 * 60));
+      const minutes = Math.floor((clampedDiff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((clampedDiff % (1000 * 60)) / 1000);
 
       setTimeRemaining(
         `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
@@ -64,7 +67,7 @@ export const VoteSiteCard = ({ site, onVote, loading }: VoteSiteCardProps) => {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [site.lastVoteTime, site.cooldown_hours, site.canVote]);
+  }, [site.secondsRemaining, site.cooldown_hours, site.canVote]);
 
   const handleVote = async () => {
     setIsVoting(true);
