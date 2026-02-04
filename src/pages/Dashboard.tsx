@@ -14,6 +14,7 @@ import { OrderHistory } from "@/components/OrderHistory";
 import { DailyZenReward } from "@/components/DailyZenReward";
 import { AchievementsCard } from "@/components/AchievementsCard";
 import { PlayerStatsCard } from "@/components/PlayerStatsCard";
+import { LuckyWheel } from "@/components/LuckyWheel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -299,6 +300,9 @@ const Dashboard = () => {
           <div className="space-y-6">
             {/* Daily Zen Reward */}
             <DailyZenReward onClaim={(amount) => setUserZen((prev) => prev + amount)} />
+
+            {/* Lucky Spin Wheel */}
+            <LuckyWheel />
 
             {/* Vote Streak Card */}
             <VoteStreakCard streakData={streakData} />
