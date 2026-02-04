@@ -369,6 +369,168 @@ switch ($action) {
     }
     break;
 
+  // PUBLIC: Purchase bundle (creates order and redirects to Stripe)
+  case 'purchase':
+    // Require auth
+    $token = '';
+    $auth = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : '';
+    if (stripos($auth, 'Bearer ') === 0) {
+      $token = trim(substr($auth, 7));
+    }
+    if (!$token) {
+      $token = isset($_SERVER['HTTP_X_SESSION_TOKEN']) ? $_SERVER['HTTP_X_SESSION_TOKEN'] : '';
+    }
+    if (!$token) {
+      jsonFail(401, 'Please login to purchase');
+    }
+    
+    // Validate session
+    $stmt = $pdo->prepare("SELECT user_id, expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
+    $stmt->execute(array($token));
+    $sess = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$sess || (int)$sess['user_id'] <= 0) {
+      jsonFail(401, 'Invalid session');
+    }
+    $userId = (int)$sess['user_id'];
+    
+    // Get bundle and character info
+    $bundleId = isset($input['bundle_id']) ? (int)$input['bundle_id'] : 0;
+    $characterId = isset($input['character_id']) ? (int)$input['character_id'] : 0;
+    $characterName = isset($input['character_name']) ? trim($input['character_name']) : '';
+    
+    if (!$bundleId) {
+      jsonFail(400, 'Bundle ID required');
+    }
+    if (!$characterId) {
+      jsonFail(400, 'Please select a character');
+    }
+    
+    // Get bundle
+    $stmt = $pdo->prepare("SELECT * FROM flash_bundles WHERE id = ? AND is_active = 1 AND ends_at > NOW()");
+    $stmt->execute(array($bundleId));
+    $bundle = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$bundle) {
+      jsonFail(404, 'Bundle not found or expired');
+    }
+    
+    // Check stock
+    if ($bundle['stock'] !== null && (int)$bundle['stock'] <= 0) {
+      jsonFail(400, 'Bundle sold out');
+    }
+    
+    // Get config for Stripe
+    $cfg = getConfig();
+    $stripeCfg = isset($cfg['stripe']) ? $cfg['stripe'] : array();
+    $secretKey = isset($stripeCfg['secret_key']) ? $stripeCfg['secret_key'] : '';
+    $currency = isset($stripeCfg['currency']) ? $stripeCfg['currency'] : 'eur';
+    $successUrl = isset($stripeCfg['success_url']) ? $stripeCfg['success_url'] : '';
+    $cancelUrl = isset($stripeCfg['cancel_url']) ? $stripeCfg['cancel_url'] : '';
+    
+    if (!$secretKey || !$successUrl || !$cancelUrl) {
+      jsonFail(500, 'Payment not configured');
+    }
+    
+    // Create Stripe checkout session
+    $salePrice = (float)$bundle['sale_price'];
+    $unitAmount = (int)round($salePrice * 100);
+    
+    $fields = array(
+      'mode' => 'payment',
+      'success_url' => $successUrl,
+      'cancel_url' => $cancelUrl,
+      'client_reference_id' => (string)$userId,
+      'metadata[user_id]' => (string)$userId,
+      'metadata[bundle_id]' => (string)$bundleId,
+      'metadata[character_id]' => (string)$characterId,
+      'metadata[character_name]' => $characterName,
+      'metadata[type]' => 'bundle',
+      'line_items[0][price_data][currency]' => $currency,
+      'line_items[0][price_data][unit_amount]' => $unitAmount,
+      'line_items[0][price_data][product_data][name]' => $bundle['name'],
+      'line_items[0][price_data][product_data][description]' => $bundle['description'] ? $bundle['description'] : 'Flash Sale Bundle',
+      'line_items[0][quantity]' => 1,
+    );
+    
+    $body = http_build_query($fields);
+    
+    // Stripe request using file_get_contents
+    $headers = array(
+      'Authorization: Bearer ' . $secretKey,
+      'Content-Type: application/x-www-form-urlencoded',
+    );
+    $opts = array(
+      'http' => array(
+        'method' => 'POST',
+        'header' => implode("\r\n", $headers),
+        'content' => $body,
+        'ignore_errors' => true,
+        'timeout' => 30,
+      ),
+      'ssl' => array(
+        'verify_peer' => true,
+        'verify_peer_name' => true,
+      ),
+    );
+    $context = stream_context_create($opts);
+    $resp = @file_get_contents('https://api.stripe.com/v1/checkout/sessions', false, $context);
+    
+    $code = 0;
+    if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
+      if (preg_match('/HTTP\/\d+\.?\d*\s+(\d+)/', $http_response_header[0], $m)) {
+        $code = (int)$m[1];
+      }
+    }
+    
+    if ($resp === false || $code < 200 || $code >= 300) {
+      error_log("BUNDLE_PURCHASE_STRIPE_ERR code={$code}");
+      jsonFail(502, 'Payment service error');
+    }
+    
+    $stripeData = json_decode($resp, true);
+    if (!is_array($stripeData) || !isset($stripeData['url'])) {
+      jsonFail(502, 'Invalid payment response');
+    }
+    
+    // Create bundle_orders table if not exists
+    $pdo->exec("
+      CREATE TABLE IF NOT EXISTS bundle_orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        bundle_id INT NOT NULL,
+        character_id INT NOT NULL,
+        character_name VARCHAR(50) DEFAULT NULL,
+        total_real DECIMAL(10,2) NOT NULL,
+        status ENUM('pending', 'completed', 'failed', 'refunded') NOT NULL DEFAULT 'pending',
+        stripe_session_id VARCHAR(255) DEFAULT NULL,
+        stripe_payment_intent VARCHAR(255) DEFAULT NULL,
+        delivered_at DATETIME DEFAULT NULL,
+        created_at DATETIME NOT NULL,
+        INDEX idx_user (user_id),
+        INDEX idx_bundle (bundle_id),
+        INDEX idx_status (status),
+        INDEX idx_session (stripe_session_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+    ");
+    
+    // Create pending order
+    $stmt = $pdo->prepare("
+      INSERT INTO bundle_orders (user_id, bundle_id, character_id, character_name, total_real, status, stripe_session_id, created_at)
+      VALUES (?, ?, ?, ?, ?, 'pending', ?, NOW())
+    ");
+    $stmt->execute(array($userId, $bundleId, $characterId, $characterName, $salePrice, $stripeData['id']));
+    $orderId = $pdo->lastInsertId();
+    
+    // Reserve stock (decrement now, will restore if payment fails)
+    if ($bundle['stock'] !== null) {
+      $pdo->prepare("UPDATE flash_bundles SET stock = stock - 1 WHERE id = ? AND stock > 0")->execute(array($bundleId));
+    }
+    
+    error_log("BUNDLE_ORDER_CREATED order={$orderId} user={$userId} bundle={$bundleId} session=" . $stripeData['id']);
+    
+    jsonOut(array('success' => true, 'url' => $stripeData['url'], 'order_id' => $orderId));
+    break;
+
   default:
     jsonFail(400, 'Invalid action');
 }

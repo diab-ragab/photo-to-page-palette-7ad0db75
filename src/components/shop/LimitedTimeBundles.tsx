@@ -3,9 +3,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, Flame, Percent, ShoppingCart, Sparkles, AlertCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Clock, Flame, Percent, ShoppingCart, Sparkles, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { bundlesApi, Bundle, getIconEmoji } from "@/lib/bundlesApi";
+import { CharacterSelector } from "@/components/shop/CharacterSelector";
+import { useAuth } from "@/contexts/AuthContext";
 
 const formatTime = (ms: number): string => {
   if (ms <= 0) return "00:00:00";
@@ -18,18 +21,16 @@ const formatTime = (ms: number): string => {
 interface BundleCardProps {
   bundle: Bundle;
   serverTimeOffset: number;
+  onBuy: (bundle: Bundle) => void;
 }
 
-const BundleCard = ({ bundle, serverTimeOffset }: BundleCardProps) => {
+const BundleCard = ({ bundle, serverTimeOffset, onBuy }: BundleCardProps) => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
-  const { toast } = useToast();
 
   useEffect(() => {
-    // Calculate end time using server time offset for accuracy
     const endTime = bundle.ends_at_ts ? bundle.ends_at_ts * 1000 : new Date(bundle.ends_at).getTime();
     
     const updateTimer = () => {
-      // Adjust local time with server offset
       const now = Date.now() + serverTimeOffset;
       setTimeLeft(Math.max(0, endTime - now));
     };
@@ -39,16 +40,9 @@ const BundleCard = ({ bundle, serverTimeOffset }: BundleCardProps) => {
     return () => clearInterval(interval);
   }, [bundle.ends_at, bundle.ends_at_ts, serverTimeOffset]);
 
-  const handleBuy = () => {
-    // In production, this would go to checkout
-    toast({
-      title: "Added to Cart! 🛒",
-      description: `${bundle.name} has been added to your cart.`,
-    });
-  };
-
   const isExpired = timeLeft <= 0;
-  const isUrgent = timeLeft < 60 * 60 * 1000; // Less than 1 hour
+  const isUrgent = timeLeft < 60 * 60 * 1000;
+  const isSoldOut = bundle.stock !== null && bundle.stock <= 0;
 
   return (
     <Card 
@@ -56,7 +50,7 @@ const BundleCard = ({ bundle, serverTimeOffset }: BundleCardProps) => {
         bundle.is_featured 
           ? "border-2 border-primary shadow-lg shadow-primary/20" 
           : "border-border"
-      } ${isExpired ? "opacity-50" : ""}`}
+      } ${isExpired || isSoldOut ? "opacity-50" : ""}`}
     >
       {bundle.is_featured && (
         <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-lg">
@@ -65,14 +59,19 @@ const BundleCard = ({ bundle, serverTimeOffset }: BundleCardProps) => {
         </div>
       )}
       
-      {bundle.stock && bundle.stock < 30 && (
+      {bundle.stock !== null && bundle.stock > 0 && bundle.stock < 30 && (
         <div className="absolute top-0 left-0 bg-destructive text-destructive-foreground text-xs font-bold px-3 py-1 rounded-br-lg">
           Only {bundle.stock} left!
         </div>
       )}
       
+      {isSoldOut && (
+        <div className="absolute top-0 left-0 bg-muted text-muted-foreground text-xs font-bold px-3 py-1 rounded-br-lg">
+          SOLD OUT
+        </div>
+      )}
+      
       <CardContent className="p-5">
-        {/* Timer */}
         <div className={`flex items-center gap-2 mb-3 ${isUrgent ? "text-destructive" : "text-muted-foreground"}`}>
           <Clock className={`h-4 w-4 ${isUrgent ? "animate-pulse" : ""}`} />
           <span className="text-sm font-mono font-medium">
@@ -83,11 +82,9 @@ const BundleCard = ({ bundle, serverTimeOffset }: BundleCardProps) => {
           )}
         </div>
 
-        {/* Name & Description */}
         <h3 className="font-bold text-lg mb-1">{bundle.name}</h3>
         <p className="text-sm text-muted-foreground mb-4">{bundle.description}</p>
 
-        {/* Items */}
         <div className="space-y-2 mb-4">
           {bundle.items?.map((item, idx) => (
             <div key={idx} className="flex items-center gap-2 text-sm">
@@ -97,7 +94,6 @@ const BundleCard = ({ bundle, serverTimeOffset }: BundleCardProps) => {
           ))}
         </div>
 
-        {/* Price */}
         <div className="flex items-center gap-3 mb-4">
           <span className="text-2xl font-bold text-primary">€{Number(bundle.sale_price).toFixed(2)}</span>
           <span className="text-lg text-muted-foreground line-through">€{Number(bundle.original_price).toFixed(2)}</span>
@@ -107,14 +103,13 @@ const BundleCard = ({ bundle, serverTimeOffset }: BundleCardProps) => {
           </Badge>
         </div>
 
-        {/* CTA */}
         <Button 
-          onClick={handleBuy}
-          disabled={isExpired}
+          onClick={() => onBuy(bundle)}
+          disabled={isExpired || isSoldOut}
           className="w-full gap-2"
         >
           <ShoppingCart className="h-4 w-4" />
-          {isExpired ? "Sale Ended" : "Buy Now"}
+          {isSoldOut ? "Sold Out" : isExpired ? "Sale Ended" : "Buy Now"}
         </Button>
       </CardContent>
     </Card>
@@ -126,6 +121,12 @@ export const LimitedTimeBundles = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [serverTimeOffset, setServerTimeOffset] = useState(0);
+  const [selectedBundle, setSelectedBundle] = useState<Bundle | null>(null);
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const { isLoggedIn } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchBundles = async () => {
@@ -133,7 +134,6 @@ export const LimitedTimeBundles = () => {
         const { bundles: data, server_time } = await bundlesApi.getActive();
         setBundles(data);
         
-        // Calculate server time offset (server_time - local_time in ms)
         if (server_time) {
           const localNow = Math.floor(Date.now() / 1000);
           setServerTimeOffset((server_time - localNow) * 1000);
@@ -146,11 +146,56 @@ export const LimitedTimeBundles = () => {
     };
 
     fetchBundles();
-    
-    // Refresh bundles every 5 minutes
     const interval = setInterval(fetchBundles, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleBuyClick = (bundle: Bundle) => {
+    if (!isLoggedIn) {
+      toast({
+        title: "Login Required",
+        description: "Please login to purchase bundles",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedBundle(bundle);
+    setSelectedRoleId(null);
+    setSelectedCharacterName(null);
+  };
+
+  const handleCharacterSelect = (roleId: number | null, characterName: string | null) => {
+    setSelectedRoleId(roleId);
+    setSelectedCharacterName(characterName);
+  };
+
+  const handlePurchase = async () => {
+    if (!selectedBundle || !selectedRoleId) {
+      toast({
+        title: "Select Character",
+        description: "Please select a character to receive the bundle items",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsPurchasing(true);
+    try {
+      const { url } = await bundlesApi.purchase(
+        selectedBundle.id,
+        selectedRoleId,
+        selectedCharacterName || ""
+      );
+      window.location.href = url;
+    } catch (err: any) {
+      toast({
+        title: "Purchase Failed",
+        description: err.message || "Failed to start checkout",
+        variant: "destructive",
+      });
+      setIsPurchasing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -181,30 +226,87 @@ export const LimitedTimeBundles = () => {
   }
 
   if (bundles.length === 0) {
-    return null; // Don't show section if no active bundles
+    return null;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-destructive/20 rounded-lg">
-          <Sparkles className="h-5 w-5 text-destructive" />
+    <>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-destructive/20 rounded-lg">
+            <Sparkles className="h-5 w-5 text-destructive" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">Flash Sales</h2>
+            <p className="text-sm text-muted-foreground">Limited-time offers - Don't miss out!</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-bold">Flash Sales</h2>
-          <p className="text-sm text-muted-foreground">Limited-time offers - Don't miss out!</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {bundles.map((bundle) => (
+            <BundleCard 
+              key={bundle.id} 
+              bundle={bundle} 
+              serverTimeOffset={serverTimeOffset}
+              onBuy={handleBuyClick}
+            />
+          ))}
         </div>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {bundles.map((bundle) => (
-          <BundleCard 
-            key={bundle.id} 
-            bundle={bundle} 
-            serverTimeOffset={serverTimeOffset}
-          />
-        ))}
-      </div>
-    </div>
+
+      {/* Purchase Dialog */}
+      <Dialog open={!!selectedBundle} onOpenChange={(open) => !open && setSelectedBundle(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Purchase {selectedBundle?.name}</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Bundle Summary */}
+            <div className="bg-secondary/30 rounded-lg p-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium">{selectedBundle?.name}</span>
+                <span className="text-primary font-bold">€{Number(selectedBundle?.sale_price || 0).toFixed(2)}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">{selectedBundle?.description}</p>
+              <div className="mt-3 space-y-1">
+                {selectedBundle?.items?.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-sm">
+                    <span>{item.icon_emoji || getIconEmoji(item.icon)}</span>
+                    <span>{item.quantity > 1 ? `${item.quantity}x ` : ""}{item.item_name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Character Selection */}
+            <CharacterSelector 
+              onSelect={handleCharacterSelect}
+              selectedRoleId={selectedRoleId}
+            />
+
+            {/* Purchase Button */}
+            <Button 
+              onClick={handlePurchase}
+              disabled={isPurchasing || !selectedRoleId}
+              className="w-full gap-2"
+              size="lg"
+            >
+              {isPurchasing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Redirecting to Stripe...
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="h-4 w-4" />
+                  Pay €{Number(selectedBundle?.sale_price || 0).toFixed(2)}
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
