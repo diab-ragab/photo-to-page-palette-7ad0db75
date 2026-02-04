@@ -83,12 +83,12 @@ try {
     // VIP Rankings - from user_currency order by vip_points
     $vipRankings = [];
     try {
+        // Try with username column first (most common schema)
         $stmt = $pdo->query("
             SELECT 
-                u.login as username, 
+                uc.username as username, 
                 uc.vip_points as value
             FROM user_currency uc
-            JOIN users u ON uc.user_id = u.ID
             WHERE uc.vip_points > 0
             ORDER BY uc.vip_points DESC
             LIMIT 10
@@ -111,7 +111,38 @@ try {
             ];
         }
     } catch (Exception $e) {
-        // Table doesn't exist
+        // Fallback: try with user_id JOIN
+        try {
+            $stmt = $pdo->query("
+                SELECT 
+                    u.login as username, 
+                    uc.vip_points as value
+                FROM user_currency uc
+                JOIN users u ON uc.user_id = u.ID
+                WHERE uc.vip_points > 0
+                ORDER BY uc.vip_points DESC
+                LIMIT 10
+            ");
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            $rank = 1;
+            foreach ($rows as $row) {
+                $vipLevel = 0;
+                $vp = (int)$row['value'];
+                if ($vp >= 10000) $vipLevel = 3;
+                elseif ($vp >= 5000) $vipLevel = 2;
+                elseif ($vp >= 1000) $vipLevel = 1;
+                
+                $vipRankings[] = [
+                    'rank' => $rank++,
+                    'username' => $row['username'],
+                    'value' => $vp,
+                    'vipLevel' => $vipLevel
+                ];
+            }
+        } catch (Exception $e2) {
+            // Table doesn't exist
+        }
     }
 
     // Top Characters by Level - from basetab_sg
