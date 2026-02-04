@@ -13,48 +13,6 @@ interface UseSessionTimeoutOptions {
   onWarning?: () => void;
 }
 
-// Refresh server-side session to prevent expiration
-const refreshServerSession = async (): Promise<boolean> => {
-  try {
-    const sessionToken = localStorage.getItem("woi_session_token") || "";
-    if (!sessionToken) return false;
-
-    const response = await fetch("https://woiendgame.online/api/auth.php?action=refresh_session", {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Session-Token": sessionToken,
-        "Authorization": `Bearer ${sessionToken}`,
-      },
-      body: JSON.stringify({ session_token: sessionToken }),
-    });
-
-    if (!response.ok) {
-      console.warn("[Session] Server refresh failed:", response.status);
-      return false;
-    }
-
-    const data = await response.json();
-    
-    // Update CSRF token if provided
-    if (data.csrf_token) {
-      localStorage.setItem("woi_csrf_token", data.csrf_token);
-    }
-    
-    // Update session token if rotated
-    if (data.session_token) {
-      localStorage.setItem("woi_session_token", data.session_token);
-    }
-
-    console.log("[Session] Server session refreshed successfully");
-    return true;
-  } catch (error) {
-    console.error("[Session] Failed to refresh server session:", error);
-    return false;
-  }
-};
-
 export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
   const { enabled = true, onTimeout, onWarning } = options;
   const { isLoggedIn, logout, rememberMe } = useAuth();
@@ -70,6 +28,48 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
   const [showWarning, setShowWarning] = useState(false);
   const [remainingTime, setRemainingTime] = useState(0);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Refresh server-side session to prevent expiration
+  const refreshServerSession = useCallback(async (): Promise<boolean> => {
+    try {
+      const sessionToken = localStorage.getItem("woi_session_token") || "";
+      if (!sessionToken) return false;
+
+      const response = await fetch("https://woiendgame.online/api/auth.php?action=refresh_session", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": sessionToken,
+          "Authorization": `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ session_token: sessionToken }),
+      });
+
+      if (!response.ok) {
+        console.warn("[Session] Server refresh failed:", response.status);
+        return false;
+      }
+
+      const data = await response.json();
+      
+      // Update CSRF token if provided
+      if (data.csrf_token) {
+        localStorage.setItem("woi_csrf_token", data.csrf_token);
+      }
+      
+      // Update session token if rotated
+      if (data.session_token) {
+        localStorage.setItem("woi_session_token", data.session_token);
+      }
+
+      console.log("[Session] Server session refreshed successfully");
+      return true;
+    } catch (error) {
+      console.error("[Session] Failed to refresh server session:", error);
+      return false;
+    }
+  }, []);
 
   const clearAllTimers = useCallback(() => {
     if (timeoutRef.current) {
@@ -181,7 +181,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
       });
       logout();
     }
-  }, [resetTimer, toast, rememberMe, logout]);
+  }, [refreshServerSession, resetTimer, toast, rememberMe, logout]);
 
   // Set up server-side session refresh interval
   useEffect(() => {
@@ -194,17 +194,18 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     }
 
     // Refresh server session periodically if user is active
-    serverRefreshIntervalRef.current = setInterval(async () => {
+    serverRefreshIntervalRef.current = setInterval(() => {
       const timeSinceLastActivity = Date.now() - lastActivityRef.current;
       const timeSinceLastRefresh = Date.now() - lastServerRefreshRef.current;
       
       // Only refresh if user was active in the last 5 minutes
       if (timeSinceLastActivity < SERVER_REFRESH_INTERVAL_MS && 
           timeSinceLastRefresh >= SERVER_REFRESH_INTERVAL_MS) {
-        const success = await refreshServerSession();
-        if (success) {
-          lastServerRefreshRef.current = Date.now();
-        }
+        refreshServerSession().then((success) => {
+          if (success) {
+            lastServerRefreshRef.current = Date.now();
+          }
+        });
       }
     }, SERVER_REFRESH_INTERVAL_MS);
 
@@ -214,7 +215,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
         serverRefreshIntervalRef.current = null;
       }
     };
-  }, [isLoggedIn, enabled]);
+  }, [isLoggedIn, enabled, refreshServerSession]);
 
   // Set up activity listeners
   useEffect(() => {
