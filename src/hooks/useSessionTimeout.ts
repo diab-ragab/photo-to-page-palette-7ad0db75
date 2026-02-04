@@ -40,10 +40,12 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
           "X-Session-Token": sessionToken,
           "Authorization": `Bearer ${sessionToken}`,
         },
-        body: JSON.stringify({ session_token: sessionToken }),
+        // Backend expects `sessionToken` (see auth.php), keep legacy key as fallback.
+        body: JSON.stringify({ sessionToken, session_token: sessionToken }),
       });
 
       if (!response.ok) {
@@ -57,9 +59,16 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
       if (data.csrf_token) {
         localStorage.setItem("woi_csrf_token", data.csrf_token);
       }
+
+      // Some endpoints may return a different naming convention
+      if (data.csrfToken) {
+        localStorage.setItem("woi_csrf_token", data.csrfToken);
+      }
       
       // Update session token if rotated
-      if (data.session_token) {
+      if (data.sessionToken) {
+        localStorage.setItem("woi_session_token", data.sessionToken);
+      } else if (data.session_token) {
         localStorage.setItem("woi_session_token", data.session_token);
       }
 
