@@ -278,9 +278,24 @@ export const useVoteSystem = () => {
   const availableVotes = voteSites.filter(s => s.canVote).length;
   const totalSites = voteSites.length;
 
+  // Initial fetch
   useEffect(() => {
     fetchVoteSitesStatus();
   }, [fetchVoteSitesStatus]);
+
+  // Auto-refresh when browser tab becomes visible again
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isLoggedIn) {
+        fetchVoteSitesStatus();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchVoteSitesStatus, isLoggedIn]);
 
   return {
     voteData,
