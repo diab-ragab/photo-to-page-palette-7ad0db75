@@ -32,7 +32,8 @@ $APP_CONFIG = array(
       '/^https:\/\/[a-z0-9-]+\.(lovable\.app|lovableproject\.com)$/i',
     ),
 
-    'allowed_headers' => 'Content-Type, Authorization, X-Requested-With, Accept, X-Session-Token',
+    // NOTE: include X-CSRF-Token for state-changing requests from browsers.
+    'allowed_headers' => 'Content-Type, Authorization, X-Requested-With, Accept, X-Session-Token, X-CSRF-Token',
     'default_methods' => array('GET','POST','PUT','PATCH','DELETE','OPTIONS'),
     'max_age' => 86400,
   ),

@@ -3,11 +3,13 @@ const API_BASE_URL = "https://woiendgame.online/api";
 // Helper to get auth headers
 function getAuthHeaders(): HeadersInit {
   const sessionToken = localStorage.getItem("woi_session_token") || "";
+  const csrfToken = localStorage.getItem("woi_csrf_token") || "";
   return {
     "Content-Type": "application/json",
     "Accept": "application/json",
     "X-Session-Token": sessionToken,
     "Authorization": `Bearer ${sessionToken}`,
+    ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
   };
 }
 

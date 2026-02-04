@@ -158,8 +158,9 @@ $confirmPasswd = (string)($_POST['confirmPasswd'] ?? '');
 $sessionTokenBody = (string)($_POST['sessionToken'] ?? '');
 $rememberMe = (bool)($_POST['remember_me'] ?? false);
 
-define('SESSION_MINUTES', 30);
-define('SESSION_REMEMBER_MINUTES', 10080);
+// Longer sessions to reduce admin reload issues (still enforced server-side).
+define('SESSION_MINUTES', 120); // 2 hours
+define('SESSION_REMEMBER_MINUTES', 43200); // 30 days
 
 // ----- Actions -----
 if ($action === 'login') {
@@ -272,13 +273,21 @@ if ($action === 'refresh_session') {
   $newToken = bin2hex(random_bytes(32));
   $newCsrf  = csrf();
 
-  $createdTs = strtotime($s['created_at']);
-  $expiresTs = strtotime($s['expires_at']);
-  $mins = max(SESSION_MINUTES, (int)(($expiresTs - $createdTs)/60));
-  $newExpires = date('Y-m-d H:i:s', time() + $mins*60);
+  // Compute session minutes using DB time to avoid PHP/MySQL clock skew.
+  $stmt = $pdo->prepare("SELECT TIMESTAMPDIFF(MINUTE, created_at, expires_at) AS session_minutes FROM user_sessions WHERE session_token=? LIMIT 1");
+  $stmt->execute([$token]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+  $mins = max(SESSION_MINUTES, (int)($row['session_minutes'] ?? 0));
 
-  $pdo->prepare("UPDATE user_sessions SET session_token=?, csrf_token=?, expires_at=?, last_activity=NOW() WHERE session_token=?")
-      ->execute([$newToken,$newCsrf,$newExpires,$token]);
+  // Update using DB time (NOW/DATE_ADD)
+  $pdo->prepare("UPDATE user_sessions SET session_token=?, csrf_token=?, expires_at=DATE_ADD(NOW(), INTERVAL ? MINUTE), last_activity=NOW() WHERE session_token=?")
+      ->execute([$newToken,$newCsrf,$mins,$token]);
+
+  // Read back computed expiry (keeps frontend aligned with DB)
+  $stmt = $pdo->prepare("SELECT expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
+  $stmt->execute([$newToken]);
+  $expiresAtRow = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+  $newExpires = (string)($expiresAtRow['expires_at'] ?? '');
 
   out_json(200, ["success"=>true,"message"=>"Session refreshed","sessionToken"=>$newToken,"csrf_token"=>$newCsrf,"expiresAt"=>$newExpires,"sessionMinutes"=>$mins,"rid"=>$RID]);
 }
