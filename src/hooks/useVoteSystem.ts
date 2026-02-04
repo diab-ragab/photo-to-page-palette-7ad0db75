@@ -285,14 +285,17 @@ export const useVoteSystem = () => {
 
   // Auto-refresh when browser tab becomes visible again
   useEffect(() => {
+    let isMounted = true;
+    
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isLoggedIn) {
+      if (isMounted && document.visibilityState === 'visible' && isLoggedIn) {
         fetchVoteSitesStatus();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
+      isMounted = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [fetchVoteSitesStatus, isLoggedIn]);
