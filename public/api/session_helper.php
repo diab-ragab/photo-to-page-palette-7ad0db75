@@ -124,7 +124,7 @@ if (!function_exists('resolveSessionRow')) {
                 SELECT us.user_id, u.{$usernameCol} as name, us.expires_at
                 FROM user_sessions us
                 JOIN users u ON u.ID = us.user_id
-                WHERE us.session_token = ?
+                WHERE us.session_token = ? AND us.expires_at > NOW()
                 LIMIT 1
             ");
             $stmt->execute(array($token));
@@ -140,7 +140,7 @@ if (!function_exists('resolveSessionRow')) {
                 SELECT us.user_id, u.{$usernameCol} as name, us.expires_at
                 FROM user_sessions us
                 JOIN users u ON u.ID = us.user_id
-                WHERE us.session_token = ?
+                WHERE us.session_token = ? AND us.expires_at > NOW()
                 LIMIT 1
             ");
             $stmt->execute(array($hash));
@@ -158,7 +158,7 @@ if (!function_exists('resolveSessionRow')) {
                     SELECT us.user_id, u.{$usernameCol} as name, us.expires_at
                     FROM user_sessions us
                     JOIN users u ON u.ID = us.user_id
-                    WHERE us.$col = ?
+                    WHERE us.$col = ? AND us.expires_at > NOW()
                     LIMIT 1
                 ");
                 $stmt->execute(array($hash));
@@ -210,24 +210,39 @@ if (!function_exists('touchSession')) {
  * Extend session expiration
  */
 if (!function_exists('extendSession')) {
-    function extendSession($token, $minutes = 120) {
+    function extendSession($token, $minutes = 240) {
         $pdo = getDB();
         $hash = hash('sha256', $token);
-        $newExpires = date('Y-m-d H:i:s', time() + ($minutes * 60));
+        $minutes = (int)$minutes;
 
         // Try with raw token
         try {
-            $pdo->prepare("UPDATE user_sessions SET expires_at = ?, last_activity = NOW() WHERE session_token = ?")
-                ->execute(array($newExpires, $token));
+            $pdo->prepare("UPDATE user_sessions SET expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE), last_activity = NOW() WHERE session_token = ?")
+                ->execute(array($minutes, $token));
         } catch (Exception $e) {}
 
         // Try with hash
         try {
-            $pdo->prepare("UPDATE user_sessions SET expires_at = ?, last_activity = NOW() WHERE session_token = ?")
-                ->execute(array($newExpires, $hash));
+            $pdo->prepare("UPDATE user_sessions SET expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE), last_activity = NOW() WHERE session_token = ?")
+                ->execute(array($minutes, $hash));
         } catch (Exception $e) {}
 
-        return $newExpires;
+        // Read back computed expiry (best effort)
+        try {
+            $stmt = $pdo->prepare("SELECT expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
+            $stmt->execute(array($token));
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row && isset($row['expires_at'])) return (string)$row['expires_at'];
+        } catch (Exception $e) {}
+
+        try {
+            $stmt = $pdo->prepare("SELECT expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
+            $stmt->execute(array($hash));
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row && isset($row['expires_at'])) return (string)$row['expires_at'];
+        } catch (Exception $e) {}
+
+        return '';
     }
 }
 
@@ -242,11 +257,6 @@ if (!function_exists('getCurrentUser')) {
 
         $sess = resolveSessionRow($token);
         if (!$sess) return null;
-
-        // Check expiration
-        if (!isset($sess['expires_at']) || isSessionExpired($sess['expires_at'])) {
-            return null;
-        }
 
         // Touch session (best effort)
         touchSession($token);
@@ -327,7 +337,7 @@ if (!function_exists('isUserAdmin')) {
  * Returns user array if admin
  */
 if (!function_exists('requireAdmin')) {
-    function requireAdmin($jsonResponse = true, $extendMinutes = 120) {
+    function requireAdmin($jsonResponse = true, $extendMinutes = 240) {
         $user = requireAuth($jsonResponse);
         
         $userId = (int)$user['user_id'];
