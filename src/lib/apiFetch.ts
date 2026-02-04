@@ -9,16 +9,41 @@ export type FetchJsonError = Error & {
   textPreview?: string;
 };
 
+/**
+ * Get auth headers for authenticated requests
+ */
+export function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem('sessionToken');
+  if (!token) return {};
+  return {
+    'Authorization': `Bearer ${token}`,
+    'X-Session-Token': token,
+  };
+}
+
 export async function fetchJsonOrThrow<T>(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: RequestInit,
+  includeAuth = true
 ): Promise<T> {
   const headers = new Headers(init?.headers);
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
+  if (!headers.has("Content-Type") && init?.body) {
+    headers.set("Content-Type", "application/json");
+  }
+  
+  // Include auth headers by default
+  if (includeAuth) {
+    const authHeaders = getAuthHeaders();
+    Object.entries(authHeaders).forEach(([key, value]) => {
+      if (!headers.has(key)) headers.set(key, value);
+    });
+  }
 
   const response = await fetch(input, {
     ...init,
     headers,
+    credentials: 'include',
     // Prevent silent POST->GET redirects that then return HTML.
     redirect: "error",
   });
