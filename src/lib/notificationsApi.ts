@@ -22,18 +22,25 @@ export const notificationsApi = {
   async getAll(): Promise<Notification[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/notifications.php?action=list`);
-      if (!response.ok) throw new Error('Failed to fetch notifications');
+      if (!response.ok) {
+        console.warn('Notifications API returned non-OK status:', response.status);
+        return [];
+      }
       const data = await response.json();
-      // Handle both old format (array) and new format ({ success, notifications })
+      // Handle various response formats:
+      // - Old format: direct array
+      // - New format: { success: true, notifications: [...] }
+      // - Error format: { success: false, message: "..." }
       if (Array.isArray(data)) {
         return data;
       }
-      if (data && Array.isArray(data.notifications)) {
+      if (data && data.success && Array.isArray(data.notifications)) {
         return data.notifications;
       }
+      // Any other format (including errors) returns empty array
       return [];
-    } catch {
-      // Silent fail - don't expose errors in production
+    } catch (err) {
+      console.warn('Failed to fetch notifications:', err);
       return [];
     }
   },
