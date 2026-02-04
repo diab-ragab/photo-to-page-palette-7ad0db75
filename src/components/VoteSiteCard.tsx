@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Clock, Coins, Crown, CheckCircle2 } from "lucide-react";
 import type { VoteSiteStatus } from "@/lib/voteSitesApi";
+import { getServerTimeOffset } from "@/hooks/useVoteSystem";
 
 interface VoteSiteCardProps {
   site: VoteSiteStatus;
@@ -13,22 +14,41 @@ interface VoteSiteCardProps {
 export const VoteSiteCard = ({ site, onVote, loading }: VoteSiteCardProps) => {
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
   const [isVoting, setIsVoting] = useState(false);
+  // Store the calculated end time (when vote becomes available) to prevent drift
+  const countdownEndTimeRef = useRef<number | null>(null);
 
-  // Calculate time remaining
+  // Calculate time remaining using server-synchronized time
   useEffect(() => {
     if (site.canVote || !site.lastVoteTime) {
       setTimeRemaining(null);
+      countdownEndTimeRef.current = null;
       return;
     }
 
+    // Calculate the end time once when lastVoteTime changes
+    // Use server time offset to ensure accuracy
+    const serverOffset = getServerTimeOffset();
+    const lastVote = new Date(site.lastVoteTime).getTime();
+    const cooldownMs = site.cooldown_hours * 60 * 60 * 1000;
+    const nextVoteTime = lastVote + cooldownMs;
+    
+    // Adjust for server time offset (convert to local reference)
+    // Server offset = server_time - local_time
+    // So local_end_time = server_end_time - (server_offset * 1000)
+    countdownEndTimeRef.current = nextVoteTime - (serverOffset * 1000);
+
     const updateTimer = () => {
-      const lastVote = new Date(site.lastVoteTime!).getTime();
-      const nextVote = lastVote + site.cooldown_hours * 60 * 60 * 1000;
+      if (!countdownEndTimeRef.current) {
+        setTimeRemaining(null);
+        return;
+      }
+
       const now = Date.now();
-      const diff = nextVote - now;
+      const diff = countdownEndTimeRef.current - now;
 
       if (diff <= 0) {
         setTimeRemaining(null);
+        countdownEndTimeRef.current = null;
         return;
       }
 
