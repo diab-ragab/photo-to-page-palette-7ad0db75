@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { CharacterSelector } from "@/components/shop/CharacterSelector";
+import { ElitePassUpsell } from "@/components/ElitePassUpsell";
 import {
   Crown,
   Lock,
@@ -576,6 +577,13 @@ export const GamePass = () => {
           </div>
         )}
       </div>
+
+      {/* Elite Pass Upsell Banner */}
+      {!hasElitePass && (
+        <div className="mb-6">
+          <ElitePassUpsell compact />
+        </div>
+      )}
 
       {/* Pass Track */}
       <div className="relative z-10 pb-6">
