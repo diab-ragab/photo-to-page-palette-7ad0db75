@@ -16,6 +16,7 @@ import { AchievementsCard } from "@/components/AchievementsCard";
 import { PlayerStatsCard } from "@/components/PlayerStatsCard";
 import { LuckyWheel } from "@/components/LuckyWheel";
 import { UpcomingEvents, EventsCalendar } from "@/components/EventsCalendar";
+import { NotificationSettings } from "@/components/NotificationSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -23,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserWallet } from "@/components/UserWallet";
 import { VoteRewardsCard } from "@/components/VoteRewardsCard";
+import { useNotificationScheduler } from "@/hooks/useNotificationScheduler";
 import { motion } from "framer-motion";
 import { 
   User, 
@@ -41,7 +43,8 @@ import {
   ShoppingBag,
   LogOut,
   ChevronRight,
-  Calendar
+  Calendar,
+  Bell
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -50,6 +53,9 @@ const Dashboard = () => {
   const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites, streakData } = useVoteSystem();
   const [userZen, setUserZen] = useState(0);
   const [activeTab, setActiveTab] = useState("rewards");
+  
+  // Initialize notification scheduler
+  useNotificationScheduler();
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -230,7 +236,7 @@ const Dashboard = () => {
 
         {/* Tab Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-6 h-auto p-1 mb-4 md:mb-6 bg-muted/50 sticky top-16 md:top-20 z-40 backdrop-blur-md">
+          <TabsList className="w-full grid grid-cols-7 h-auto p-1 mb-4 md:mb-6 bg-muted/50 sticky top-16 md:top-20 z-40 backdrop-blur-md">
             <TabsTrigger value="rewards" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
               <Gift className="h-4 w-4" />
               <span className="hidden xs:inline">Rewards</span>
@@ -250,6 +256,10 @@ const Dashboard = () => {
             <TabsTrigger value="stats" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden xs:inline">Stats</span>
+            </TabsTrigger>
+            <TabsTrigger value="alerts" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
+              <Bell className="h-4 w-4" />
+              <span className="hidden xs:inline">Alerts</span>
             </TabsTrigger>
             <TabsTrigger value="shop" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
               <ShoppingBag className="h-4 w-4" />
@@ -449,6 +459,11 @@ const Dashboard = () => {
 
             {/* Leaderboards */}
             <Leaderboards />
+          </TabsContent>
+
+          {/* Alerts Tab */}
+          <TabsContent value="alerts" className="mt-0 space-y-4 md:space-y-6">
+            <NotificationSettings />
           </TabsContent>
 
           {/* Shop Tab */}
