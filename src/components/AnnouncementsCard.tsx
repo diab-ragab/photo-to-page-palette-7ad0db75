@@ -31,10 +31,13 @@ export const AnnouncementsCard = () => {
     const loadAnnouncements = async () => {
       try {
         const data = await notificationsApi.getAll();
+        // Ensure data is an array before slicing
+        const items = Array.isArray(data) ? data : [];
         // Get the latest 4 announcements
-        setAnnouncements(data.slice(0, 4));
+        setAnnouncements(items.slice(0, 4));
       } catch (error) {
         console.error('Failed to fetch announcements:', error);
+        setAnnouncements([]);
       } finally {
         setLoading(false);
       }
