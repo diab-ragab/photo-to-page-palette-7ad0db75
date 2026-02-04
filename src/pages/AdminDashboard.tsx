@@ -22,6 +22,7 @@ import { AchievementsManager } from "@/components/admin/AchievementsManager";
 import { SpinWheelManager } from "@/components/admin/SpinWheelManager";
 import { EventsManager } from "@/components/admin/EventsManager";
 import { ChangelogManager } from "@/components/admin/ChangelogManager";
+import { BundlesManager } from "@/components/admin/BundlesManager";
 import {
   Shield,
   Users, 
@@ -42,7 +43,8 @@ import {
   Sparkles,
   Calendar,
   Send,
-  ScrollText
+  ScrollText,
+  Package,
 } from "lucide-react";
 
 interface LastOrder {
@@ -291,7 +293,7 @@ export default function AdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6 md:grid-cols-12 mb-6 h-auto gap-1">
+          <TabsList className="grid w-full grid-cols-6 md:grid-cols-13 mb-6 h-auto gap-1">
             <TabsTrigger value="overview" className="gap-2 py-2">
               <Server className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -331,6 +333,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="webshop" className="gap-2 py-2">
               <ShoppingBag className="h-4 w-4" />
               <span className="hidden sm:inline">Webshop</span>
+            </TabsTrigger>
+            <TabsTrigger value="bundles" className="gap-2 py-2">
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">Bundles</span>
             </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2 py-2">
               <Bell className="h-4 w-4" />
@@ -563,6 +569,11 @@ export default function AdminDashboard() {
           {/* Webshop Tab */}
           <TabsContent value="webshop">
             <WebshopManager />
+          </TabsContent>
+
+          {/* Bundles Tab */}
+          <TabsContent value="bundles">
+            <BundlesManager />
           </TabsContent>
 
           {/* Notifications Tab */}
