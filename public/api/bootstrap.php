@@ -1,168 +1,173 @@
 <?php
-// api/bootstrap.php
-// Unified app config + getConfig() + CORS handler
-// PHP 5.x compatible
+/**
+ * bootstrap.php - Centralized configuration and utilities for /api/ endpoints
+ * MUST be included at the top of every API script
+ */
 
-// Load environment variables (Stripe keys, etc.)
-if (file_exists(__DIR__ . '/env.php')) {
-  require_once __DIR__ . '/env.php';
-}
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 
-$APP_CONFIG = array(
-  'db' => array(
-    'host' => '192.168.1.88',
-    'name' => 'shengui',
-    'user' => 'root',
-    'pass' => 'root',
-    'charset' => 'utf8', // MySQL 5.1 safe (avoid utf8mb4)
-  ),
-
-  'cors' => array(
-    // Exact allowed origins (NO trailing slash)
-    'allowed_origins' => array(
-      'https://woiendgame.online',
-      'https://www.woiendgame.online',
-      'https://woiendgame.lovable.app',
-      'http://localhost:5173',
-      'http://localhost:3000',
-    ),
-
-    // Allow lovable previews
-    'allowed_origin_regex' => array(
-      '/^https:\/\/[a-z0-9-]+\.(lovable\.app|lovableproject\.com)$/i',
-    ),
-
-    // NOTE: include X-CSRF-Token for state-changing requests from browsers.
-    'allowed_headers' => 'Content-Type, Authorization, X-Requested-With, Accept, X-Session-Token, X-CSRF-Token',
-    'default_methods' => array('GET','POST','PUT','PATCH','DELETE','OPTIONS'),
-    'max_age' => 86400,
-  ),
-
-  'security' => array(
-    // Bootstrap admin IDs (users.ID)
-    'admin_user_ids' => array(24),
-  ),
-
-  'stripe' => array(
-    'secret_key' => getenv('STRIPE_SECRET_KEY') ? getenv('STRIPE_SECRET_KEY') : '',
-    'webhook_secret' => getenv('STRIPE_WEBHOOK_SECRET') ? getenv('STRIPE_WEBHOOK_SECRET') : '',
-    'currency' => 'eur',
-    'success_url' => 'https://woiendgame.online/payment-success?session_id={CHECKOUT_SESSION_ID}',
-    'cancel_url' => 'https://woiendgame.online/cart',
-  ),
-);
-
-// Polyfill for older PHP versions
+// Polyfill for http_response_code (PHP 5.3 compatibility)
 if (!function_exists('http_response_code')) {
     function http_response_code($code = null) {
         static $current = 200;
         if ($code !== null) {
             $current = (int)$code;
-            header('X-PHP-Response-Code: ' . $current, true, $current);
+            $protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
+            $texts = array(
+                200 => 'OK', 201 => 'Created', 204 => 'No Content',
+                400 => 'Bad Request', 401 => 'Unauthorized', 403 => 'Forbidden',
+                404 => 'Not Found', 405 => 'Method Not Allowed', 429 => 'Too Many Requests',
+                500 => 'Internal Server Error', 502 => 'Bad Gateway', 503 => 'Service Unavailable'
+            );
+            $text = isset($texts[$code]) ? $texts[$code] : '';
+            header("{$protocol} {$code} {$text}", true, $code);
         }
         return $current;
     }
 }
 
-if (!function_exists('getConfig')) {
-  function getConfig() {
-    global $APP_CONFIG;
-    return $APP_CONFIG;
-  }
-}
-
 /**
- * Unified CORS handler for all API endpoints.
- * Call early (before output). Handles OPTIONS and exits.
+ * CORS helper
+ * - Never return "*" when using credentials
+ * - Only reflect allowed origins
+ * - Handles preflight OPTIONS (204)
  */
-if (!function_exists('handleCors')) {
-  function handleCors($methods = null) {
-    $cfg  = getConfig();
-    $cors = isset($cfg['cors']) ? $cfg['cors'] : array();
-
-    if ($methods === null) {
-        $methods = isset($cors['default_methods']) ? $cors['default_methods'] : array('GET','POST','OPTIONS');
-    }
+function handleCors($allowedMethods = array('GET', 'POST', 'OPTIONS')) {
 
     $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
-    $allowedOrigins = isset($cors['allowed_origins']) ? $cors['allowed_origins'] : array();
-    $allowedRegex   = isset($cors['allowed_origin_regex']) ? $cors['allowed_origin_regex'] : array();
+
+    // Allowlist
+    $allowedOrigins = array(
+        'https://woiendgame.online',
+        'https://www.woiendgame.online',
+        'https://woiendgame.lovable.app',
+        'http://localhost:8080',
+        'http://localhost:5173',
+        'http://localhost:3000',
+    );
 
     $isAllowed = false;
 
     if ($origin) {
-      if (in_array($origin, $allowedOrigins, true)) {
-        $isAllowed = true;
-      } else {
-        foreach ($allowedRegex as $rx) {
-          if (is_string($rx) && @preg_match($rx, $origin)) {
+        if (in_array($origin, $allowedOrigins, true)) {
             $isAllowed = true;
-            break;
-          }
+        } else {
+            // Allow lovable preview domains safely
+            // e.g. https://abc-123.lovableproject.com or https://abc.lovable.app
+            if (preg_match('/^https:\/\/[a-z0-9-]+\.(lovableproject\.com|lovable\.app)$/i', $origin)) {
+                $isAllowed = true;
+            }
         }
-      }
     }
 
-    // Preflight basics (always safe)
-    header("Access-Control-Allow-Methods: " . implode(', ', $methods));
-    $allowedHeaders = isset($cors['allowed_headers']) ? $cors['allowed_headers'] : 'Content-Type, Authorization, Accept';
-    header("Access-Control-Allow-Headers: " . $allowedHeaders);
-    $maxAge = isset($cors['max_age']) ? (int)$cors['max_age'] : 86400;
-    header("Access-Control-Max-Age: " . $maxAge);
-
-    // Allow-Origin only if allowed
+    // Only send CORS headers when there is an Origin header
+    // (No Origin = same-origin or server-to-server request)
     if ($origin && $isAllowed) {
-      header("Access-Control-Allow-Origin: $origin");
-      header("Access-Control-Allow-Credentials: true");
-      header("Vary: Origin");
+        // Ensure we don't accidentally send duplicate headers
+        @header_remove('Access-Control-Allow-Origin');
+        @header_remove('Access-Control-Allow-Credentials');
+        @header_remove('Access-Control-Allow-Headers');
+        @header_remove('Access-Control-Allow-Methods');
+        @header_remove('Access-Control-Max-Age');
+
+        header("Access-Control-Allow-Origin: {$origin}");
+        header("Vary: Origin");
+        header("Access-Control-Allow-Credentials: true");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization, X-CSRF-Token, X-Session-Token, X-Requested-With");
+        header("Access-Control-Allow-Methods: " . implode(', ', $allowedMethods));
+        header("Access-Control-Max-Age: 86400");
     }
 
-    $requestMethod = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '';
-    if ($requestMethod === 'OPTIONS') {
-      if ($origin && !$isAllowed) {
-        http_response_code(403);
+    // Handle preflight
+    if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(204);
         exit;
-      }
-      http_response_code(204);
-      exit;
     }
-  }
+}
+
+/**
+ * Get configuration
+ */
+function getConfig() {
+    static $config = null;
+    if ($config !== null) return $config;
+
+    $configFile = __DIR__ . '/config.php';
+    if (file_exists($configFile)) {
+        $config = require $configFile;
+        return $config;
+    }
+
+    // Fallback defaults
+    $config = array(
+        'db' => array(
+            'host' => '192.168.1.88',
+            'user' => 'root',
+            'pass' => 'root',
+            'name' => 'shengui',
+        ),
+        'stripe' => array(
+            'secret_key' => '',
+            'publishable_key' => '',
+            'webhook_secret' => '',
+        ),
+    );
+
+    return $config;
 }
 
 /**
  * Get PDO database connection
  */
-if (!function_exists('getDB')) {
-  function getDB() {
+function getDB() {
     static $pdo = null;
     if ($pdo !== null) return $pdo;
-    
+
     $cfg = getConfig();
     $db = $cfg['db'];
-    
+
     $dsn = "mysql:host={$db['host']};dbname={$db['name']};charset=utf8";
     $options = array(
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
     );
-    
+
     try {
         $pdo = new PDO($dsn, $db['user'], $db['pass'], $options);
     } catch (PDOException $e) {
         error_log("DB_CONNECT_FAILED: " . $e->getMessage());
         http_response_code(500);
-        header('Content-Type: application/json');
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(array('success' => false, 'message' => 'Database connection failed'));
         exit;
     }
-    
+
     return $pdo;
-  }
 }
 
-// Auto-call CORS handler when bootstrap is included
-handleCors();
+/**
+ * Get mysqli connection (legacy)
+ */
+function getMySQLi() {
+    static $mysqli = null;
+    if ($mysqli !== null) return $mysqli;
 
-// Let "require config.php" also return array if someone uses include-return style.
-return $APP_CONFIG;
+    $cfg = getConfig();
+    $db = $cfg['db'];
+
+    $mysqli = new mysqli($db['host'], $db['user'], $db['pass'], $db['name']);
+
+    if ($mysqli->connect_error) {
+        error_log("MYSQLI_CONNECT_FAILED: " . $mysqli->connect_error);
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('success' => false, 'message' => 'Database connection failed'));
+        exit;
+    }
+
+    $mysqli->set_charset('utf8');
+    return $mysqli;
+}
