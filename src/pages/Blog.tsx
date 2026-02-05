@@ -17,7 +17,9 @@ const Blog = () => {
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const notifications = await notificationsApi.getAll();
+        const data = await notificationsApi.getAll();
+        // Ensure data is an array before filtering
+        const notifications = Array.isArray(data) ? data : [];
         const notificationPosts = notifications
           .filter((n) => n.is_active === 1)
           .map(notificationToBlogPost);

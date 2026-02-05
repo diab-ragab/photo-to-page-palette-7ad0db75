@@ -65,7 +65,8 @@ export function NotificationsManager({ username }: NotificationsManagerProps) {
   const fetchNotifications = async () => {
     setIsLoading(true);
     const data = await notificationsApi.getAll();
-    setNotifications(data);
+    // Ensure data is an array before setting state
+    setNotifications(Array.isArray(data) ? data : []);
     setIsLoading(false);
   };
 
