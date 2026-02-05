@@ -1,6 +1,6 @@
 <?php
 /**
- * Daily Zen Reward API - 24h Cooldown from last claim
+ * Daily Zen Reward API - 24h Cooldown (IP + Device Token)
  * PHP 5.x compatible
  */
 
@@ -9,8 +9,7 @@ require_once __DIR__ . '/bootstrap.php';
 header('Content-Type: application/json; charset=utf-8');
 
 define('DAILY_ZEN_REWARD', 100000);
-define('COOLDOWN_SECONDS', 24 * 60 * 60); // 24 hours
-
+define('COOLDOWN_SECONDS', 24 * 60 * 60);
 define('SERVER_SECRET_SALT', 'wOi3ndG4m3_z3N_s4Lt_X9kP2mQ7vL5nR8tY1wZ6');
 
 // Cookie
@@ -18,7 +17,7 @@ define('DEVICE_TOKEN_NAME', 'woi_device_token');
 define('DEVICE_TOKEN_EXPIRY', 180 * 24 * 60 * 60);
 
 // Limits
-define('MAX_FAILED_ATTEMPTS_PER_IP_PER_HOUR', 10);
+define('MAX_FAILED_ATTEMPTS_PER_IP_PER_HOUR', 2);
 define('MAX_RISK_SCORE_BLOCK', 60);
 
 // Allowed origins
@@ -73,6 +72,7 @@ function setDeviceCookie($token) {
   $maxAge = DEVICE_TOKEN_EXPIRY;
   $expires = time() + $maxAge;
 
+  // PHP5 compatible header cookie
   $cookie = DEVICE_TOKEN_NAME . '=' . rawurlencode($token)
     . '; Path=/'
     . '; Max-Age=' . $maxAge
@@ -196,7 +196,8 @@ function ensureTablesExist($pdo) {
       claimed_at DATETIME NOT NULL,
       INDEX idx_account_time (account_id, claimed_at),
       INDEX idx_device_time (device_token_hash, claimed_at),
-      INDEX idx_ip_time (ip_address, claimed_at)
+      INDEX idx_ip_time (ip_address, claimed_at),
+      INDEX idx_subnet_time (ip_subnet, claimed_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8
   ");
 
@@ -216,31 +217,49 @@ function ensureTablesExist($pdo) {
 }
 
 /**
- * Get seconds until next claim based on LAST claimed_at for THIS account only
- * Uses database server time (NOW()) for consistency
- * Returns 0 if can claim now
+ * Cooldown by IP (rolling 24h)
  */
-function secondsUntilNextClaim($pdo, $accountId) {
-  // Use database time for consistency - calculates remaining seconds server-side
+function secondsUntilNextClaimByIP($pdo, $ip) {
   $stmt = $pdo->prepare("
-    SELECT 
-      claimed_at,
-      UNIX_TIMESTAMP(NOW()) as server_now,
-      UNIX_TIMESTAMP(claimed_at) as claim_timestamp,
-      GREATEST(0, UNIX_TIMESTAMP(DATE_ADD(claimed_at, INTERVAL " . COOLDOWN_SECONDS . " SECOND)) - UNIX_TIMESTAMP(NOW())) as remaining_seconds
+    SELECT claimed_at
     FROM daily_zen_claims
-    WHERE account_id = ?
+    WHERE ip_address = ?
     ORDER BY claimed_at DESC
     LIMIT 1
   ");
-  $stmt->execute(array($accountId));
+  $stmt->execute(array($ip));
   $row = $stmt->fetch();
 
-  if (!$row || empty($row['claimed_at'])) {
-    return 0; // Never claimed, can claim now
-  }
+  if (!$row || empty($row['claimed_at'])) return 0;
 
-  return (int)$row['remaining_seconds'];
+  $lastClaim = strtotime($row['claimed_at']);
+  $nextClaim = $lastClaim + COOLDOWN_SECONDS;
+  $remaining = $nextClaim - time();
+
+  return ($remaining > 0) ? $remaining : 0;
+}
+
+/**
+ * ✅ Cooldown by Device Token hash (rolling 24h)
+ */
+function secondsUntilNextClaimByDevice($pdo, $deviceHash) {
+  $stmt = $pdo->prepare("
+    SELECT claimed_at
+    FROM daily_zen_claims
+    WHERE device_token_hash = ?
+    ORDER BY claimed_at DESC
+    LIMIT 1
+  ");
+  $stmt->execute(array($deviceHash));
+  $row = $stmt->fetch();
+
+  if (!$row || empty($row['claimed_at'])) return 0;
+
+  $lastClaim = strtotime($row['claimed_at']);
+  $nextClaim = $lastClaim + COOLDOWN_SECONDS;
+  $remaining = $nextClaim - time();
+
+  return ($remaining > 0) ? $remaining : 0;
 }
 
 /**
@@ -308,16 +327,14 @@ try {
       ), 401);
     }
 
+    // ✅ لازم نطلع/نثبت device token حتى في GET
     $deviceToken = getOrCreateDeviceToken();
-    $deviceHash = hashDeviceToken($deviceToken);
+    $deviceHash  = hashDeviceToken($deviceToken);
 
-    // Calculate remaining time from last claim for THIS account using DB time
-    $remain = secondsUntilNextClaim($pdo, $user['account_id']);
-    
-    // Get server timestamp for frontend synchronization
-    $serverStmt = $pdo->query("SELECT UNIX_TIMESTAMP(NOW()) as server_time");
-    $serverRow = $serverStmt->fetch();
-    $serverTime = (int)$serverRow['server_time'];
+    // ✅ الأقسى بين IP و Device
+    $remainIP     = secondsUntilNextClaimByIP($pdo, $ip);
+    $remainDevice = secondsUntilNextClaimByDevice($pdo, $deviceHash);
+    $remain       = max($remainIP, $remainDevice);
 
     jsonOut(array(
       'success'=>true,
@@ -325,7 +342,6 @@ try {
       'has_claimed'=>($remain > 0),
       'reward_amount'=>DAILY_ZEN_REWARD,
       'seconds_until_next_claim'=>$remain,
-      'server_time'=>$serverTime,
       'csrf_token'=>getCsrfToken()
     ));
   }
@@ -348,13 +364,17 @@ try {
     $deviceToken = getOrCreateDeviceToken();
     $deviceHash  = hashDeviceToken($deviceToken);
 
-    // Check 24h cooldown for THIS account
-    $remain = secondsUntilNextClaim($pdo, $user['account_id']);
+    // ✅ IP + Device Token cooldown (الأقسى يمشي)
+    $remainIP     = secondsUntilNextClaimByIP($pdo, $ip);
+    $remainDevice = secondsUntilNextClaimByDevice($pdo, $deviceHash);
+    $remain       = max($remainIP, $remainDevice);
+
     if ($remain > 0) {
-      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'cooldown_active');
+      $reason = ($remainIP >= $remainDevice) ? 'ip_cooldown_active' : 'device_cooldown_active';
+      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', $reason);
       jsonOut(array(
         'success'=>false,
-        'error'=>'You can claim again after 24 hours.',
+        'error'=>'Cooldown active. Try again later.',
         'seconds_until_next_claim'=>$remain
       ), 429);
     }
@@ -422,18 +442,11 @@ try {
 
     logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'successful_claim', 'reward:'.DAILY_ZEN_REWARD);
 
-    // Get server timestamp for frontend synchronization
-    $serverStmt = $pdo->query("SELECT UNIX_TIMESTAMP(NOW()) as server_time");
-    $serverRow = $serverStmt->fetch();
-    $serverTime = (int)$serverRow['server_time'];
-
-    // Return actual remaining time (24h from now)
     jsonOut(array(
       'success'=>true,
       'message'=>'Daily Zen claimed successfully!',
       'reward_amount'=>DAILY_ZEN_REWARD,
-      'seconds_until_next_claim'=>COOLDOWN_SECONDS,
-      'server_time'=>$serverTime
+      'seconds_until_next_claim'=>COOLDOWN_SECONDS
     ));
   }
 

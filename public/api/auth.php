@@ -1,5 +1,5 @@
 <?php
-// api/auth.php (HARDENED)
+// api/auth.php (HARDENED + CORS FIXED)
 
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
@@ -36,22 +36,22 @@ register_shutdown_function(function() use (&$RID){
   }
 });
 
-// Load bootstrap first (CORS handles OPTIONS + exits)
+// Load bootstrap + enable CORS NOW (must be before any response)
 require_once __DIR__ . '/bootstrap.php';
+handleCors(array('GET','POST','OPTIONS'));
+
 require_once __DIR__ . '/db.php';
 
-// ----- Accept OPTIONS explicitly (just in case something bypassed bootstrap) -----
+// ----- METHOD ROUTING -----
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-if ($method === 'OPTIONS') {
-  out_json(204, ["success"=>true]);
-}
 
-// ----- Allow GET health check (helps debugging) -----
+// NOTE: No need to handle OPTIONS here.
+// bootstrap->handleCors() will exit(204) for OPTIONS automatically.
+
 if ($method === 'GET') {
   out_json(200, ["success"=>true,"message"=>"auth ok","rid"=>$RID]);
 }
 
-// ----- Only POST for actions -----
 if ($method !== 'POST') {
   fail(405, "Method not allowed", $RID);
 }
@@ -158,9 +158,8 @@ $confirmPasswd = (string)($_POST['confirmPasswd'] ?? '');
 $sessionTokenBody = (string)($_POST['sessionToken'] ?? '');
 $rememberMe = (bool)($_POST['remember_me'] ?? false);
 
-// Longer sessions to reduce admin reload issues (still enforced server-side).
-define('SESSION_MINUTES', 120); // 2 hours
-define('SESSION_REMEMBER_MINUTES', 43200); // 30 days
+define('SESSION_MINUTES', 30);
+define('SESSION_REMEMBER_MINUTES', 10080);
 
 // ----- Actions -----
 if ($action === 'login') {
@@ -188,12 +187,10 @@ if ($action === 'login') {
   $csrfToken = csrf();
   $ua = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 2000);
 
-  // IMPORTANT: compute expiry using DB time (NOW) to avoid PHP/MySQL clock skew
   $pdo->prepare("INSERT INTO user_sessions (user_id, session_token, csrf_token, ip_address, user_agent, created_at, expires_at, last_activity)
                  VALUES (?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), NOW())")
       ->execute([(int)$user['ID'], $sessionToken, $csrfToken, $clientIP, $ua, (int)$sessionMinutes]);
 
-  // Read back the computed expiry (keeps frontend aligned with DB)
   $stmt = $pdo->prepare("SELECT expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
   $stmt->execute([$sessionToken]);
   $expiresAtRow = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -273,21 +270,13 @@ if ($action === 'refresh_session') {
   $newToken = bin2hex(random_bytes(32));
   $newCsrf  = csrf();
 
-  // Compute session minutes using DB time to avoid PHP/MySQL clock skew.
-  $stmt = $pdo->prepare("SELECT TIMESTAMPDIFF(MINUTE, created_at, expires_at) AS session_minutes FROM user_sessions WHERE session_token=? LIMIT 1");
-  $stmt->execute([$token]);
-  $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-  $mins = max(SESSION_MINUTES, (int)($row['session_minutes'] ?? 0));
+  $createdTs = strtotime($s['created_at']);
+  $expiresTs = strtotime($s['expires_at']);
+  $mins = max(SESSION_MINUTES, (int)(($expiresTs - $createdTs)/60));
+  $newExpires = date('Y-m-d H:i:s', time() + $mins*60);
 
-  // Update using DB time (NOW/DATE_ADD)
-  $pdo->prepare("UPDATE user_sessions SET session_token=?, csrf_token=?, expires_at=DATE_ADD(NOW(), INTERVAL ? MINUTE), last_activity=NOW() WHERE session_token=?")
-      ->execute([$newToken,$newCsrf,$mins,$token]);
-
-  // Read back computed expiry (keeps frontend aligned with DB)
-  $stmt = $pdo->prepare("SELECT expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
-  $stmt->execute([$newToken]);
-  $expiresAtRow = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-  $newExpires = (string)($expiresAtRow['expires_at'] ?? '');
+  $pdo->prepare("UPDATE user_sessions SET session_token=?, csrf_token=?, expires_at=?, last_activity=NOW() WHERE session_token=?")
+      ->execute([$newToken,$newCsrf,$newExpires,$token]);
 
   out_json(200, ["success"=>true,"message"=>"Session refreshed","sessionToken"=>$newToken,"csrf_token"=>$newCsrf,"expiresAt"=>$newExpires,"sessionMinutes"=>$mins,"rid"=>$RID]);
 }
@@ -306,7 +295,6 @@ if ($action === 'reset') {
   $stmt->execute([$login,$email]);
   $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-  // No user enumeration
   if (!$row) out_json(200, ["success"=>true,"message"=>"If this account exists, password has been reset","rid"=>$RID]);
 
   $hash = legacy_hash($login,$newpass);
@@ -340,7 +328,6 @@ if ($action === 'change_password') {
   $newHash = legacy_hash($login,$newPasswd);
   $pdo->prepare("UPDATE users SET passwd=?, passwd2=? WHERE ID=?")->execute([$newHash,$newHash,$u['ID']]);
 
-  // delete other sessions, keep current token if provided
   ensureUserSessionsTable($pdo);
   $currentToken = trim($sessionTokenBody);
   if ($currentToken==='') $currentToken = tokenFromHeaders();
