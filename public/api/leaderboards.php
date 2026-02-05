@@ -1,29 +1,32 @@
 <?php
 // api/leaderboards.php
 // Leaderboard data - Top Voters & VIP Rankings
+// PHP 5.x compatible
 
 require_once __DIR__ . '/bootstrap.php';
+handleCors(array('GET', 'OPTIONS'));
 require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-$rid = substr(bin2hex(random_bytes(6)), 0, 12);
+$rid = function_exists('random_bytes') ? substr(bin2hex(random_bytes(6)), 0, 12) : substr(md5(uniqid(mt_rand(), true)), 0, 12);
 
 try {
     $pdo = getDB();
 
-    // Top Voters - from vote_log (use username column directly, no JOIN needed)
-    $topVoters = [];
+    // Top Voters - from vote_log or user_currency (order by total_votes)
+    $topVoters = array();
     try {
-        // Get vote counts directly from vote_log.username
+        // Try to get from vote aggregation
         $stmt = $pdo->query("
             SELECT 
-                vl.username as username, 
+                u.login as username, 
                 COUNT(vl.id) as value,
                 COALESCE(uc.vip_points, 0) as vip_points
             FROM vote_log vl
-            LEFT JOIN user_currency uc ON uc.user_id = vl.user_id
-            GROUP BY vl.user_id, vl.username
+            JOIN users u ON vl.user_id = u.ID
+            LEFT JOIN user_currency uc ON uc.user_id = u.ID
+            GROUP BY u.ID, u.login
             ORDER BY value DESC
             LIMIT 10
         ");
@@ -37,12 +40,12 @@ try {
             elseif ($vp >= 5000) $vipLevel = 2;
             elseif ($vp >= 1000) $vipLevel = 1;
             
-            $topVoters[] = [
+            $topVoters[] = array(
                 'rank' => $rank++,
                 'username' => $row['username'],
                 'value' => (int)$row['value'],
                 'vipLevel' => $vipLevel
-            ];
+            );
         }
     } catch (Exception $e) {
         // Fallback: try user_currency table with total_votes column
@@ -68,12 +71,12 @@ try {
                 elseif ($vp >= 5000) $vipLevel = 2;
                 elseif ($vp >= 1000) $vipLevel = 1;
                 
-                $topVoters[] = [
+                $topVoters[] = array(
                     'rank' => $rank++,
                     'username' => $row['username'],
                     'value' => (int)$row['value'],
                     'vipLevel' => $vipLevel
-                ];
+                );
             }
         } catch (Exception $e2) {
             // No data available
@@ -81,14 +84,14 @@ try {
     }
 
     // VIP Rankings - from user_currency order by vip_points
-    $vipRankings = [];
+    $vipRankings = array();
     try {
-        // Try with username column first (most common schema)
         $stmt = $pdo->query("
             SELECT 
-                uc.username as username, 
+                u.login as username, 
                 uc.vip_points as value
             FROM user_currency uc
+            JOIN users u ON uc.user_id = u.ID
             WHERE uc.vip_points > 0
             ORDER BY uc.vip_points DESC
             LIMIT 10
@@ -103,50 +106,19 @@ try {
             elseif ($vp >= 5000) $vipLevel = 2;
             elseif ($vp >= 1000) $vipLevel = 1;
             
-            $vipRankings[] = [
+            $vipRankings[] = array(
                 'rank' => $rank++,
                 'username' => $row['username'],
                 'value' => $vp,
                 'vipLevel' => $vipLevel
-            ];
+            );
         }
     } catch (Exception $e) {
-        // Fallback: try with user_id JOIN
-        try {
-            $stmt = $pdo->query("
-                SELECT 
-                    u.login as username, 
-                    uc.vip_points as value
-                FROM user_currency uc
-                JOIN users u ON uc.user_id = u.ID
-                WHERE uc.vip_points > 0
-                ORDER BY uc.vip_points DESC
-                LIMIT 10
-            ");
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            $rank = 1;
-            foreach ($rows as $row) {
-                $vipLevel = 0;
-                $vp = (int)$row['value'];
-                if ($vp >= 10000) $vipLevel = 3;
-                elseif ($vp >= 5000) $vipLevel = 2;
-                elseif ($vp >= 1000) $vipLevel = 1;
-                
-                $vipRankings[] = [
-                    'rank' => $rank++,
-                    'username' => $row['username'],
-                    'value' => $vp,
-                    'vipLevel' => $vipLevel
-                ];
-            }
-        } catch (Exception $e2) {
-            // Table doesn't exist
-        }
+        // Table doesn't exist
     }
 
     // Top Characters by Level - from basetab_sg
-    $topCharacters = [];
+    $topCharacters = array();
     try {
         $stmt = $pdo->query("
             SELECT 
@@ -162,33 +134,33 @@ try {
         
         $rank = 1;
         foreach ($rows as $row) {
-            $topCharacters[] = [
+            $topCharacters[] = array(
                 'rank' => $rank++,
                 'username' => $row['username'],
                 'value' => (int)$row['value'],
                 'class' => (int)$row['class']
-            ];
+            );
         }
     } catch (Exception $e) {
         // Table doesn't exist
     }
 
-    echo json_encode([
+    echo json_encode(array(
         'success' => true,
         'topVoters' => $topVoters,
         'vipRankings' => $vipRankings,
         'topCharacters' => $topCharacters,
         'rid' => $rid
-    ]);
+    ));
 
 } catch (PDOException $e) {
     error_log("leaderboards error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode([
+    echo json_encode(array(
         'success' => false,
         'message' => 'Database error',
-        'topVoters' => [],
-        'vipRankings' => [],
+        'topVoters' => array(),
+        'vipRankings' => array(),
         'rid' => $rid
-    ]);
+    ));
 }
