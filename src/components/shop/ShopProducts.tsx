@@ -42,8 +42,10 @@ export const ShopProducts = ({ selectedCategory }: ShopProductsProps) => {
       setIsLoading(true);
       try {
         const productsData = await fetchProducts({ limit: 50 });
+        // Defensive: ensure products is an array before filtering
+        const productsList = Array.isArray(productsData?.products) ? productsData.products : [];
         // Filter only active products
-        setProducts(productsData.products.filter(p => p.is_active !== false));
+        setProducts(productsList.filter(p => p.is_active !== false));
       } catch (error) {
         console.error("Failed to load shop data:", error);
       } finally {

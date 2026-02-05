@@ -8,12 +8,15 @@ interface VoteRewardsCardProps {
 }
 
 export const VoteRewardsCard = ({ sites, loading }: VoteRewardsCardProps) => {
+  // Defensive: ensure sites is always an array
+  const safeSites = Array.isArray(sites) ? sites : [];
+  
   // Calculate totals
-  const availableSites = sites.filter(s => s.canVote);
+  const availableSites = safeSites.filter(s => s.canVote);
   const totalCoinsAvailable = availableSites.reduce((sum, s) => sum + s.coins_reward, 0);
   const totalVipAvailable = availableSites.reduce((sum, s) => sum + s.vip_reward, 0);
-  const maxCoinsPerCycle = sites.reduce((sum, s) => sum + s.coins_reward, 0);
-  const maxVipPerCycle = sites.reduce((sum, s) => sum + s.vip_reward, 0);
+  const maxCoinsPerCycle = safeSites.reduce((sum, s) => sum + s.coins_reward, 0);
+  const maxVipPerCycle = safeSites.reduce((sum, s) => sum + s.vip_reward, 0);
 
   if (loading) {
     return (
@@ -107,7 +110,7 @@ export const VoteRewardsCard = ({ sites, loading }: VoteRewardsCardProps) => {
         </div>
 
         {/* Motivation message */}
-        {availableSites.length === 0 && sites.length > 0 && (
+        {availableSites.length === 0 && safeSites.length > 0 && (
           <div className="text-center py-2 text-xs text-muted-foreground">
             🎉 All votes claimed! Check back in 12 hours.
           </div>

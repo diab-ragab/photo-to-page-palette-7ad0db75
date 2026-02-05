@@ -242,8 +242,9 @@ export const AchievementsCard = () => {
     setLoading(true);
     try {
       const data = await achievementsApi.getUserProgress();
-      setAchievements(data.achievements);
-      setStats(data.stats);
+      // Defensive: ensure achievements is always an array
+      setAchievements(Array.isArray(data?.achievements) ? data.achievements : []);
+      setStats(data?.stats || { total: 0, unlocked: 0, claimed: 0, unclaimed: 0 });
     } catch (e) {
       console.error("Failed to fetch achievements:", e);
     } finally {

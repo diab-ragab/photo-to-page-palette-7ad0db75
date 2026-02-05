@@ -99,7 +99,9 @@ export const useVoteSystem = () => {
     if (!isLoggedIn || !user?.username) {
       // For non-logged-in users, show sites but require login to vote
       const sites = await voteSitesApi.getActiveSites();
-      setVoteSites(sites.map(site => ({
+      // Defensive: ensure sites is always an array
+      const safeSites = Array.isArray(sites) ? sites : [];
+      setVoteSites(safeSites.map(site => ({
         ...site,
         canVote: false, // Can't vote without login
         lastVoteTime: null,
@@ -147,9 +149,11 @@ export const useVoteSystem = () => {
 
         // Merge vote status with site data
         const sites = await voteSitesApi.getActiveSites();
+        // Defensive: ensure sites is always an array
+        const safeSites = Array.isArray(sites) ? sites : [];
         const siteStatuses = result.site_statuses || {};
 
-        const mergedSites: VoteSiteStatus[] = sites.map((site) => {
+        const mergedSites: VoteSiteStatus[] = safeSites.map((site) => {
           const status = siteStatuses[site.id] || null;
 
           // Important: treat "no last_vote_time" as "never voted" (vote should be available)
@@ -172,8 +176,9 @@ export const useVoteSystem = () => {
         setVoteSites(mergedSites);
       } else {
         // API failed - still show sites as available (optimistic) for logged-in users
-        const sites = await voteSitesApi.getActiveSites();
-        setVoteSites(sites.map(site => ({
+        const fallbackSites = await voteSitesApi.getActiveSites();
+        const safeFallback = Array.isArray(fallbackSites) ? fallbackSites : [];
+        setVoteSites(safeFallback.map(site => ({
           ...site,
           canVote: true, // Allow voting, server will validate
           lastVoteTime: null,
@@ -185,15 +190,20 @@ export const useVoteSystem = () => {
     } catch (err) {
       console.error('[Vote] get_vote_status failed', err);
       // On error - still show sites as available for logged-in users
-      const sites = await voteSitesApi.getActiveSites();
-      setVoteSites(sites.map(site => ({
-        ...site,
-        canVote: true, // Allow voting, server will validate
-        lastVoteTime: null,
-        nextVoteTime: null,
-        timeRemaining: null,
-        secondsRemaining: null
-      })));
+      try {
+        const errSites = await voteSitesApi.getActiveSites();
+        const safeErr = Array.isArray(errSites) ? errSites : [];
+        setVoteSites(safeErr.map(site => ({
+          ...site,
+          canVote: true, // Allow voting, server will validate
+          lastVoteTime: null,
+          nextVoteTime: null,
+          timeRemaining: null,
+          secondsRemaining: null
+        })));
+      } catch {
+        setVoteSites([]);
+      }
     } finally {
       setSitesLoading(false);
     }
