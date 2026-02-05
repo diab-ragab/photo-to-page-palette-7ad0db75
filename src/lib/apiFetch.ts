@@ -13,11 +13,16 @@ export type FetchJsonError = Error & {
  * Get auth headers for authenticated requests
  */
 export function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('sessionToken');
+  // Check both keys for compatibility (snake_case and camelCase)
+  const token = localStorage.getItem('woi_session_token') || localStorage.getItem('sessionToken');
+  const csrfToken = localStorage.getItem('woi_csrf_token') || localStorage.getItem('csrfToken');
+  
   if (!token) return {};
+  
   return {
     'Authorization': `Bearer ${token}`,
     'X-Session-Token': token,
+    ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
   };
 }
 
