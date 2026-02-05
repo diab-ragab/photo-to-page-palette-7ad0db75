@@ -3,7 +3,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { generateFingerprint } from '@/lib/fingerprint';
 import { useToast } from '@/hooks/use-toast';
 import { voteSitesApi, VoteSite, VoteSiteStatus } from '@/lib/voteSitesApi';
-import { fetchJsonOrThrow } from '@/lib/apiFetch';
 
 interface VoteData {
   coins: number;
@@ -36,6 +35,34 @@ export interface StreakData {
 
 // Server time offset (server_time - local_time) in seconds
 let serverTimeOffset = 0;
+
+const API_BASE = 'https://woiendgame.online/api';
+
+/**
+ * Make a POST request to the vote API with FormData
+ * Uses native fetch to avoid issues with Content-Type headers
+ */
+async function voteApiFetch(formData: FormData): Promise<any> {
+  const sessionToken = localStorage.getItem('woi_session_token') || '';
+  
+  const response = await fetch(`${API_BASE}/vote.php?rid=${Date.now()}`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+    headers: {
+      'Accept': 'application/json',
+      'X-Session-Token': sessionToken,
+      'Authorization': `Bearer ${sessionToken}`,
+    },
+    cache: 'no-store',
+  });
+  
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  
+  return response.json();
+}
 
 export function getServerTimeOffset(): number {
   return serverTimeOffset;
@@ -91,14 +118,7 @@ export const useVoteSystem = () => {
       formData.append('username', user.username);
       formData.append('fingerprint', fingerprint);
 
-      // Add cache-busting to avoid stale cooldown/status responses after reloads.
-      const result = await fetchJsonOrThrow<any>(
-        `https://woiendgame.online/api/vote.php?rid=${Date.now()}`,
-        {
-        method: 'POST',
-        body: formData,
-          cache: 'no-store',
-      });
+      const result = await voteApiFetch(formData);
 
       if (result.success) {
         // Sync server time offset for accurate countdown
@@ -194,13 +214,7 @@ export const useVoteSystem = () => {
       formData.append('fingerprint', fingerprint);
       formData.append('site_id', siteId.toString());
 
-      const result = await fetchJsonOrThrow<any>(
-        `https://woiendgame.online/api/vote.php?rid=${Date.now()}`,
-        {
-        method: 'POST',
-        body: formData,
-          cache: 'no-store',
-      });
+      const result = await voteApiFetch(formData);
 
       if (result.success) {
         const bonusText = result.bonus_coins > 0 
