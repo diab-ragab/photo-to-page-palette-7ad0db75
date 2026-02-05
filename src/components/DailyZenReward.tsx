@@ -84,9 +84,21 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
 
   // Countdown timer - uses stored end time for accuracy
   useEffect(() => {
-    if (canClaim || countdownEndTimeRef.current === 0) return;
+    // Don't run countdown if user can claim or no countdown is set
+    if (canClaim) return;
+    if (countdownEndTimeRef.current === 0 && countdown <= 0) return;
+
+    // Initialize end time if we have a countdown but no end time yet
+    if (countdownEndTimeRef.current === 0 && countdown > 0) {
+      countdownEndTimeRef.current = Date.now() + (countdown * 1000);
+    }
 
     const timer = setInterval(() => {
+      if (countdownEndTimeRef.current === 0) {
+        clearInterval(timer);
+        return;
+      }
+      
       const now = Date.now();
       const remaining = Math.max(0, Math.floor((countdownEndTimeRef.current - now) / 1000));
       
@@ -100,7 +112,7 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [canClaim, fetchStatus]);
+  }, [canClaim, countdown, fetchStatus]);
 
   // Handle claim
   const handleClaim = async () => {
