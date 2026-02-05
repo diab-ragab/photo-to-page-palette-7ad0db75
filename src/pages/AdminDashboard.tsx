@@ -23,6 +23,7 @@ import { SpinWheelManager } from "@/components/admin/SpinWheelManager";
 import { EventsManager } from "@/components/admin/EventsManager";
 import { ChangelogManager } from "@/components/admin/ChangelogManager";
 import { BundlesManager } from "@/components/admin/BundlesManager";
+import { CurrencyTopUpManager } from "@/components/admin/CurrencyTopUpManager";
 import {
   Shield,
   Users, 
@@ -45,6 +46,7 @@ import {
   Send,
   ScrollText,
   Package,
+  Banknote,
 } from "lucide-react";
 
 interface LastOrder {
@@ -338,6 +340,10 @@ export default function AdminDashboard() {
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Bundles</span>
             </TabsTrigger>
+            <TabsTrigger value="topup" className="gap-2 py-2">
+              <Banknote className="h-4 w-4" />
+              <span className="hidden sm:inline">Top-Up</span>
+            </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2 py-2">
               <Bell className="h-4 w-4" />
               <span className="hidden sm:inline">Notifs</span>
@@ -574,6 +580,11 @@ export default function AdminDashboard() {
           {/* Bundles Tab */}
           <TabsContent value="bundles">
             <BundlesManager />
+          </TabsContent>
+
+          {/* Currency Top-Up Tab */}
+          <TabsContent value="topup">
+            <CurrencyTopUpManager />
           </TabsContent>
 
           {/* Notifications Tab */}
