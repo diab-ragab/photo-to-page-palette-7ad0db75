@@ -4,6 +4,7 @@
  * PHP 5.x / MySQL 5.1+ compatible
  */
 require_once __DIR__ . '/bootstrap.php';
+handleCors(array('GET', 'POST', 'OPTIONS'));
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/session_helper.php';
 
