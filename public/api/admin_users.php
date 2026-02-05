@@ -16,40 +16,47 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
-$RID = bin2hex(random_bytes(6));
+require_once __DIR__ . '/bootstrap.php';
+handleCors(array('GET', 'POST', 'OPTIONS'));
+require_once __DIR__ . '/session_helper.php';
 
-function json_response(array $data): void {
+$RID = generateRID();
+
+function json_response($data) {
     global $RID;
     while (ob_get_level()) { ob_end_clean(); }
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(array_merge($data, ['rid' => $RID]), JSON_UNESCAPED_UNICODE);
+    $data['rid'] = $RID;
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-function json_fail(int $code, string $msg): void {
+function json_fail($code, $msg) {
     global $RID;
     error_log("RID={$RID} RESP={$code} MSG={$msg}");
     while (ob_get_level()) { ob_end_clean(); }
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['success' => false, 'message' => $msg, 'rid' => $RID], JSON_UNESCAPED_UNICODE);
+    echo json_encode(array('success' => false, 'message' => $msg, 'rid' => $RID), JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-// Convert unexpected fatals/exceptions into JSON (prevents empty 500 responses)
-set_exception_handler(function ($e): void {
-    $msg = $e instanceof Throwable ? $e->getMessage() : 'unknown';
-    error_log("RID={$GLOBALS['RID']} UNCAUGHT=" . $msg);
+// Convert unexpected fatals/exceptions into JSON
+set_exception_handler(function ($e) {
+    global $RID;
+    $msg = ($e instanceof Exception) ? $e->getMessage() : 'unknown';
+    error_log("RID={$RID} UNCAUGHT=" . $msg);
     json_fail(500, 'Internal server error');
 });
 
-register_shutdown_function(function (): void {
+register_shutdown_function(function () {
+    global $RID;
     $err = error_get_last();
     if (!$err) return;
 
-    $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR];
-    if (in_array($err['type'] ?? 0, $fatalTypes, true)) {
-        error_log("RID={$GLOBALS['RID']} FATAL=" . ($err['message'] ?? 'unknown'));
+    $fatalTypes = array(E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR);
+    if (in_array($err['type'], $fatalTypes, true)) {
+        error_log("RID={$RID} FATAL=" . $err['message']);
         json_fail(500, 'Internal server error');
     }
 });
@@ -59,92 +66,12 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 
-// CORS handling
-$allowedOrigins = [
-    'https://woiendgame.online',
-    'https://www.woiendgame.online',
-    'https://woiendgame.lovable.app',
-    'http://localhost:5173',
-];
+// Get database connection via centralized db.php
+$pdo = getDB();
 
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-$isLovableOrigin = is_string($origin) && 
-    preg_match('/^https:\/\/[a-z0-9-]+\.(lovableproject\.com|lovable\.app)$/i', $origin);
-
-if ($origin && (in_array($origin, $allowedOrigins, true) || $isLovableOrigin)) {
-    header("Access-Control-Allow-Origin: $origin");
-    header("Vary: Origin");
-    header("Access-Control-Allow-Credentials: true");
-}
-
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Accept, X-Session-Token, Authorization');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
-
-// Database connection
-$DBHost     = getenv('DB_HOST') ?: '192.168.1.88';
-$DBUser     = getenv('DB_USER') ?: 'root';
-$DBPassword = getenv('DB_PASS') ?: 'root';
-$DBName     = getenv('DB_NAME') ?: 'shengui';
-
-try {
-    $pdo = new PDO("mysql:host={$DBHost};dbname={$DBName};charset=utf8", $DBUser, $DBPassword, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
-} catch (PDOException $e) {
-    json_fail(503, 'Service temporarily unavailable');
-}
-
-// Auth helper
-function getSessionToken(): string {
-    $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    if (stripos($auth, 'Bearer ') === 0) {
-        return trim(substr($auth, 7));
-    }
-    return trim($_SERVER['HTTP_X_SESSION_TOKEN'] ?? '');
-}
-
-function requireAdmin(PDO $pdo): int {
-    $sessionToken = getSessionToken();
-    
-    if ($sessionToken === '') {
-        json_fail(401, 'Authentication required');
-    }
-    
-    $stmt = $pdo->prepare("
-        SELECT us.user_id
-        FROM user_sessions us
-        WHERE us.session_token = ? AND us.expires_at > NOW()
-        LIMIT 1
-    ");
-    $stmt->execute([$sessionToken]);
-    $session = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$session) {
-        json_fail(401, 'Session expired or invalid');
-    }
-    
-    $userId = (int)$session['user_id'];
-    
-    try {
-        $stmt = $pdo->prepare("SELECT 1 FROM user_roles WHERE user_id = ? AND role = 'admin' LIMIT 1");
-        $stmt->execute([$userId]);
-
-        if (!$stmt->fetch()) {
-            json_fail(403, 'Admin access required');
-        }
-    } catch (Throwable $e) {
-        error_log("RID={$GLOBALS['RID']} requireAdmin_roles=" . $e->getMessage());
-        json_fail(503, 'Authorization system unavailable');
-    }
-    
-    return $userId;
-}
+// Require admin access using centralized session_helper
+$adminUser = requireAdmin();
+$adminId = (int)$adminUser['user_id'];
 
 // Ensure sidecar tables exist - create each separately to handle partial failures
 function ensureTables(PDO $pdo): array {
