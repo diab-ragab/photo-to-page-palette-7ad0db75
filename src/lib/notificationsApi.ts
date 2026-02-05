@@ -27,17 +27,18 @@ export const notificationsApi = {
         return [];
       }
       const data = await response.json();
-      // Handle various response formats:
-      // - Old format: direct array
-      // - New format: { success: true, notifications: [...] }
-      // - Error format: { success: false, message: "..." }
+      
+      // Always extract and validate the notifications array
+      // New format: { success: true, notifications: [...] }
+      if (data && typeof data === 'object' && Array.isArray(data.notifications)) {
+        return data.notifications;
+      }
+      // Old format: direct array
       if (Array.isArray(data)) {
         return data;
       }
-      if (data && data.success && Array.isArray(data.notifications)) {
-        return data.notifications;
-      }
-      // Any other format (including errors) returns empty array
+      // Any other format returns empty array
+      console.warn('Notifications API returned unexpected format:', typeof data);
       return [];
     } catch (err) {
       console.warn('Failed to fetch notifications:', err);
