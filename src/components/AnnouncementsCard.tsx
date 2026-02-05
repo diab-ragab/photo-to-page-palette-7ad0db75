@@ -31,10 +31,14 @@ export const AnnouncementsCard = () => {
     const loadAnnouncements = async () => {
       try {
         const data = await notificationsApi.getAll();
-        // Ensure data is an array before slicing
-        const items = Array.isArray(data) ? data : [];
-        // Get the latest 4 announcements
-        setAnnouncements(items.slice(0, 4));
+        // Double-check data is a valid array before any operations
+        if (!data || !Array.isArray(data)) {
+          setAnnouncements([]);
+          return;
+        }
+        // Get the latest 4 announcements safely
+        const safeItems = data.filter(item => item && typeof item === 'object');
+        setAnnouncements(safeItems.slice(0, 4));
       } catch (error) {
         console.error('Failed to fetch announcements:', error);
         setAnnouncements([]);
