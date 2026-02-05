@@ -68,7 +68,8 @@ export const NotificationsPopover = () => {
   useEffect(() => {
     const fetchNotifications = async () => {
       const data = await notificationsApi.getAll();
-      setNotifications(data);
+      // Ensure data is an array before setting state
+      setNotifications(Array.isArray(data) ? data : []);
     };
 
     fetchNotifications();

@@ -29,7 +29,9 @@ const BlogPost = () => {
       if (slug.startsWith("notification-")) {
         const notifId = parseInt(slug.replace("notification-", ""), 10);
         if (!isNaN(notifId)) {
-          const notifications = await notificationsApi.getAll();
+          const data = await notificationsApi.getAll();
+          // Ensure data is an array before calling find
+          const notifications = Array.isArray(data) ? data : [];
           const notification = notifications.find((n) => n.id === notifId);
           if (notification) {
             setPost(notificationToBlogPost(notification));
