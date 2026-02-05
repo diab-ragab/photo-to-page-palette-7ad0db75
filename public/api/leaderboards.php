@@ -1,59 +1,57 @@
 <?php
 // api/leaderboards.php
-// Leaderboard data - Top Voters & VIP Rankings
+// Leaderboard data - Top Voters, VIP Rankings, Top Characters
 // PHP 5.x compatible
 
 require_once __DIR__ . '/bootstrap.php';
 handleCors(array('GET', 'OPTIONS'));
-require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-$rid = function_exists('random_bytes') ? substr(bin2hex(random_bytes(6)), 0, 12) : substr(md5(uniqid(mt_rand(), true)), 0, 12);
+$rid = substr(md5(uniqid(mt_rand(), true)), 0, 12);
 
 try {
     $pdo = getDB();
 
-    // Top Voters - from vote_log or user_currency (order by total_votes)
+    // Top Voters - from vote_log aggregation
     $topVoters = array();
     try {
-        // Try to get from vote aggregation
         $stmt = $pdo->query("
             SELECT 
                 u.login as username, 
-                COUNT(vl.id) as value,
+                COUNT(vl.id) as vote_count,
                 COALESCE(uc.vip_points, 0) as vip_points
             FROM vote_log vl
             JOIN users u ON vl.user_id = u.ID
             LEFT JOIN user_currency uc ON uc.user_id = u.ID
             GROUP BY u.ID, u.login
-            ORDER BY value DESC
+            ORDER BY vote_count DESC
             LIMIT 10
         ");
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         $rank = 1;
         foreach ($rows as $row) {
-            $vipLevel = 0;
             $vp = (int)$row['vip_points'];
-            if ($vp >= 10000) $vipLevel = 3;
-            elseif ($vp >= 5000) $vipLevel = 2;
-            elseif ($vp >= 1000) $vipLevel = 1;
+            $vipLevel = 0;
+            if ($vp >= 10000) { $vipLevel = 3; }
+            elseif ($vp >= 5000) { $vipLevel = 2; }
+            elseif ($vp >= 1000) { $vipLevel = 1; }
             
             $topVoters[] = array(
                 'rank' => $rank++,
                 'username' => $row['username'],
-                'value' => (int)$row['value'],
+                'value' => (int)$row['vote_count'],
                 'vipLevel' => $vipLevel
             );
         }
     } catch (Exception $e) {
-        // Fallback: try user_currency table with total_votes column
+        // Fallback: try user_currency table
         try {
             $stmt = $pdo->query("
                 SELECT 
                     u.login as username, 
-                    uc.total_votes as value,
+                    uc.total_votes as vote_count,
                     uc.vip_points
                 FROM user_currency uc
                 JOIN users u ON uc.user_id = u.ID
@@ -65,31 +63,31 @@ try {
             
             $rank = 1;
             foreach ($rows as $row) {
-                $vipLevel = 0;
                 $vp = (int)$row['vip_points'];
-                if ($vp >= 10000) $vipLevel = 3;
-                elseif ($vp >= 5000) $vipLevel = 2;
-                elseif ($vp >= 1000) $vipLevel = 1;
+                $vipLevel = 0;
+                if ($vp >= 10000) { $vipLevel = 3; }
+                elseif ($vp >= 5000) { $vipLevel = 2; }
+                elseif ($vp >= 1000) { $vipLevel = 1; }
                 
                 $topVoters[] = array(
                     'rank' => $rank++,
                     'username' => $row['username'],
-                    'value' => (int)$row['value'],
+                    'value' => (int)$row['vote_count'],
                     'vipLevel' => $vipLevel
                 );
             }
         } catch (Exception $e2) {
-            // No data available
+            // No vote data available
         }
     }
 
-    // VIP Rankings - from user_currency order by vip_points
+    // VIP Rankings - from user_currency
     $vipRankings = array();
     try {
         $stmt = $pdo->query("
             SELECT 
                 u.login as username, 
-                uc.vip_points as value
+                uc.vip_points
             FROM user_currency uc
             JOIN users u ON uc.user_id = u.ID
             WHERE uc.vip_points > 0
@@ -100,11 +98,11 @@ try {
         
         $rank = 1;
         foreach ($rows as $row) {
+            $vp = (int)$row['vip_points'];
             $vipLevel = 0;
-            $vp = (int)$row['value'];
-            if ($vp >= 10000) $vipLevel = 3;
-            elseif ($vp >= 5000) $vipLevel = 2;
-            elseif ($vp >= 1000) $vipLevel = 1;
+            if ($vp >= 10000) { $vipLevel = 3; }
+            elseif ($vp >= 5000) { $vipLevel = 2; }
+            elseif ($vp >= 1000) { $vipLevel = 1; }
             
             $vipRankings[] = array(
                 'rank' => $rank++,
@@ -122,9 +120,9 @@ try {
     try {
         $stmt = $pdo->query("
             SELECT 
-                Name as username,
-                Level as value,
-                Profession as class
+                Name as char_name,
+                Level as char_level,
+                Profession as char_class
             FROM basetab_sg
             WHERE IsDel = 0
             ORDER BY Level DESC, Exp DESC
@@ -136,9 +134,9 @@ try {
         foreach ($rows as $row) {
             $topCharacters[] = array(
                 'rank' => $rank++,
-                'username' => $row['username'],
-                'value' => (int)$row['value'],
-                'class' => (int)$row['class']
+                'username' => $row['char_name'],
+                'value' => (int)$row['char_level'],
+                'class' => (int)$row['char_class']
             );
         }
     } catch (Exception $e) {
@@ -161,6 +159,7 @@ try {
         'message' => 'Database error',
         'topVoters' => array(),
         'vipRankings' => array(),
+        'topCharacters' => array(),
         'rid' => $rid
     ));
 }
