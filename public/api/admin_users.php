@@ -169,13 +169,14 @@ function pickFirstExisting(array $columns, array $candidates): ?string {
 
 // Parse input
 $method = $_SERVER['REQUEST_METHOD'];
-$action = $_GET['action'] ?? '';
+$action = isset($_GET['action']) ? $_GET['action'] : '';
 
-$input = [];
+$input = array();
 if ($method === 'POST') {
     $raw = file_get_contents('php://input');
     if ($raw) {
-        $input = json_decode($raw, true) ?: [];
+        $decoded = json_decode($raw, true);
+        $input = $decoded ? $decoded : array();
     }
 }
 
@@ -228,9 +229,9 @@ $sidecarReady = sidecarTablesReady($pdo);
 
 // ============ LIST USERS ============
 if ($action === 'list') {
-    $search = trim($_GET['search'] ?? '');
-    $page = max(1, (int)($_GET['page'] ?? 1));
-    $limit = min(100, max(10, (int)($_GET['limit'] ?? 20)));
+    $search = isset($_GET['search']) ? trim($_GET['search']) : '';
+    $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    $limit = isset($_GET['limit']) ? min(100, max(10, (int)$_GET['limit'])) : 20;
     $offset = ($page - 1) * $limit;
 
     $userCols = getUsersColumns($pdo);
@@ -333,7 +334,7 @@ if ($action === 'list') {
 
 // ============ GET SINGLE USER ============
 if ($action === 'get') {
-    $userId = (int)($_GET['id'] ?? 0);
+    $userId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     
     if ($userId <= 0) {
         json_fail(400, 'Invalid user ID');
@@ -414,7 +415,7 @@ if ($action === 'get') {
 
 // ============ UPDATE CURRENCY ============
 if ($action === 'update_currency' && $method === 'POST') {
-    $userId = (int)($input['user_id'] ?? 0);
+    $userId = isset($input['user_id']) ? (int)$input['user_id'] : 0;
     
     if ($userId <= 0) {
         json_fail(400, 'Invalid user ID');
@@ -486,9 +487,9 @@ if ($action === 'update_currency' && $method === 'POST') {
 
 // ============ SET ROLE ============
 if ($action === 'set_role' && $method === 'POST') {
-    $userId = (int)($input['user_id'] ?? 0);
-    $role = trim($input['role'] ?? 'admin');
-    $grant = (bool)($input['grant'] ?? true);
+    $userId = isset($input['user_id']) ? (int)$input['user_id'] : 0;
+    $role = isset($input['role']) ? trim($input['role']) : 'admin';
+    $grant = isset($input['grant']) ? (bool)$input['grant'] : true;
     
     if ($userId <= 0) {
         json_fail(400, 'Invalid user ID');
@@ -534,9 +535,9 @@ if ($action === 'set_role' && $method === 'POST') {
 
 // ============ TOGGLE BAN ============
 if ($action === 'toggle_ban' && $method === 'POST') {
-    $userId = (int)($input['user_id'] ?? 0);
-    $ban = (bool)($input['ban'] ?? true);
-    $reason = trim($input['reason'] ?? '');
+    $userId = isset($input['user_id']) ? (int)$input['user_id'] : 0;
+    $ban = isset($input['ban']) ? (bool)$input['ban'] : true;
+    $reason = isset($input['reason']) ? trim($input['reason']) : '';
     
     if ($userId <= 0) {
         json_fail(400, 'Invalid user ID');
