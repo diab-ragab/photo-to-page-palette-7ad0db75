@@ -85,11 +85,11 @@ ensureUserSessionsTable($pdo);
 ensureUserRolesTable($pdo);
 
 // ---- token helpers ----
-function getSessionToken(): string {
-  $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+function getSessionToken() {
+  $auth = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : '';
   if (stripos($auth, 'Bearer ') === 0) return trim(substr($auth, 7));
 
-  $hdr = $_SERVER['HTTP_X_SESSION_TOKEN'] ?? '';
+  $hdr = isset($_SERVER['HTTP_X_SESSION_TOKEN']) ? $_SERVER['HTTP_X_SESSION_TOKEN'] : '';
   if ($hdr) return trim($hdr);
 
   if (!empty($_GET['sessionToken'])) return trim((string)$_GET['sessionToken']);
@@ -161,11 +161,11 @@ $roles = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 $isAdmin = in_array('admin', $roles, true) || in_array('gm', $roles, true);
 
 // Bootstrap admin from config
-$cfg = function_exists('getConfig') ? (array)getConfig() : [];
-$sec = $cfg['security'] ?? [];
+$cfg = function_exists('getConfig') ? (array)getConfig() : array();
+$sec = isset($cfg['security']) ? $cfg['security'] : array();
 
-$adminIds = is_array($sec['admin_user_ids'] ?? null) ? $sec['admin_user_ids'] : (is_array($cfg['admin_user_ids'] ?? null) ? $cfg['admin_user_ids'] : []);
-$adminNames = is_array($sec['admin_usernames'] ?? null) ? $sec['admin_usernames'] : (is_array($cfg['admin_usernames'] ?? null) ? $cfg['admin_usernames'] : []);
+$adminIds = isset($sec['admin_user_ids']) && is_array($sec['admin_user_ids']) ? $sec['admin_user_ids'] : (isset($cfg['admin_user_ids']) && is_array($cfg['admin_user_ids']) ? $cfg['admin_user_ids'] : array());
+$adminNames = isset($sec['admin_usernames']) && is_array($sec['admin_usernames']) ? $sec['admin_usernames'] : (isset($cfg['admin_usernames']) && is_array($cfg['admin_usernames']) ? $cfg['admin_usernames'] : array());
 
 $bootstrapAdmin = in_array($userId, $adminIds, true) || in_array($username, $adminNames, true);
 
