@@ -18,10 +18,11 @@ export function AdminRoute({ children }: Props) {
 
         const res = await fetch("https://woiendgame.online/api/check_admin.php", {
           method: "GET",
+          credentials: "include",
           headers: {
             "Accept": "application/json",
             "X-Session-Token": token,
-            "Authorization": `Bearer ${token}`, // backup
+            "Authorization": `Bearer ${token}`,
           },
         });
 
