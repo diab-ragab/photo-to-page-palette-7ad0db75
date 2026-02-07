@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
-import { getAuthHeaders } from "@/lib/apiFetch";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 
 export interface User {
   username: string;
@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("[Auth] Checking admin status for:", user.username);
       
       const response = await fetch(
-        `https://woiendgame.online/api/check_admin.php`,
+        `${API_BASE}/check_admin.php`,
         {
           method: "GET",
           credentials: "include",

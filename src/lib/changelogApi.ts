@@ -1,6 +1,4 @@
-import { fetchJsonOrThrow } from './apiFetch';
-
-const API_BASE = 'https://woiendgame.online/api';
+import { fetchJsonOrThrow, API_BASE } from './apiFetch';
 
 export type ChangeType = 'add' | 'fix' | 'remove' | 'change' | 'security';
 export type VersionType = 'major' | 'minor' | 'patch' | 'hotfix';

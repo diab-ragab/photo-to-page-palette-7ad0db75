@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getAuthHeaders } from "@/lib/apiFetch";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 import { Navigate } from "react-router-dom";
 
 type Props = { children: React.ReactNode };
@@ -17,7 +17,7 @@ export function AdminRoute({ children }: Props) {
           return;
         }
 
-        const res = await fetch("https://woiendgame.online/api/check_admin.php", {
+        const res = await fetch(`${API_BASE}/check_admin.php`, {
           method: "GET",
           credentials: "include",
           headers: {

@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, User, Lock, Mail, ArrowLeft, KeyRound, Shield, AlertTriangle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAuthHeaders } from "@/lib/apiFetch";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   loginSchema, 
@@ -101,7 +101,7 @@ export const AuthModals = ({
     
     try {
       // API expects: action, login, passwd in POST body
-      const response = await fetch("https://woiendgame.online/api/auth.php", {
+      const response = await fetch(`${API_BASE}/auth.php`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -136,7 +136,7 @@ export const AuthModals = ({
 try {
   const token = result.sessionToken || localStorage.getItem("woi_session_token") || "";
 
-  const adminResponse = await fetch("https://woiendgame.online/api/check_admin.php", {
+  const adminResponse = await fetch(`${API_BASE}/check_admin.php`, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -230,7 +230,7 @@ try {
     
     try {
       // API expects: action, login, email, passwd, repasswd in POST body
-      const response = await fetch("https://woiendgame.online/api/auth.php", {
+      const response = await fetch(`${API_BASE}/auth.php`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -310,7 +310,7 @@ try {
     
     try {
       // API expects: action=reset, login, email, newpass, renew in POST body
-      const response = await fetch("https://woiendgame.online/api/auth.php", {
+      const response = await fetch(`${API_BASE}/auth.php`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -389,7 +389,7 @@ try {
     setChangeLoading(true);
     
     try {
-      const response = await fetch("https://woiendgame.online/api/auth.php", {
+      const response = await fetch(`${API_BASE}/auth.php`, {
         method: "POST",
         credentials: "include",
         headers: {

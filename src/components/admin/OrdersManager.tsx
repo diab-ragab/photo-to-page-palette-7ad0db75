@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -95,16 +96,7 @@ interface BundleOrdersResponse {
   pages: number;
 }
 
-const API_BASE = "https://woiendgame.online/api";
-
-function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem("woi_session_token") || "";
-  return {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    ...(token ? { "X-Session-Token": token, Authorization: `Bearer ${token}` } : {}),
-  };
-}
+// Uses centralized API_BASE and getAuthHeaders from apiFetch
 
 const statusConfig = {
   pending: {

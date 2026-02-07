@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getAuthHeaders } from "@/lib/apiFetch";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/Navbar";
@@ -109,7 +109,7 @@ export default function AdminDashboard() {
         
         // Call PHP API to check admin role from user_roles table
         const response = await fetch(
-          "https://woiendgame.online/api/check_admin.php",
+          `${API_BASE}/check_admin.php`,
           {
             method: "GET",
             credentials: "include",
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
       setStatsLoading(true);
       try {
         
-        const response = await fetch("https://woiendgame.online/api/admin_stats.php", {
+        const response = await fetch(`${API_BASE}/admin_stats.php`, {
           credentials: "include",
           headers: {
             "Accept": "application/json",

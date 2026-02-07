@@ -1,6 +1,4 @@
-import { fetchJsonOrThrow } from './apiFetch';
-
-const API_BASE = 'https://woiendgame.online/api';
+import { fetchJsonOrThrow, API_BASE } from './apiFetch';
 
 export interface WheelSegment {
   id: number;

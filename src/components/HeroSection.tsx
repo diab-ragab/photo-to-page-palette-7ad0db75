@@ -1,4 +1,5 @@
 import { motion, useScroll, useTransform } from "framer-motion";
+import { API_BASE } from "@/lib/apiFetch";
 import { Download, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ServerStatusCard } from "@/components/ServerStatusCard";
@@ -106,7 +107,7 @@ export const HeroSection = () => {
 
         {/* Info Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 max-w-5xl mx-auto mb-3 md:mb-4">
-          <ServerStatusCard apiEndpoint="https://woiendgame.online/api/server-status.php" />
+          <ServerStatusCard apiEndpoint={`${API_BASE}/server-status.php`} />
           <AnnouncementsCard />
           <ChangelogCard />
         </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { getAuthHeaders } from "@/lib/apiFetch";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -310,7 +310,7 @@ export const GamePass = () => {
     const fetchRewards = async () => {
       setIsLoadingRewards(true);
       try {
-        const response = await fetch("https://woiendgame.online/api/gamepass.php?action=rewards");
+        const response = await fetch(`${API_BASE}/gamepass.php?action=rewards`);
         const data = await response.json();
         if (data.success && data.rewards?.length > 0) {
           setRewards(convertApiRewards(data.rewards));
@@ -326,7 +326,7 @@ export const GamePass = () => {
     const fetchUserPassStatus = async () => {
       if (!user) return;
       try {
-        const response = await fetch("https://woiendgame.online/api/gamepass.php?action=status", {
+        const response = await fetch(`${API_BASE}/gamepass.php?action=status`, {
           method: "GET",
           credentials: "include",
           headers: {
@@ -380,7 +380,7 @@ export const GamePass = () => {
 
     setLoading(true);
     try {
-      const response = await fetch("https://woiendgame.online/api/gamepass.php?action=claim", {
+      const response = await fetch(`${API_BASE}/gamepass.php?action=claim`, {
         method: "POST",
         credentials: "include",
         headers: {

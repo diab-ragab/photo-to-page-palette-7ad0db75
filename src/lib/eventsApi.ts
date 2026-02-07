@@ -1,6 +1,4 @@
-import { fetchJsonOrThrow } from './apiFetch';
-
-const API_BASE = 'https://woiendgame.online/api';
+import { fetchJsonOrThrow, API_BASE } from './apiFetch';
 
 export type EventType = 'double_xp' | 'double_drops' | 'bonus_vote' | 'sale' | 'maintenance' | 'update' | 'pvp' | 'boss' | 'custom';
 

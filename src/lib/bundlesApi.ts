@@ -1,16 +1,4 @@
-const API_BASE = "https://woiendgame.online/api";
-
-function getAuthHeaders(): HeadersInit {
-  const sessionToken = localStorage.getItem("woi_session_token") || "";
-  const csrfToken = localStorage.getItem("woi_csrf_token") || "";
-  return {
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    "X-Session-Token": sessionToken,
-    "Authorization": `Bearer ${sessionToken}`,
-    ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
-  };
-}
+import { API_BASE, getAuthHeaders } from './apiFetch';
 
 export interface BundleItem {
   id?: number;
@@ -18,8 +6,8 @@ export interface BundleItem {
   quantity: number;
   icon: string;
   icon_emoji?: string;
-  item_id?: number;       // Game item ID (0 = display only, >0 = real item, -1 = zen, -2 = coins, -3 = exp)
-  item_quantity?: number; // Quantity of game item to deliver
+  item_id?: number;
+  item_quantity?: number;
   sort_order?: number;
 }
 
@@ -53,7 +41,6 @@ export interface BundleFormData {
 }
 
 export const bundlesApi = {
-  // Public: Get active bundles for shop
   async getActive(): Promise<{ bundles: Bundle[]; server_time: number }> {
     const response = await fetch(`${API_BASE}/bundles.php?action=list&rid=${Date.now()}`, {
       cache: "no-store",
@@ -65,12 +52,11 @@ export const bundlesApi = {
     return { bundles: data.bundles || [], server_time: data.server_time };
   },
 
-  // Admin: Get all bundles
   async getAll(): Promise<Bundle[]> {
     const response = await fetch(`${API_BASE}/bundles.php?action=list_all&rid=${Date.now()}`, {
       cache: "no-store",
       credentials: "include",
-      headers: getAuthHeaders(),
+      headers: { ...getAuthHeaders(), Accept: "application/json" },
     });
     if (!response.ok) throw new Error("Failed to fetch bundles");
     const data = await response.json();
@@ -78,12 +64,11 @@ export const bundlesApi = {
     return data.bundles || [];
   },
 
-  // Admin: Create bundle
   async create(bundle: BundleFormData): Promise<{ bundle_id: number }> {
     const response = await fetch(`${API_BASE}/bundles.php`, {
       method: "POST",
       credentials: "include",
-      headers: getAuthHeaders(),
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ action: "create", ...bundle }),
     });
     const data = await response.json();
@@ -91,85 +76,67 @@ export const bundlesApi = {
     return { bundle_id: data.bundle_id };
   },
 
-  // Admin: Update bundle
   async update(id: number, bundle: BundleFormData): Promise<void> {
     const response = await fetch(`${API_BASE}/bundles.php`, {
       method: "POST",
       credentials: "include",
-      headers: getAuthHeaders(),
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ action: "update", id, ...bundle }),
     });
     const data = await response.json();
     if (!data.success) throw new Error(data.message || "Failed to update bundle");
   },
 
-  // Admin: Delete bundle
   async delete(id: number): Promise<void> {
     const response = await fetch(`${API_BASE}/bundles.php`, {
       method: "POST",
       credentials: "include",
-      headers: getAuthHeaders(),
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ action: "delete", id }),
     });
     const data = await response.json();
     if (!data.success) throw new Error(data.message || "Failed to delete bundle");
   },
 
-  // Admin: Toggle active status
   async toggle(id: number, is_active: boolean): Promise<void> {
     const response = await fetch(`${API_BASE}/bundles.php`, {
       method: "POST",
       credentials: "include",
-      headers: getAuthHeaders(),
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ action: "toggle", id, is_active }),
     });
     const data = await response.json();
     if (!data.success) throw new Error(data.message || "Failed to toggle bundle");
   },
 
-  // Public: Purchase bundle
-  async purchase(
-    bundleId: number,
-    characterId: number,
-    characterName: string
-  ): Promise<{ url: string; order_id: number }> {
+  async purchase(bundleId: number, characterId: number, characterName: string): Promise<{ url: string; order_id: number }> {
     const response = await fetch(`${API_BASE}/bundles.php`, {
       method: "POST",
       credentials: "include",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        action: "purchase",
-        bundle_id: bundleId,
-        character_id: characterId,
-        character_name: characterName,
-      }),
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify({ action: "purchase", bundle_id: bundleId, character_id: characterId, character_name: characterName }),
     });
     const data = await response.json();
     if (!data.success) throw new Error(data.message || "Failed to initiate purchase");
     return { url: data.url, order_id: data.order_id };
   },
 
-  // Public: Cancel bundle order and restore stock
   async cancelOrder(sessionId: string): Promise<void> {
     try {
       const response = await fetch(`${API_BASE}/bundle_cancel.php`, {
         method: "POST",
         credentials: "include",
-        headers: getAuthHeaders(),
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ sessionId }),
       });
       const data = await response.json();
-      if (!data.success) {
-        console.warn("Bundle cancel response:", data.message);
-      }
+      if (!data.success) console.warn("Bundle cancel response:", data.message);
     } catch (err) {
-      // Silent fail - stock restoration is best-effort
       console.warn("Bundle cancel failed:", err);
     }
   },
 };
 
-// Icon options for bundle items
 export const BUNDLE_ICON_OPTIONS = [
   { code: "GIFT", emoji: "🎁", label: "Gift" },
   { code: "GEM", emoji: "💎", label: "Gem/Zen" },

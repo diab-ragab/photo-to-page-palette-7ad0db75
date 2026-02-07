@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getAuthHeaders } from "@/lib/apiFetch";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +66,7 @@ export function UsersManager() {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("https://woiendgame.online/api/admin_users.php?action=list", {
+      const response = await fetch(`${API_BASE}/admin_users.php?action=list`, {
         credentials: "include",
         redirect: "error",
         headers: {
@@ -139,7 +139,7 @@ export function UsersManager() {
     setIsUpdating(true);
     try {
       // Update currency
-      const currencyResponse = await fetch("https://woiendgame.online/api/admin_users.php?action=update_currency", {
+      const currencyResponse = await fetch(`${API_BASE}/admin_users.php?action=update_currency`, {
         method: "POST",
         credentials: "include",
         headers: { 
@@ -161,7 +161,7 @@ export function UsersManager() {
       const newIsAdmin = editData.role === "admin";
       
       if (currentIsAdmin !== newIsAdmin) {
-        await fetch("https://woiendgame.online/api/admin_users.php?action=set_role", {
+        await fetch(`${API_BASE}/admin_users.php?action=set_role`, {
           method: "POST",
           credentials: "include",
           headers: { 
@@ -178,7 +178,7 @@ export function UsersManager() {
 
       // Update ban status if changed
       if (selectedUser.is_banned !== editData.is_banned) {
-        await fetch("https://woiendgame.online/api/admin_users.php?action=toggle_ban", {
+        await fetch(`${API_BASE}/admin_users.php?action=toggle_ban`, {
           method: "POST",
           credentials: "include",
           headers: { 
@@ -209,7 +209,7 @@ export function UsersManager() {
 
   const handleToggleBan = async (userId: number, isBanned: boolean) => {
     try {
-      const response = await fetch("https://woiendgame.online/api/admin_users.php?action=toggle_ban", {
+      const response = await fetch(`${API_BASE}/admin_users.php?action=toggle_ban`, {
         method: "POST",
         credentials: "include",
         headers: { 

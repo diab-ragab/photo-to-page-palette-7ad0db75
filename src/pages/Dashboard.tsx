@@ -5,7 +5,7 @@ import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVoteSystem } from "@/hooks/useVoteSystem";
-import { fetchJsonOrThrow } from "@/lib/apiFetch";
+import { fetchJsonOrThrow, API_BASE } from "@/lib/apiFetch";
 import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
 import { VoteSiteCard } from "@/components/VoteSiteCard";
@@ -70,7 +70,7 @@ const Dashboard = () => {
       
       try {
         const data = await fetchJsonOrThrow<any>(
-          `https://woiendgame.online/api/user_currency.php?username=${encodeURIComponent(user.username)}`
+          `${API_BASE}/user_currency.php?username=${encodeURIComponent(user.username)}`
         );
         if (data.success) {
           setUserZen(data.zen || 0);
