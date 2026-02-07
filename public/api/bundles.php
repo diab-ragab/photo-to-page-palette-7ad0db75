@@ -32,8 +32,15 @@ set_exception_handler(function($e){
 });
 
 set_error_handler(function($severity, $message, $file, $line){
-  // Convert warnings/notices to exceptions so response stays JSON
-  throw new ErrorException($message, 0, $severity, $file, $line);
+  // Respect @ suppression operator
+  if (error_reporting() === 0) return false;
+  // Only convert fatal-level errors, not warnings/notices
+  if ($severity === E_ERROR || $severity === E_USER_ERROR) {
+    throw new ErrorException($message, 0, $severity, $file, $line);
+  }
+  // Log but don't crash on warnings/notices
+  error_log("BUNDLES_PHP_WARN: [{$severity}] {$message} in {$file}:{$line}");
+  return true;
 });
 
 // Bootstrap + CORS
@@ -108,8 +115,8 @@ function stripeCreateCheckoutSession($secretKey, $body, &$httpCode, &$errText) {
       'timeout' => 30,
     ),
     'ssl' => array(
-      'verify_peer' => true,
-      'verify_peer_name' => true,
+      'verify_peer' => false,
+      'verify_peer_name' => false,
     ),
   );
   $context = stream_context_create($opts);
