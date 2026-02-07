@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { SkeletonCard, ApiErrorState } from '@/components/ui/api-loading-state';
 import { 
   BarChart3, 
   Download, 
@@ -148,30 +148,16 @@ export function PlayerStatsCard() {
   };
 
   if (loading) {
-    return (
-      <Card className="bg-card border-primary/20">
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-24 w-full" />
-          <div className="grid grid-cols-2 gap-3">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <Skeleton key={i} className="h-16" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <SkeletonCard rows={6} className="border-primary/20" />;
   }
 
   if (!stats) {
     return (
-      <Card className="bg-card border-primary/20">
-        <CardContent className="py-8 text-center text-muted-foreground">
-          Failed to load stats. Please try again.
-        </CardContent>
-      </Card>
+      <ApiErrorState
+        variant="card"
+        message="Failed to load player stats. Please try again."
+        onRetry={loadStats}
+      />
     );
   }
 

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { SkeletonCard, ApiErrorState } from '@/components/ui/api-loading-state';
 import { 
   Sparkles, 
   Clock, 
@@ -209,6 +209,7 @@ export function LuckyWheel() {
   const [segments, setSegments] = useState<WheelSegment[]>([]);
   const [status, setStatus] = useState<SpinStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
   const [result, setResult] = useState<SpinResult | null>(null);
@@ -216,6 +217,7 @@ export function LuckyWheel() {
   const [countdown, setCountdown] = useState('');
 
   const loadData = useCallback(async () => {
+    setError(false);
     try {
       const [segs, stat] = await Promise.all([
         fetchWheelSegments(),
@@ -225,6 +227,7 @@ export function LuckyWheel() {
       setStatus(stat);
     } catch (err) {
       console.error('Failed to load wheel data:', err);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -291,16 +294,16 @@ export function LuckyWheel() {
   };
 
   if (loading) {
+    return <SkeletonCard rows={4} className="border-primary/20" />;
+  }
+
+  if (error) {
     return (
-      <Card className="bg-card border-primary/20">
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-        </CardHeader>
-        <CardContent className="flex flex-col items-center gap-4">
-          <Skeleton className="w-64 h-64 rounded-full" />
-          <Skeleton className="h-10 w-32" />
-        </CardContent>
-      </Card>
+      <ApiErrorState
+        variant="card"
+        message="Failed to load the spin wheel."
+        onRetry={loadData}
+      />
     );
   }
 

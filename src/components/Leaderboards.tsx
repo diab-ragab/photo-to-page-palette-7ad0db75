@@ -3,6 +3,7 @@ import { API_BASE } from "@/lib/apiFetch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, Vote, Crown, Medal, Swords } from "lucide-react";
+import { InlineLoader, ApiErrorState } from "@/components/ui/api-loading-state";
 
 interface LeaderboardPlayer {
   rank: number;
@@ -69,27 +70,29 @@ export const Leaderboards = () => {
   const [vipRankings, setVipRankings] = useState<LeaderboardPlayer[]>([]);
   const [topCharacters, setTopCharacters] = useState<LeaderboardPlayer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const fetchLeaderboards = async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const response = await fetch(`${API_BASE}/leaderboards.php`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setTopVoters(data.topVoters || []);
+          setVipRankings(data.vipRankings || []);
+          setTopCharacters(data.topCharacters || []);
+        }
+      }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchLeaderboards = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`${API_BASE}/leaderboards.php`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            setTopVoters(data.topVoters || []);
-            setVipRankings(data.vipRankings || []);
-            setTopCharacters(data.topCharacters || []);
-          }
-        }
-      } catch {
-        // Silent fail - show empty leaderboards
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchLeaderboards();
   }, []);
 
@@ -162,7 +165,9 @@ export const Leaderboards = () => {
           
           <TabsContent value="characters" className="mt-0">
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              <InlineLoader text="Loading leaderboards..." />
+            ) : error ? (
+              <ApiErrorState message="Failed to load leaderboards." onRetry={fetchLeaderboards} />
             ) : (
               <LeaderboardTable data={topCharacters} valueLabel="Lv" showClass />
             )}
@@ -170,7 +175,9 @@ export const Leaderboards = () => {
           
           <TabsContent value="voters" className="mt-0">
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              <InlineLoader text="Loading leaderboards..." />
+            ) : error ? (
+              <ApiErrorState message="Failed to load leaderboards." onRetry={fetchLeaderboards} />
             ) : (
               <LeaderboardTable data={topVoters} valueLabel="votes" />
             )}
@@ -178,7 +185,9 @@ export const Leaderboards = () => {
           
           <TabsContent value="vip" className="mt-0">
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              <InlineLoader text="Loading leaderboards..." />
+            ) : error ? (
+              <ApiErrorState message="Failed to load leaderboards." onRetry={fetchLeaderboards} />
             ) : (
               <LeaderboardTable data={vipRankings} valueLabel="pts" />
             )}

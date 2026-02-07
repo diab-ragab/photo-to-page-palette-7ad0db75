@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
+import { PageLoader } from "@/components/ui/api-loading-state";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/Navbar";
@@ -202,7 +203,7 @@ export default function AdminDashboard() {
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Checking authorization...</div>
+        <PageLoader text="Checking authorization..." />
       </div>
     );
   }
