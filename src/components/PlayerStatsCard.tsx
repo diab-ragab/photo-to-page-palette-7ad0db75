@@ -215,7 +215,7 @@ export function PlayerStatsCard() {
           <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-primary/5 via-purple-500/5 to-transparent border border-primary/10">
             <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center flex-shrink-0">
               <span className="text-2xl font-bold text-primary-foreground">
-                {stats.username.charAt(0).toUpperCase()}
+                {(stats.username || '?').charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="min-w-0 flex-1">
