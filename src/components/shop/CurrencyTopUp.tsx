@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Gem, Coins, Check, Crown, Sparkles, Loader2 } from "lucide-react";
+import { SkeletonGrid, ApiEmptyState, ApiErrorState } from "@/components/ui/api-loading-state";
 import { useToast } from "@/hooks/use-toast";
 import { fetchActivePackages, TopUpPackage } from "@/lib/currencyTopupApi";
 
@@ -92,24 +92,26 @@ export const CurrencyTopUp = () => {
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
   const [packages, setPackages] = useState<TopUpPackage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const { toast } = useToast();
 
   // Fetch packages from database
-  useEffect(() => {
-    const loadPackages = async () => {
-      setLoading(true);
-      try {
-        const data = await fetchActivePackages();
-        setPackages(data);
-      } catch (err) {
-        console.error("Failed to load currency packages:", err);
-        // Use empty array on error
-        setPackages([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadPackages = async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const data = await fetchActivePackages();
+      setPackages(data);
+    } catch (err) {
+      console.error("Failed to load currency packages:", err);
+      setPackages([]);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadPackages();
   }, []);
 
@@ -185,17 +187,15 @@ export const CurrencyTopUp = () => {
 
       {/* Packages Grid */}
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Skeleton key={i} className="h-40 rounded-xl" />
-          ))}
-        </div>
+        <SkeletonGrid count={6} gridCols="grid-cols-2 md:grid-cols-3 lg:grid-cols-6" itemHeight="h-40" />
+      ) : error ? (
+        <ApiErrorState message="Failed to load currency packages." onRetry={loadPackages} />
       ) : filteredPackages.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Gem className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p className="font-medium">No packages available</p>
-          <p className="text-sm mt-1">Check back later for {currencyType === "zen" ? "Zen" : "Coins"} packages.</p>
-        </div>
+        <ApiEmptyState
+          icon={<Gem className="h-12 w-12" />}
+          title="No packages available"
+          description={`Check back later for ${currencyType === "zen" ? "Zen" : "Coins"} packages.`}
+        />
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {filteredPackages.map((pkg) => (
