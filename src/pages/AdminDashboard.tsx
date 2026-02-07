@@ -159,7 +159,9 @@ export default function AdminDashboard() {
         const response = await fetch("https://woiendgame.online/api/admin_stats.php", {
           credentials: "include",
           headers: {
-            ...(sessionToken && { "X-Session-Token": sessionToken }),
+            "Accept": "application/json",
+            "X-Session-Token": sessionToken,
+            "Authorization": `Bearer ${sessionToken}`,
           },
         });
         const data = await response.json();
