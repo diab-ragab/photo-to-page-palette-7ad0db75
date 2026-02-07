@@ -1,18 +1,17 @@
 <?php
 /**
  * bundles.php - Flash Sale Bundles API (PRO)
- * PHP 5.x compatible
- * - NO schema creation in runtime (prevents 502/timeouts)
- * - Stable Stripe call via cURL
- * - Always JSON responses
+ * PHP 5.1+ compatible - NO closures, NO short array syntax
  */
 
+ob_start();
 header('Content-Type: application/json; charset=utf-8');
 ini_set('display_errors', '0');
-error_reporting(E_ALL);
+error_reporting(0);
 
 if (!function_exists('jsonFail')) {
   function jsonFail($code, $msg) {
+    ob_clean();
     http_response_code((int)$code);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(array('success' => false, 'error' => (string)$msg));
@@ -21,27 +20,24 @@ if (!function_exists('jsonFail')) {
 }
 
 function jsonOut($data) {
+  ob_clean();
   header('Content-Type: application/json; charset=utf-8');
   echo json_encode($data);
   exit;
 }
 
-set_exception_handler(function($e){
+function _bundles_exception_handler($e) {
   error_log("BUNDLES_EXCEPTION: " . $e->getMessage());
   jsonFail(500, 'Server error');
-});
+}
+set_exception_handler('_bundles_exception_handler');
 
-set_error_handler(function($severity, $message, $file, $line){
-  // Respect @ suppression operator
+function _bundles_error_handler($severity, $message, $file, $line) {
   if (error_reporting() === 0) return false;
-  // Only convert fatal-level errors, not warnings/notices
-  if ($severity === E_ERROR || $severity === E_USER_ERROR) {
-    throw new ErrorException($message, 0, $severity, $file, $line);
-  }
-  // Log but don't crash on warnings/notices
   error_log("BUNDLES_PHP_WARN: [{$severity}] {$message} in {$file}:{$line}");
   return true;
-});
+}
+set_error_handler('_bundles_error_handler');
 
 // Bootstrap + CORS
 require_once __DIR__ . '/bootstrap.php';
