@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getAuthHeaders } from "@/lib/apiFetch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,14 +66,12 @@ export function UsersManager() {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem("woi_session_token") || "";
       const response = await fetch("https://woiendgame.online/api/admin_users.php?action=list", {
         credentials: "include",
         redirect: "error",
         headers: {
           "Accept": "application/json",
-          "X-Session-Token": token,
-          "Authorization": `Bearer ${token}`,
+          ...getAuthHeaders(),
         },
       });
 
@@ -139,16 +138,13 @@ export function UsersManager() {
 
     setIsUpdating(true);
     try {
-      const token = localStorage.getItem("woi_session_token") || "";
-      
       // Update currency
       const currencyResponse = await fetch("https://woiendgame.online/api/admin_users.php?action=update_currency", {
         method: "POST",
         credentials: "include",
         headers: { 
           "Content-Type": "application/json",
-          "X-Session-Token": token,
-          "Authorization": `Bearer ${token}`,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           user_id: selectedUser.id,
@@ -170,8 +166,7 @@ export function UsersManager() {
           credentials: "include",
           headers: { 
             "Content-Type": "application/json",
-            "X-Session-Token": token,
-            "Authorization": `Bearer ${token}`,
+            ...getAuthHeaders(),
           },
           body: JSON.stringify({
             user_id: selectedUser.id,
@@ -188,8 +183,7 @@ export function UsersManager() {
           credentials: "include",
           headers: { 
             "Content-Type": "application/json",
-            "X-Session-Token": token,
-            "Authorization": `Bearer ${token}`,
+            ...getAuthHeaders(),
           },
           body: JSON.stringify({
             user_id: selectedUser.id,
@@ -215,14 +209,12 @@ export function UsersManager() {
 
   const handleToggleBan = async (userId: number, isBanned: boolean) => {
     try {
-      const token = localStorage.getItem("woi_session_token") || "";
       const response = await fetch("https://woiendgame.online/api/admin_users.php?action=toggle_ban", {
         method: "POST",
         credentials: "include",
         headers: { 
           "Content-Type": "application/json",
-          "X-Session-Token": token,
-          "Authorization": `Bearer ${token}`,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({ user_id: userId, ban: isBanned }),
       });

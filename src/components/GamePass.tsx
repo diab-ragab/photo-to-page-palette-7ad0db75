@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { getAuthHeaders } from "@/lib/apiFetch";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -324,15 +325,13 @@ export const GamePass = () => {
   useEffect(() => {
     const fetchUserPassStatus = async () => {
       if (!user) return;
-      const sessionToken = localStorage.getItem("woi_session_token") || "";
       try {
         const response = await fetch("https://woiendgame.online/api/gamepass.php?action=status", {
           method: "GET",
           credentials: "include",
           headers: {
             "Accept": "application/json",
-            "X-Session-Token": sessionToken,
-            "Authorization": `Bearer ${sessionToken}`,
+            ...getAuthHeaders(),
           },
         });
         const data = await response.json();
@@ -379,7 +378,6 @@ export const GamePass = () => {
       return;
     }
 
-    const sessionToken = localStorage.getItem("woi_session_token") || "";
     setLoading(true);
     try {
       const response = await fetch("https://woiendgame.online/api/gamepass.php?action=claim", {
@@ -388,8 +386,7 @@ export const GamePass = () => {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          "X-Session-Token": sessionToken,
-          "Authorization": `Bearer ${sessionToken}`,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({ day, tier, roleId: selectedRoleId, payWithZen }),
       });

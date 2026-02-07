@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
+import { getAuthHeaders } from "@/lib/apiFetch";
 
 export interface User {
   username: string;
@@ -60,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setAdminLoading(true);
     try {
-      const sessionToken = localStorage.getItem("woi_session_token") || "";
+      
       
       console.log("[Auth] Checking admin status for:", user.username);
       
@@ -71,8 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           credentials: "include",
           headers: {
             "Accept": "application/json",
-            "X-Session-Token": sessionToken,
-            "Authorization": `Bearer ${sessionToken}`,
+            ...getAuthHeaders(),
           },
         }
       );
