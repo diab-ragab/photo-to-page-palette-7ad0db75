@@ -1,3 +1,5 @@
+import { getAuthHeaders } from './apiFetch';
+
 // Configure your PHP API URL here
 const API_BASE_URL = 'https://woiendgame.online/api';
 
@@ -50,7 +52,8 @@ export const notificationsApi = {
     try {
       const response = await fetch(`${API_BASE_URL}/notifications.php?action=create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        credentials: 'include',
         body: JSON.stringify(notification),
       });
       const result = await response.json();
@@ -65,7 +68,8 @@ export const notificationsApi = {
     try {
       const response = await fetch(`${API_BASE_URL}/notifications.php?action=update&id=${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        credentials: 'include',
         body: JSON.stringify(notification),
       });
       const result = await response.json();
@@ -80,6 +84,8 @@ export const notificationsApi = {
     try {
       const response = await fetch(`${API_BASE_URL}/notifications.php?action=delete&id=${id}`, {
         method: 'DELETE',
+        headers: { ...getAuthHeaders() },
+        credentials: 'include',
       });
       const result = await response.json();
       return result.success;
@@ -118,7 +124,8 @@ export const autoNotificationSettingsApi = {
     try {
       const response = await fetch(`${API_BASE_URL}/notifications.php?action=update_auto_settings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        credentials: 'include',
         body: JSON.stringify(settings),
       });
       const result = await response.json();
