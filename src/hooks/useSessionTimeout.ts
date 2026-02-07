@@ -35,7 +35,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
       const sessionToken = localStorage.getItem("woi_session_token") || "";
       if (!sessionToken) return false;
 
-      const response = await fetch("https://woiendgame.online/api/auth.php?action=refresh_session", {
+      const response = await fetch("https://woiendgame.online/api/auth.php", {
         method: "POST",
         credentials: "include",
         headers: {
@@ -44,8 +44,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
           "X-Session-Token": sessionToken,
           "Authorization": `Bearer ${sessionToken}`,
         },
-        // Backend expects `sessionToken` (see auth.php), keep legacy key as fallback.
-        body: JSON.stringify({ sessionToken, session_token: sessionToken }),
+        body: JSON.stringify({ action: "refresh_session", sessionToken, session_token: sessionToken }),
       });
 
       if (!response.ok) {
