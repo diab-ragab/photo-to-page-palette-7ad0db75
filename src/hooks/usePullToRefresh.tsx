@@ -225,16 +225,3 @@ export function usePullToRefresh({
     PullIndicator,
   };
 }
-
-  return {
-    isRefreshing,
-    pullDistance,
-    containerProps: {
-      ref: setRef,
-      onTouchStart: handleTouchStart,
-      onTouchMove: handleTouchMove,
-      onTouchEnd: handleTouchEnd,
-    },
-    PullIndicator,
-  };
-}
