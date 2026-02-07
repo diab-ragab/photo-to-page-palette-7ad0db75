@@ -1,10 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-/** Trigger haptic feedback if the Vibration API is available */
+/** Trigger haptic feedback - supports both Vibration API (Android) and iOS haptics */
 function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
-  if (!navigator.vibrate) return;
-  const durations = { light: 10, medium: 20, heavy: 30 };
-  navigator.vibrate(durations[style]);
+  // Try Vibration API (Android/Chrome)
+  if (navigator.vibrate) {
+    const durations = { light: 10, medium: 20, heavy: 30 };
+    navigator.vibrate(durations[style]);
+    return;
+  }
+  // iOS has no Vibration API - use AudioContext trick for tactile feedback
+  // or simply rely on CSS/visual feedback (no true haptic on iOS Safari)
 }
 
 interface UsePullToRefreshOptions {

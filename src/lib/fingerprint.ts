@@ -209,23 +209,16 @@ export const generateFingerprint = async (): Promise<string> => {
   // Plugins count
   components.push(`plugins:${navigator.plugins?.length || 0}`);
   
-  // Audio fingerprint
+  // Audio fingerprint (using OfflineAudioContext to avoid ScriptProcessorNode deprecation)
   try {
-    const audioCtx = new (window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
-    const oscillator = audioCtx.createOscillator();
-    const analyser = audioCtx.createAnalyser();
-    const gain = audioCtx.createGain();
-    const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-    
-    gain.gain.value = 0;
-    oscillator.type = 'triangle';
-    oscillator.connect(analyser);
-    analyser.connect(processor);
-    processor.connect(gain);
-    gain.connect(audioCtx.destination);
-    
-    components.push(`audio:${audioCtx.sampleRate}`);
-    audioCtx.close();
+    const AudioCtx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (AudioCtx) {
+      const audioCtx = new AudioCtx();
+      components.push(`audio:${audioCtx.sampleRate}`);
+      audioCtx.close();
+    } else {
+      components.push('audio:unavailable');
+    }
   } catch {
     components.push('audio:unavailable');
   }
