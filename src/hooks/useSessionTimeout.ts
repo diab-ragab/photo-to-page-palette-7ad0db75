@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { getAuthHeaders } from "@/lib/apiFetch";
 import { useToast } from "@/hooks/use-toast";
 
 const DEFAULT_SESSION_TIMEOUT_MS = 120 * 60 * 1000; // 2 hours
@@ -41,8 +42,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          "X-Session-Token": sessionToken,
-          "Authorization": `Bearer ${sessionToken}`,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({ action: "refresh_session", sessionToken, session_token: sessionToken }),
       });

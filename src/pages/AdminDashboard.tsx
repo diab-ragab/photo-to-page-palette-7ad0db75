@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getAuthHeaders } from "@/lib/apiFetch";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/Navbar";
@@ -154,14 +155,12 @@ export default function AdminDashboard() {
     const fetchStats = async () => {
       setStatsLoading(true);
       try {
-        const sessionToken = localStorage.getItem("woi_session_token") || "";
         
         const response = await fetch("https://woiendgame.online/api/admin_stats.php", {
           credentials: "include",
           headers: {
             "Accept": "application/json",
-            "X-Session-Token": sessionToken,
-            "Authorization": `Bearer ${sessionToken}`,
+            ...getAuthHeaders(),
           },
         });
         const data = await response.json();

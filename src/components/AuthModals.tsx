@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, User, Lock, Mail, ArrowLeft, KeyRound, Shield, AlertTriangle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { getAuthHeaders } from "@/lib/apiFetch";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   loginSchema, 
@@ -140,8 +141,7 @@ try {
     credentials: "include",
     headers: {
       "Accept": "application/json",
-      "X-Session-Token": token,
-      "Authorization": `Bearer ${token}`,
+      ...getAuthHeaders(),
     },
   });
 

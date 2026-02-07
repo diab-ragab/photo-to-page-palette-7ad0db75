@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getAuthHeaders } from "@/lib/apiFetch";
 import { Navigate } from "react-router-dom";
 
 type Props = { children: React.ReactNode };
@@ -21,8 +22,7 @@ export function AdminRoute({ children }: Props) {
           credentials: "include",
           headers: {
             "Accept": "application/json",
-            "X-Session-Token": token,
-            "Authorization": `Bearer ${token}`,
+            ...getAuthHeaders(),
           },
         });
 
