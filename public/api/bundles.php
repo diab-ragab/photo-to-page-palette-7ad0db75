@@ -92,27 +92,36 @@ function getBearerToken() {
   return $token;
 }
 
-function stripeCreateCheckoutSessionCurl($secretKey, $body, &$httpCode, &$errText) {
+function stripeCreateCheckoutSession($secretKey, $body, &$httpCode, &$errText) {
   $httpCode = 0;
   $errText = '';
-  if (!function_exists('curl_init')) {
-    $errText = 'cURL not available';
-    return false;
-  }
-  $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-  curl_setopt($ch, CURLOPT_POST, true);
-  curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-  curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+  $headers = array(
     'Authorization: Bearer ' . $secretKey,
     'Content-Type: application/x-www-form-urlencoded',
-  ));
-  curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-  $resp = curl_exec($ch);
-  $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-  $errText = curl_error($ch);
-  curl_close($ch);
+  );
+  $opts = array(
+    'http' => array(
+      'method' => 'POST',
+      'header' => implode("\r\n", $headers),
+      'content' => $body,
+      'ignore_errors' => true,
+      'timeout' => 30,
+    ),
+    'ssl' => array(
+      'verify_peer' => true,
+      'verify_peer_name' => true,
+    ),
+  );
+  $context = stream_context_create($opts);
+  $resp = @file_get_contents('https://api.stripe.com/v1/checkout/sessions', false, $context);
+  if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
+    if (preg_match('/HTTP\/\d+\.?\d*\s+(\d+)/', $http_response_header[0], $m)) {
+      $httpCode = (int)$m[1];
+    }
+  }
+  if ($resp === false) {
+    $errText = 'file_get_contents failed';
+  }
   return $resp;
 }
 
@@ -411,7 +420,7 @@ switch ($action) {
 
       $pdo->commit();
     } catch (Exception $e) {
-      if ($pdo->inTransaction()) $pdo->rollBack();
+      try { $pdo->rollBack(); } catch (Exception $ignore) {}
       error_log("BUNDLE_PREPARE_ORDER_ERR: " . $e->getMessage());
       jsonFail(500, 'Failed to prepare order');
     }
@@ -438,7 +447,7 @@ switch ($action) {
     $body = http_build_query($fields);
     $httpCode = 0;
     $errText = '';
-    $resp = stripeCreateCheckoutSessionCurl($secretKey, $body, $httpCode, $errText);
+    $resp = stripeCreateCheckoutSession($secretKey, $body, $httpCode, $errText);
 
     if ($resp === false || $httpCode < 200 || $httpCode >= 300) {
       error_log("BUNDLE_STRIPE_ERR order={$orderId} code={$httpCode} err={$errText} resp=" . substr((string)$resp, 0, 600));
@@ -451,7 +460,7 @@ switch ($action) {
         }
         $pdo->commit();
       } catch (Exception $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        try { $pdo->rollBack(); } catch (Exception $ignore) {}
       }
       jsonFail(502, 'Payment service error');
     }
@@ -467,7 +476,7 @@ switch ($action) {
         }
         $pdo->commit();
       } catch (Exception $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        try { $pdo->rollBack(); } catch (Exception $ignore) {}
       }
       jsonFail(502, 'Invalid payment response');
     }
