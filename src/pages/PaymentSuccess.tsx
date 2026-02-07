@@ -8,8 +8,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/SEO";
 import { useEffect, useState } from "react";
 import { useCart } from "@/contexts/CartContext";
-
-const API_BASE = "https://woiendgame.online/api";
+import { API_BASE } from "@/lib/apiFetch";
 
 const PaymentSuccess = () => {
   const { t } = useLanguage();

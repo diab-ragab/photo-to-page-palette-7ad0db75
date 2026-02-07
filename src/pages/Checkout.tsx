@@ -11,8 +11,7 @@ import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import { SEO } from "@/components/SEO";
 import { CharacterSelector } from "@/components/shop/CharacterSelector";
-
-const API_BASE = "https://woiendgame.online/api";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 
 const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();

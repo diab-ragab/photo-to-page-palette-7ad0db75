@@ -1,15 +1,5 @@
-/**
- * Daily Zen Reward API Client
- * 
- * Handles device fingerprinting and secure API communication
- * for the daily Zen reward system with enhanced anti-abuse.
- * 
- * Uses server time synchronization to ensure accurate countdown display.
- */
-
+import { API_BASE, getAuthHeaders } from './apiFetch';
 import { getDetailedFingerprint } from './fingerprint';
-
-const API_BASE = 'https://woiendgame.online/api';
 
 interface DailyZenStatus {
   success: boolean;
@@ -49,116 +39,63 @@ export function setCsrfToken(token: string) {
   csrfToken = token;
 }
 
-/**
- * Calculate the corrected remaining seconds based on server time offset
- */
-export function getCorrectedRemainingSeconds(
-  serverSecondsRemaining: number,
-  serverTimestamp: number
-): number {
-  if (!serverTimestamp || serverSecondsRemaining <= 0) {
-    return serverSecondsRemaining;
-  }
-  
+export function getCorrectedRemainingSeconds(serverSecondsRemaining: number, serverTimestamp: number): number {
+  if (!serverTimestamp || serverSecondsRemaining <= 0) return serverSecondsRemaining;
   const localNow = Math.floor(Date.now() / 1000);
   serverTimeOffset = serverTimestamp - localNow;
-  
   const readyAt = serverTimestamp + serverSecondsRemaining;
   const correctedLocalNow = localNow + serverTimeOffset;
-  const remaining = readyAt - correctedLocalNow;
-  
-  return Math.max(0, remaining);
+  return Math.max(0, readyAt - correctedLocalNow);
 }
 
-/**
- * Get the current server-adjusted remaining time
- */
 export function getServerAdjustedTime(): number {
   return Math.floor(Date.now() / 1000) + serverTimeOffset;
 }
 
 /**
- * Get authentication headers for API requests
+ * Build auth headers, optionally including the local CSRF token for claims.
  */
-function getAuthHeaders(includeCsrf = false): Record<string, string> {
-  const sessionToken = localStorage.getItem('woi_session_token') || '';
-  const headers: Record<string, string> = {
+function getDailyZenHeaders(includeCsrf = false): Record<string, string> {
+  const base = getAuthHeaders();
+  return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-Session-Token': sessionToken,
-    'Authorization': `Bearer ${sessionToken}`,
+    ...base,
+    ...(includeCsrf && csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
   };
-  
-  if (includeCsrf && csrfToken) {
-    headers['X-CSRF-Token'] = csrfToken;
-  }
-  
-  return headers;
 }
 
-/**
- * Check daily Zen claim status
- */
 export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
   const sessionToken = localStorage.getItem('woi_session_token');
-  
   if (!sessionToken) {
-    return {
-      success: false,
-      can_claim: false,
-      has_claimed: false,
-      reward_amount: 0,
-      seconds_until_next_claim: 0,
-      error: 'Not logged in',
-    };
+    return { success: false, can_claim: false, has_claimed: false, reward_amount: 0, seconds_until_next_claim: 0, error: 'Not logged in' };
   }
-  
+
   try {
-    const rid = Date.now();
-    const response = await fetch(`${API_BASE}/daily_zen.php?rid=${rid}`, {
+    const response = await fetch(`${API_BASE}/daily_zen.php?rid=${Date.now()}`, {
       method: 'GET',
-      headers: getAuthHeaders(),
+      headers: getDailyZenHeaders(),
       credentials: 'include',
       cache: 'no-store',
     });
-    
     const data = await response.json();
-    
-    if (data.csrf_token) {
-      setCsrfToken(data.csrf_token);
-    }
-    
+    if (data.csrf_token) setCsrfToken(data.csrf_token);
     if (data.success && data.server_time && data.seconds_until_next_claim > 0) {
-      data.seconds_until_next_claim = getCorrectedRemainingSeconds(
-        data.seconds_until_next_claim,
-        data.server_time
-      );
+      data.seconds_until_next_claim = getCorrectedRemainingSeconds(data.seconds_until_next_claim, data.server_time);
     }
-    
     return data;
   } catch (error) {
     console.error('[DailyZen] Status check failed:', error);
-    return {
-      success: false,
-      can_claim: false,
-      has_claimed: false,
-      reward_amount: 0,
-      seconds_until_next_claim: 0,
-      error: 'Failed to check status',
-    };
+    return { success: false, can_claim: false, has_claimed: false, reward_amount: 0, seconds_until_next_claim: 0, error: 'Failed to check status' };
   }
 }
 
-/**
- * Claim daily Zen reward
- */
 export async function claimDailyZen(): Promise<ClaimResult> {
   try {
     const fingerprintData = await getDetailedFingerprint();
-    
     const response = await fetch(`${API_BASE}/daily_zen.php`, {
       method: 'POST',
-      headers: getAuthHeaders(true),
+      headers: getDailyZenHeaders(true),
       credentials: 'include',
       body: JSON.stringify({
         fingerprint: fingerprintData.hash,
@@ -174,37 +111,22 @@ export async function claimDailyZen(): Promise<ClaimResult> {
         languages: navigator.languages?.join(',') || navigator.language,
       }),
     });
-    
     const data = await response.json();
-    
     if (data.success && data.server_time && data.seconds_until_next_claim) {
-      data.seconds_until_next_claim = getCorrectedRemainingSeconds(
-        data.seconds_until_next_claim,
-        data.server_time
-      );
+      data.seconds_until_next_claim = getCorrectedRemainingSeconds(data.seconds_until_next_claim, data.server_time);
     }
-    
     return data;
   } catch (error) {
     console.error('[DailyZen] Claim failed:', error);
-    return {
-      success: false,
-      error: 'Failed to claim reward. Please try again.',
-    };
+    return { success: false, error: 'Failed to claim reward. Please try again.' };
   }
 }
 
-/**
- * Format seconds into human-readable countdown
- */
 export function formatCountdown(seconds: number): string {
   if (seconds <= 0) return '00:00:00';
-  
   const clampedSeconds = Math.min(seconds, 86400);
-  
   const hours = Math.floor(clampedSeconds / 3600);
   const minutes = Math.floor((clampedSeconds % 3600) / 60);
   const secs = Math.floor(clampedSeconds % 60);
-  
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }

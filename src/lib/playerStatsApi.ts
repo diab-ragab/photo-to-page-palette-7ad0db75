@@ -1,4 +1,4 @@
-import { fetchJsonOrThrow } from './apiFetch';
+import { fetchJsonOrThrow, API_BASE } from './apiFetch';
 
 export interface PlayerStats {
   success: boolean;
@@ -19,8 +19,6 @@ export interface PlayerStats {
   achievements_unlocked: number;
   achievements_total: number;
 }
-
-const API_BASE = 'https://woiendgame.online/api';
 
 export async function fetchPlayerStats(): Promise<PlayerStats> {
   return fetchJsonOrThrow<PlayerStats>(`${API_BASE}/player_stats.php`);

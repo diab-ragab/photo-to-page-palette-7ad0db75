@@ -10,6 +10,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Gift, Crown, Plus, Pencil, Trash2, Save, X, Coins, Gem, Package } from "lucide-react";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 
 type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
 
@@ -73,16 +74,6 @@ const getIconDisplay = (value: string): string => {
   return option ? option.display : value;
 };
 
-// Helper to get auth headers
-function getAuthHeaders(): HeadersInit {
-  const sessionToken = localStorage.getItem("woi_session_token") || "";
-  return {
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    "X-Session-Token": sessionToken,
-    "Authorization": `Bearer ${sessionToken}`,
-  };
-}
 
 const defaultReward: Omit<GamePassReward, "id"> = {
   day: 1,
@@ -283,8 +274,8 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=get_settings", {
-        headers: getAuthHeaders(),
+      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=get_settings`, {
+        headers: { ...getAuthHeaders() },
         credentials: "include",
       });
       const data = await response.json();
@@ -306,9 +297,9 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     
     setIsSavingSettings(true);
     try {
-      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=update_settings", {
+      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=update_settings`, {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
         body: JSON.stringify({ zen_skip_cost: cost }),
       });
@@ -330,7 +321,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   const fetchRewards = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=get_rewards");
+      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=get_rewards`);
       const data = await response.json();
       if (data.success && data.rewards) {
         setRewards(data.rewards);
@@ -355,12 +346,12 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     setIsSubmitting(true);
     try {
       const endpoint = selectedReward 
-        ? "https://woiendgame.online/api/gamepass_admin.php?action=update_reward"
-        : "https://woiendgame.online/api/gamepass_admin.php?action=add_reward";
+        ? `${API_BASE}/gamepass_admin.php?action=update_reward`
+        : `${API_BASE}/gamepass_admin.php?action=add_reward`;
       
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
         body: JSON.stringify({
           ...editData,
@@ -388,9 +379,9 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
 
   const handleDeleteReward = async (id: number) => {
     try {
-      const response = await fetch("https://woiendgame.online/api/gamepass_admin.php?action=delete_reward", {
+      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=delete_reward`, {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
         body: JSON.stringify({ id }),
       });

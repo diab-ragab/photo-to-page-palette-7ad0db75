@@ -8,8 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const API_BASE = "https://woiendgame.online/api";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 
 interface Character {
   roleId: number;

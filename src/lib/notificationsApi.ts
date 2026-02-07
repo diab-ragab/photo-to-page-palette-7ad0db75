@@ -1,7 +1,4 @@
-import { getAuthHeaders } from './apiFetch';
-
-// Configure your PHP API URL here
-const API_BASE_URL = 'https://woiendgame.online/api';
+import { API_BASE, getAuthHeaders } from './apiFetch';
 
 export interface Notification {
   id: number;
@@ -23,23 +20,16 @@ export interface AutoNotificationSettings {
 export const notificationsApi = {
   async getAll(): Promise<Notification[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/notifications.php?action=list`);
+      const response = await fetch(`${API_BASE}/notifications.php?action=list`);
       if (!response.ok) {
         console.warn('Notifications API returned non-OK status:', response.status);
         return [];
       }
       const data = await response.json();
-      
-      // Always extract and validate the notifications array
-      // New format: { success: true, notifications: [...] }
       if (data && typeof data === 'object' && Array.isArray(data.notifications)) {
         return data.notifications;
       }
-      // Old format: direct array
-      if (Array.isArray(data)) {
-        return data;
-      }
-      // Any other format returns empty array
+      if (Array.isArray(data)) return data;
       console.warn('Notifications API returned unexpected format:', typeof data);
       return [];
     } catch (err) {
@@ -50,7 +40,7 @@ export const notificationsApi = {
 
   async create(notification: { title: string; message: string; type: string; created_by: string }): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/notifications.php?action=create`, {
+      const response = await fetch(`${API_BASE}/notifications.php?action=create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         credentials: 'include',
@@ -59,14 +49,13 @@ export const notificationsApi = {
       const result = await response.json();
       return result.success;
     } catch {
-      // Silent fail - don't expose errors in production
       return false;
     }
   },
 
   async update(id: number, notification: { title: string; message: string; type: string }): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/notifications.php?action=update&id=${id}`, {
+      const response = await fetch(`${API_BASE}/notifications.php?action=update&id=${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         credentials: 'include',
@@ -75,14 +64,13 @@ export const notificationsApi = {
       const result = await response.json();
       return result.success;
     } catch {
-      // Silent fail - don't expose errors in production
       return false;
     }
   },
 
   async delete(id: number): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/notifications.php?action=delete&id=${id}`, {
+      const response = await fetch(`${API_BASE}/notifications.php?action=delete&id=${id}`, {
         method: 'DELETE',
         headers: { ...getAuthHeaders() },
         credentials: 'include',
@@ -90,7 +78,6 @@ export const notificationsApi = {
       const result = await response.json();
       return result.success;
     } catch {
-      // Silent fail - don't expose errors in production
       return false;
     }
   },
@@ -99,10 +86,9 @@ export const notificationsApi = {
 export const autoNotificationSettingsApi = {
   async get(): Promise<AutoNotificationSettings> {
     try {
-      const response = await fetch(`${API_BASE_URL}/notifications.php?action=auto_settings`);
+      const response = await fetch(`${API_BASE}/notifications.php?action=auto_settings`);
       if (!response.ok) throw new Error('Failed to fetch settings');
       const data = await response.json();
-      // Handle new format { success, settings } or old format (direct object)
       const settings = data.settings || data;
       return {
         daily_zen_enabled: !!settings.daily_zen_enabled,
@@ -111,18 +97,13 @@ export const autoNotificationSettingsApi = {
         gamepass_enabled: !!settings.gamepass_enabled,
       };
     } catch {
-      return {
-        daily_zen_enabled: false,
-        spin_wheel_enabled: false,
-        vote_streak_enabled: false,
-        gamepass_enabled: false,
-      };
+      return { daily_zen_enabled: false, spin_wheel_enabled: false, vote_streak_enabled: false, gamepass_enabled: false };
     }
   },
 
   async update(settings: AutoNotificationSettings): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/notifications.php?action=update_auto_settings`, {
+      const response = await fetch(`${API_BASE}/notifications.php?action=update_auto_settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         credentials: 'include',

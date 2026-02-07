@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { API_BASE } from "@/lib/apiFetch";
 
 interface Purchase {
   playerName: string;
@@ -20,7 +21,7 @@ export const RecentPurchases = () => {
   useEffect(() => {
     const fetchPurchases = async () => {
       try {
-        const response = await fetch("https://woiendgame.online/api/recent_purchases.php");
+        const response = await fetch(`${API_BASE}/recent_purchases.php`);
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.purchases && data.purchases.length > 0) {

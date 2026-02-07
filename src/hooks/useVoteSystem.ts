@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_BASE, getAuthHeaders } from '@/lib/apiFetch';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateFingerprint } from '@/lib/fingerprint';
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +37,7 @@ export interface StreakData {
 // Server time offset (server_time - local_time) in seconds
 let serverTimeOffset = 0;
 
-const API_BASE = 'https://woiendgame.online/api';
+// API_BASE imported from apiFetch
 
 /**
  * Make a POST request to the vote API with FormData

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAuthHeaders } from "@/lib/apiFetch";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 import { useToast } from "@/hooks/use-toast";
 
 const DEFAULT_SESSION_TIMEOUT_MS = 120 * 60 * 1000; // 2 hours
@@ -36,7 +36,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
       const sessionToken = localStorage.getItem("woi_session_token") || "";
       if (!sessionToken) return false;
 
-      const response = await fetch("https://woiendgame.online/api/auth.php", {
+      const response = await fetch(`${API_BASE}/auth.php`, {
         method: "POST",
         credentials: "include",
         headers: {

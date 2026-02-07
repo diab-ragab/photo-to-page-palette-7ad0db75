@@ -1,9 +1,4 @@
-/**
- * Site Settings API Client
- * Fetches and updates configurable site settings (Discord, Download links, etc.)
- */
-
-const API_BASE = 'https://woiendgame.online/api';
+import { API_BASE, getAuthHeaders } from './apiFetch';
 
 export interface SiteSettings {
   discord_link: string;
@@ -21,32 +16,23 @@ const defaultSettings: SiteSettings = {
   download_filefm: 'https://files.fm/u/czrengvywk',
 };
 
-// Cache settings to avoid repeated fetches
 let cachedSettings: SiteSettings | null = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 5 * 60 * 1000;
 
-/**
- * Fetch site settings (cached)
- */
 export async function getSiteSettings(forceRefresh = false): Promise<SiteSettings> {
   const now = Date.now();
-  
-  // Return cached if valid
   if (!forceRefresh && cachedSettings && (now - cacheTimestamp) < CACHE_DURATION) {
     return cachedSettings;
   }
 
   try {
-    const rid = Date.now();
-    const response = await fetch(`${API_BASE}/site_settings.php?rid=${rid}`, {
+    const response = await fetch(`${API_BASE}/site_settings.php?rid=${Date.now()}`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
       cache: 'no-store',
     });
-
     const data = await response.json();
-    
     if (data.success && data.settings) {
       cachedSettings = { ...defaultSettings, ...data.settings };
       cacheTimestamp = now;
@@ -55,38 +41,19 @@ export async function getSiteSettings(forceRefresh = false): Promise<SiteSetting
   } catch (error) {
     console.error('[SiteSettings] Failed to fetch:', error);
   }
-
-  // Return defaults on error
   return defaultSettings;
 }
 
-/**
- * Update site settings (admin only)
- */
 export async function updateSiteSettings(settings: Partial<SiteSettings>): Promise<{ success: boolean; error?: string }> {
   try {
-    const sessionToken = localStorage.getItem('woi_session_token') || '';
-    
     const response = await fetch(`${API_BASE}/site_settings.php`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Session-Token': sessionToken,
-        'Authorization': `Bearer ${sessionToken}`,
-      },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...getAuthHeaders() },
       credentials: 'include',
       body: JSON.stringify({ settings }),
     });
-
     const data = await response.json();
-    
-    if (data.success) {
-      // Invalidate cache
-      cachedSettings = null;
-      cacheTimestamp = 0;
-    }
-    
+    if (data.success) { cachedSettings = null; cacheTimestamp = 0; }
     return data;
   } catch (error) {
     console.error('[SiteSettings] Update failed:', error);
@@ -94,9 +61,6 @@ export async function updateSiteSettings(settings: Partial<SiteSettings>): Promi
   }
 }
 
-/**
- * Clear the settings cache (useful after admin updates)
- */
 export function clearSettingsCache(): void {
   cachedSettings = null;
   cacheTimestamp = 0;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_BASE } from "@/lib/apiFetch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, Vote, Crown, Medal, Swords } from "lucide-react";
@@ -73,7 +74,7 @@ export const Leaderboards = () => {
     const fetchLeaderboards = async () => {
       setLoading(true);
       try {
-        const response = await fetch("https://woiendgame.online/api/leaderboards.php");
+        const response = await fetch(`${API_BASE}/leaderboards.php`);
         if (response.ok) {
           const data = await response.json();
           if (data.success) {

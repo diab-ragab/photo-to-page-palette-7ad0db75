@@ -1,7 +1,15 @@
 /**
- * Small helper to debug backend issues where an endpoint returns HTML / non-JSON
- * (common with PHP fatal errors, auth redirects, or misconfigured server).
+ * Unified API Client
+ * 
+ * Single source of truth for:
+ * - API base URL
+ * - Auth headers (session token, CSRF)
+ * - JSON fetch with error handling
+ * - Convenience methods (apiGet, apiPost)
  */
+
+/** Base URL for all API calls — change this one place to update everywhere */
+export const API_BASE = 'https://woiendgame.online/api';
 
 export type FetchJsonError = Error & {
   status?: number;
@@ -10,15 +18,15 @@ export type FetchJsonError = Error & {
 };
 
 /**
- * Get auth headers for authenticated requests
+ * Get auth headers for authenticated requests.
+ * Reads woi_session_token and woi_csrf_token from localStorage.
  */
-export function getAuthHeaders(): HeadersInit {
-  // Check both keys for compatibility (snake_case and camelCase)
+export function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem('woi_session_token') || localStorage.getItem('sessionToken');
   const csrfToken = localStorage.getItem('woi_csrf_token') || localStorage.getItem('csrfToken');
-  
+
   if (!token) return {};
-  
+
   return {
     'Authorization': `Bearer ${token}`,
     'X-Session-Token': token,
@@ -26,6 +34,9 @@ export function getAuthHeaders(): HeadersInit {
   };
 }
 
+/**
+ * Core fetch wrapper with auth, JSON validation, and error diagnostics.
+ */
 export async function fetchJsonOrThrow<T>(
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -36,8 +47,7 @@ export async function fetchJsonOrThrow<T>(
   if (!headers.has("Content-Type") && init?.body) {
     headers.set("Content-Type", "application/json");
   }
-  
-  // Include auth headers by default
+
   if (includeAuth) {
     const authHeaders = getAuthHeaders();
     Object.entries(authHeaders).forEach(([key, value]) => {
@@ -49,7 +59,6 @@ export async function fetchJsonOrThrow<T>(
     ...init,
     headers,
     credentials: 'include',
-    // Prevent silent POST->GET redirects that then return HTML.
     redirect: "error",
   });
 
@@ -78,4 +87,28 @@ export async function fetchJsonOrThrow<T>(
   }
 
   return (await response.json()) as T;
+}
+
+/**
+ * Convenience: GET request to an API endpoint.
+ * @param path - Relative path after API_BASE, e.g. "/events.php?action=list"
+ */
+export async function apiGet<T>(path: string, includeAuth = true): Promise<T> {
+  return fetchJsonOrThrow<T>(`${API_BASE}${path}`, undefined, includeAuth);
+}
+
+/**
+ * Convenience: POST request to an API endpoint.
+ * @param path - Relative path after API_BASE
+ * @param body - JSON-serializable body
+ */
+export async function apiPost<T>(path: string, body?: unknown, includeAuth = true): Promise<T> {
+  return fetchJsonOrThrow<T>(
+    `${API_BASE}${path}`,
+    {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    },
+    includeAuth
+  );
 }
