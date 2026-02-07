@@ -5,42 +5,15 @@
  */
 
 require_once __DIR__ . '/bootstrap.php';
+handleCors(array('GET', 'POST', 'OPTIONS'));
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/session_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-// CORS
-$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
-$allowedOrigins = array(
-  'https://woiendgame.online',
-  'https://www.woiendgame.online',
-  'https://woiendgame.lovable.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-);
-$isLovable = is_string($origin) && preg_match('/^https:\/\/[a-z0-9-]+\.(lovableproject\.com|lovable\.app)$/i', $origin);
-if ($origin && (in_array($origin, $allowedOrigins, true) || $isLovable)) {
-  header("Access-Control-Allow-Origin: $origin");
-  header("Vary: Origin");
-  header("Access-Control-Allow-Credentials: true");
-}
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Accept, X-Session-Token, Authorization, X-CSRF-Token");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-  http_response_code(204);
-  exit;
-}
-
 function jsonOut($data) {
   echo json_encode($data);
   exit;
-}
-
-function jsonFail($code, $msg) {
-  http_response_code($code);
-  jsonOut(array('success' => false, 'message' => $msg));
 }
 
 // DB connection
