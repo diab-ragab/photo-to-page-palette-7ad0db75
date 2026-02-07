@@ -1,5 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
+/** Trigger haptic feedback if the Vibration API is available */
+function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
+  if (!navigator.vibrate) return;
+  const durations = { light: 10, medium: 20, heavy: 30 };
+  navigator.vibrate(durations[style]);
+}
+
 interface UsePullToRefreshOptions {
   /** Callback to execute on pull refresh */
   onRefresh: () => Promise<void>;
@@ -37,6 +44,7 @@ export function usePullToRefresh({
   const [pullDistance, setPullDistance] = useState(0);
   const startY = useRef(0);
   const pulling = useRef(false);
+  const passedThreshold = useRef(false);
   const containerRef = useRef<HTMLElement | null>(null);
 
   const setRef = useCallback((node: HTMLElement | null) => {
@@ -51,6 +59,7 @@ export function usePullToRefresh({
     if (scrollTop <= 0) {
       startY.current = e.touches[0].clientY;
       pulling.current = true;
+      passedThreshold.current = false;
     }
   }, [enabled, isRefreshing]);
 
@@ -61,6 +70,14 @@ export function usePullToRefresh({
     if (diff > 0) {
       // Apply resistance curve
       const distance = Math.min(diff * 0.5, maxPull);
+      // Haptic when crossing threshold
+      if (distance >= threshold && !passedThreshold.current) {
+        passedThreshold.current = true;
+        haptic('medium');
+      } else if (distance < threshold && passedThreshold.current) {
+        passedThreshold.current = false;
+        haptic('light');
+      }
       setPullDistance(distance);
     } else {
       pulling.current = false;
@@ -73,8 +90,9 @@ export function usePullToRefresh({
     pulling.current = false;
 
     if (pullDistance >= threshold) {
+      haptic('heavy');
       setIsRefreshing(true);
-      setPullDistance(threshold * 0.5); // Settle to a smaller position
+      setPullDistance(threshold * 0.5);
       try {
         await onRefresh();
       } finally {
