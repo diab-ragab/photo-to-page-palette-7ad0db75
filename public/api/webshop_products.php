@@ -11,7 +11,7 @@ handleCors(array('GET', 'OPTIONS'));
 header('Content-Type: application/json');
 
 try {
-    $pdo = getDbConnection();
+    $pdo = getDB();
     
     $search = isset($_GET['search']) ? trim($_GET['search']) : '';
     $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
