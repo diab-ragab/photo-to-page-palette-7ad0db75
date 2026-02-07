@@ -2,40 +2,28 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 
 /** Trigger haptic feedback - supports both Vibration API (Android) and iOS haptics */
 function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
-  // Try Vibration API (Android/Chrome)
   if (navigator.vibrate) {
     const durations = { light: 10, medium: 20, heavy: 30 };
     navigator.vibrate(durations[style]);
-    return;
   }
-  // iOS has no Vibration API - use AudioContext trick for tactile feedback
-  // or simply rely on CSS/visual feedback (no true haptic on iOS Safari)
 }
 
 interface UsePullToRefreshOptions {
-  /** Callback to execute on pull refresh */
   onRefresh: () => Promise<void>;
-  /** Minimum pull distance in px to trigger refresh (default: 80) */
   threshold?: number;
-  /** Maximum pull indicator distance in px (default: 120) */
   maxPull?: number;
-  /** Whether pull-to-refresh is enabled (default: true) */
   enabled?: boolean;
 }
 
 interface UsePullToRefreshReturn {
-  /** Whether a refresh is currently in progress */
   isRefreshing: boolean;
-  /** Current pull distance (0 when not pulling) */
   pullDistance: number;
-  /** Props to spread on the scrollable container */
   containerProps: {
     ref: React.RefCallback<HTMLElement>;
     onTouchStart: (e: React.TouchEvent) => void;
     onTouchMove: (e: React.TouchEvent) => void;
     onTouchEnd: () => void;
   };
-  /** The pull indicator component - render at top of container */
   PullIndicator: React.FC;
 }
 
@@ -47,6 +35,7 @@ export function usePullToRefresh({
 }: UsePullToRefreshOptions): UsePullToRefreshReturn {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
   const startY = useRef(0);
   const pulling = useRef(false);
   const passedThreshold = useRef(false);
@@ -58,7 +47,6 @@ export function usePullToRefresh({
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (!enabled || isRefreshing) return;
-    // Only activate if scrolled to top
     const el = containerRef.current;
     const scrollTop = el ? el.scrollTop : window.scrollY;
     if (scrollTop <= 0) {
@@ -73,9 +61,7 @@ export function usePullToRefresh({
     const currentY = e.touches[0].clientY;
     const diff = currentY - startY.current;
     if (diff > 0) {
-      // Apply resistance curve
       const distance = Math.min(diff * 0.5, maxPull);
-      // Haptic when crossing threshold
       if (distance >= threshold && !passedThreshold.current) {
         passedThreshold.current = true;
         haptic('medium');
@@ -88,7 +74,7 @@ export function usePullToRefresh({
       pulling.current = false;
       setPullDistance(0);
     }
-  }, [enabled, isRefreshing, maxPull]);
+  }, [enabled, isRefreshing, maxPull, threshold]);
 
   const handleTouchEnd = useCallback(async () => {
     if (!pulling.current || !enabled) return;
@@ -102,14 +88,15 @@ export function usePullToRefresh({
         await onRefresh();
       } finally {
         setIsRefreshing(false);
+        setShowSuccess(true);
         setPullDistance(0);
+        setTimeout(() => setShowSuccess(false), 1200);
       }
     } else {
       setPullDistance(0);
     }
   }, [pullDistance, threshold, onRefresh, enabled]);
 
-  // Reset on unmount
   useEffect(() => {
     return () => {
       setPullDistance(0);
@@ -118,50 +105,126 @@ export function usePullToRefresh({
   }, []);
 
   const progress = Math.min(pullDistance / threshold, 1);
+  const ready = progress >= 1;
 
   const PullIndicator: React.FC = () => {
-    if (pullDistance === 0 && !isRefreshing) return null;
+    if (pullDistance === 0 && !isRefreshing && !showSuccess) return null;
 
     return (
       <div
-        className="flex items-center justify-center overflow-hidden transition-[height] duration-200 ease-out"
-        style={{ height: isRefreshing ? 48 : pullDistance }}
+        className="flex flex-col items-center justify-center overflow-hidden"
+        style={{
+          height: showSuccess ? 48 : isRefreshing ? 48 : pullDistance,
+          transition: pulling.current ? 'none' : 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
-        <div
-          className={`flex items-center gap-2 text-sm text-muted-foreground ${
-            isRefreshing ? 'animate-pulse' : ''
-          }`}
-        >
-          <svg
-            className={`h-5 w-5 transition-transform duration-200 ${
-              isRefreshing ? 'animate-spin' : ''
-            }`}
-            style={{
-              transform: isRefreshing
-                ? undefined
-                : `rotate(${progress * 360}deg)`,
-            }}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-            <path d="M21 3v5h-5" />
-          </svg>
-          <span>
-            {isRefreshing
-              ? 'Refreshing...'
-              : progress >= 1
-              ? 'Release to refresh'
-              : 'Pull to refresh'}
-          </span>
-        </div>
+        {/* Success checkmark after refresh */}
+        {showSuccess ? (
+          <div className="flex items-center gap-2 text-sm font-medium text-primary animate-scale-in">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            <span>Updated!</span>
+          </div>
+        ) : (
+          <>
+            {/* Animated pull indicator */}
+            <div
+              className="relative flex items-center justify-center"
+              style={{
+                transform: `scale(${0.6 + progress * 0.4})`,
+                transition: pulling.current ? 'none' : 'transform 0.3s ease-out',
+              }}
+            >
+              {/* Outer ring that fills as you pull */}
+              <svg className="h-8 w-8" viewBox="0 0 36 36">
+                {/* Background circle */}
+                <circle
+                  cx="18" cy="18" r="14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="text-muted-foreground/20"
+                />
+                {/* Progress arc */}
+                <circle
+                  cx="18" cy="18" r="14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  className={ready ? 'text-primary' : 'text-muted-foreground/60'}
+                  style={{
+                    strokeDasharray: `${progress * 88} 88`,
+                    transform: 'rotate(-90deg)',
+                    transformOrigin: 'center',
+                    transition: isRefreshing ? 'none' : 'stroke-dasharray 0.1s ease-out',
+                    animation: isRefreshing ? 'spin 0.8s linear infinite' : 'none',
+                  }}
+                />
+                {/* Arrow icon in center */}
+                {!isRefreshing && (
+                  <g
+                    style={{
+                      transform: `rotate(${progress * 360}deg)`,
+                      transformOrigin: 'center',
+                      transition: pulling.current ? 'none' : 'transform 0.2s ease-out',
+                    }}
+                  >
+                    <path
+                      d="M18 12v8M15 17l3 3 3-3"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={ready ? 'text-primary' : 'text-muted-foreground'}
+                      style={{
+                        transform: ready ? 'rotate(180deg)' : 'none',
+                        transformOrigin: 'center',
+                        transition: 'transform 0.2s ease-out',
+                      }}
+                    />
+                  </g>
+                )}
+              </svg>
+            </div>
+
+            {/* Text label */}
+            <span
+              className={`mt-1 text-xs font-medium transition-all duration-200 ${
+                ready
+                  ? 'text-primary'
+                  : isRefreshing
+                  ? 'text-muted-foreground animate-pulse'
+                  : 'text-muted-foreground/60'
+              }`}
+              style={{
+                opacity: progress > 0.3 || isRefreshing ? 1 : 0,
+                transform: `translateY(${progress > 0.3 || isRefreshing ? 0 : 4}px)`,
+                transition: 'opacity 0.2s, transform 0.2s',
+              }}
+            >
+              {isRefreshing ? 'Refreshing…' : ready ? 'Release ↑' : 'Pull down'}
+            </span>
+          </>
+        )}
       </div>
     );
   };
+
+  return {
+    isRefreshing,
+    pullDistance,
+    containerProps: {
+      ref: setRef,
+      onTouchStart: handleTouchStart,
+      onTouchMove: handleTouchMove,
+      onTouchEnd: handleTouchEnd,
+    },
+    PullIndicator,
+  };
+}
 
   return {
     isRefreshing,
