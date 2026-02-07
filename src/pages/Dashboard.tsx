@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVoteSystem } from "@/hooks/useVoteSystem";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { fetchJsonOrThrow, API_BASE } from "@/lib/apiFetch";
 import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
@@ -53,6 +54,21 @@ const Dashboard = () => {
   const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites, streakData } = useVoteSystem();
   const [userZen, setUserZen] = useState(0);
   const [activeTab, setActiveTab] = useState("rewards");
+
+  // Pull to refresh
+  const { containerProps, PullIndicator } = usePullToRefresh({
+    onRefresh: async () => {
+      // Refetch user currency
+      if (user?.username) {
+        try {
+          const data = await fetchJsonOrThrow<any>(
+            `${API_BASE}/user_currency.php?username=${encodeURIComponent(user.username)}`
+          );
+          if (data.success) setUserZen(data.zen || 0);
+        } catch {}
+      }
+    },
+  });
   
   // Initialize notification scheduler
   useNotificationScheduler();
@@ -133,7 +149,7 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground" {...containerProps}>
       <SEO 
         title="Dashboard - WOI Endgame"
         description="Manage your WOI Endgame account, vote for rewards, and track your progress."
@@ -141,6 +157,7 @@ const Dashboard = () => {
       <Navbar />
       
       <main className="container mx-auto px-3 md:px-4 py-4 pt-20 md:pt-24 pb-24 md:pb-8">
+        <PullIndicator />
         {/* Compact Header */}
         <motion.div 
           initial={{ opacity: 0, y: -10 }}

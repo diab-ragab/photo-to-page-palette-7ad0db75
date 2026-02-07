@@ -6,13 +6,20 @@ import { ShopProducts } from "@/components/shop/ShopProducts";
 import { LimitedTimeBundles } from "@/components/shop/LimitedTimeBundles";
 import { CurrencyTopUp } from "@/components/shop/CurrencyTopUp";
 import { SEO } from "@/components/SEO";
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 export type ShopCategory = "all" | "fashion" | "pets" | "currency" | "passes" | "bundles";
 
 const Shop = () => {
   const [selectedCategory, setSelectedCategory] = useState<ShopCategory>("all");
+  const [refreshKey, setRefreshKey] = useState(0);
 
+  const { containerProps, PullIndicator } = usePullToRefresh({
+    onRefresh: async () => {
+      setRefreshKey(k => k + 1);
+    },
+  });
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "Store",
@@ -29,7 +36,7 @@ const Shop = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground" {...containerProps}>
       <SEO 
         title="Shop"
         description="Browse and purchase exclusive in-game items, fashion, pets, and currency for WOI Endgame private server. Fast delivery and secure checkout."
@@ -41,23 +48,26 @@ const Shop = () => {
       <Navbar />
       <ShopHero />
       
-      {/* Flash Sales Section */}
-      <section className="container mx-auto px-4 py-8">
-        <LimitedTimeBundles />
-      </section>
+      <main>
+        <PullIndicator />
+        {/* Flash Sales Section */}
+        <section className="container mx-auto px-4 py-8">
+          <LimitedTimeBundles key={`bundles-${refreshKey}`} />
+        </section>
       
-      {/* Currency Top-Up Section */}
-      <section className="container mx-auto px-4 py-8 border-t border-border">
-        <CurrencyTopUp />
-      </section>
-      
-      <div className="border-t border-border">
-        <ShopCategories 
-          selectedCategory={selectedCategory} 
-          onSelectCategory={setSelectedCategory} 
-        />
-        <ShopProducts selectedCategory={selectedCategory} />
-      </div>
+        {/* Currency Top-Up Section */}
+        <section className="container mx-auto px-4 py-8 border-t border-border">
+          <CurrencyTopUp key={`topup-${refreshKey}`} />
+        </section>
+        
+        <div className="border-t border-border">
+          <ShopCategories 
+            selectedCategory={selectedCategory} 
+            onSelectCategory={setSelectedCategory} 
+          />
+          <ShopProducts selectedCategory={selectedCategory} key={`products-${refreshKey}`} />
+        </div>
+      </main>
       <Footer />
     </div>
   );
