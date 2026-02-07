@@ -24,7 +24,6 @@ $result = array(
 // Test DB connection
 try {
     require_once __DIR__ . '/bootstrap.php';
-    require_once __DIR__ . '/db.php';
     $pdo = getDB();
     $result['db'] = 'connected';
     

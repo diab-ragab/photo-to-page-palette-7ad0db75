@@ -8,7 +8,6 @@
  */
 
 require_once __DIR__ . '/bootstrap.php';
-require_once __DIR__ . '/db.php';
 handleCors(array('POST', 'OPTIONS'));
 
 $RID = bin2hex(random_bytes(6));
