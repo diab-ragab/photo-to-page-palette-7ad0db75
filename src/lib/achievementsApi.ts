@@ -1,6 +1,16 @@
-import { getAuthHeaders } from "@/lib/apiFetch";
-
 const API_BASE_URL = "https://woiendgame.online/api";
+
+function getAuthHeaders(): HeadersInit {
+  const sessionToken = localStorage.getItem("woi_session_token") || "";
+  const csrfToken = localStorage.getItem("woi_csrf_token") || "";
+  return {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "X-Session-Token": sessionToken,
+    "Authorization": `Bearer ${sessionToken}`,
+    ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+  };
+}
 
 export type AchievementRarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
 export type AchievementCategory = "voting" | "purchases" | "gameplay" | "social" | "events";
@@ -49,29 +59,6 @@ export interface NewlyUnlocked {
   reward_vip: number;
 }
 
-export interface GameCharacter {
-  RoleID: number;
-  Name: string;
-  Level: number;
-  SlotID?: number;
-  Profession?: string;
-  Sex?: number;
-}
-
-export interface RoleInfo {
-  role_id: number;
-  name: string;
-  level: number;
-}
-
-function authHeaders(): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    ...getAuthHeaders(),
-  };
-}
-
 export const achievementsApi = {
   // Public: List all achievements
   async listAchievements(): Promise<Achievement[]> {
@@ -83,35 +70,24 @@ export const achievementsApi = {
     return data.achievements || [];
   },
 
-  // User: Get characters for this account
-  async getMyCharacters(): Promise<GameCharacter[]> {
-    const response = await fetch(`${API_BASE_URL}/achievements.php?action=my_characters`, {
+  // User: Get progress on all achievements
+  async getUserProgress(): Promise<{ achievements: UserAchievement[]; stats: AchievementStats }> {
+    const response = await fetch(`${API_BASE_URL}/achievements.php?action=user_progress`, {
       credentials: "include",
-      headers: authHeaders(),
-    });
-    const data = await response.json();
-    return data.characters || [];
-  },
-
-  // User: Get progress on all achievements (per character)
-  async getUserProgress(roleId: number): Promise<{ achievements: UserAchievement[]; stats: AchievementStats; role: RoleInfo }> {
-    const response = await fetch(`${API_BASE_URL}/achievements.php?action=user_progress&role_id=${roleId}`, {
-      credentials: "include",
-      headers: authHeaders(),
+      headers: getAuthHeaders(),
     });
     const data = await response.json();
     return {
       achievements: data.achievements || [],
       stats: data.stats || { total: 0, unlocked: 0, claimed: 0, unclaimed: 0 },
-      role: data.role || { role_id: roleId, name: "", level: 0 },
     };
   },
 
-  // User: Check and unlock new achievements (per character)
-  async checkUnlocks(roleId: number): Promise<{ newlyUnlocked: NewlyUnlocked[]; count: number }> {
-    const response = await fetch(`${API_BASE_URL}/achievements.php?action=check_unlocks&role_id=${roleId}`, {
+  // User: Check and unlock new achievements
+  async checkUnlocks(): Promise<{ newlyUnlocked: NewlyUnlocked[]; count: number }> {
+    const response = await fetch(`${API_BASE_URL}/achievements.php?action=check_unlocks`, {
       credentials: "include",
-      headers: authHeaders(),
+      headers: getAuthHeaders(),
     });
     const data = await response.json();
     return {
@@ -120,13 +96,13 @@ export const achievementsApi = {
     };
   },
 
-  // User: Claim achievement reward (per character)
-  async claimReward(achievementId: number, roleId: number): Promise<{ success: boolean; coins: number; vip: number; error?: string }> {
+  // User: Claim achievement reward
+  async claimReward(achievementId: number): Promise<{ success: boolean; coins: number; vip: number; error?: string }> {
     const response = await fetch(`${API_BASE_URL}/achievements.php?action=claim`, {
       method: "POST",
       credentials: "include",
-      headers: authHeaders(),
-      body: JSON.stringify({ achievement_id: achievementId, role_id: roleId }),
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ achievement_id: achievementId }),
     });
     const data = await response.json();
     return {
@@ -141,7 +117,7 @@ export const achievementsApi = {
   async adminListAll(): Promise<Achievement[]> {
     const response = await fetch(`${API_BASE_URL}/achievements.php?action=list_all`, {
       credentials: "include",
-      headers: authHeaders(),
+      headers: getAuthHeaders(),
     });
     const data = await response.json();
     return data.achievements || [];
@@ -152,7 +128,7 @@ export const achievementsApi = {
     const response = await fetch(`${API_BASE_URL}/achievements.php?action=add`, {
       method: "POST",
       credentials: "include",
-      headers: authHeaders(),
+      headers: getAuthHeaders(),
       body: JSON.stringify(achievement),
     });
     const data = await response.json();
@@ -164,7 +140,7 @@ export const achievementsApi = {
     const response = await fetch(`${API_BASE_URL}/achievements.php?action=update`, {
       method: "POST",
       credentials: "include",
-      headers: authHeaders(),
+      headers: getAuthHeaders(),
       body: JSON.stringify({ id, ...updates }),
     });
     const data = await response.json();
@@ -176,7 +152,7 @@ export const achievementsApi = {
     const response = await fetch(`${API_BASE_URL}/achievements.php?action=delete`, {
       method: "POST",
       credentials: "include",
-      headers: authHeaders(),
+      headers: getAuthHeaders(),
       body: JSON.stringify({ id }),
     });
     const data = await response.json();
@@ -186,13 +162,14 @@ export const achievementsApi = {
   // Admin: Get stats
   async adminGetStats(): Promise<{
     total_achievements: number;
-    roles_with_achievements: number;
+    users_with_achievements: number;
     total_unlocks: number;
     total_claimed: number;
+    popular: { name: string; rarity: string; unlock_count: number }[];
   }> {
     const response = await fetch(`${API_BASE_URL}/achievements.php?action=stats`, {
       credentials: "include",
-      headers: authHeaders(),
+      headers: getAuthHeaders(),
     });
     const data = await response.json();
     return data.stats || {};

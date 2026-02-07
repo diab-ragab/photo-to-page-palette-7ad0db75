@@ -252,7 +252,7 @@ export const AchievementsManager = () => {
   const [saving, setSaving] = useState(false);
   const [stats, setStats] = useState<{
     total_achievements: number;
-    roles_with_achievements: number;
+    users_with_achievements: number;
     total_unlocks: number;
     total_claimed: number;
   } | null>(null);
@@ -396,8 +396,8 @@ export const AchievementsManager = () => {
             <div className="flex items-center gap-3">
               <Users className="h-8 w-8 text-primary" />
               <div>
-                <p className="text-2xl font-bold">{stats?.roles_with_achievements || 0}</p>
-                <p className="text-xs text-muted-foreground">Characters w/ Achievements</p>
+                <p className="text-2xl font-bold">{stats?.users_with_achievements || 0}</p>
+                <p className="text-xs text-muted-foreground">Players w/ Achievements</p>
               </div>
             </div>
           </CardContent>
