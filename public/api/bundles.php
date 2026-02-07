@@ -68,32 +68,24 @@ try {
   // Tables may already exist
 }
 
-// Get action
+// Read php://input ONCE (stream can only be read once in PHP)
+$raw = file_get_contents('php://input');
+$input = array();
+if ($raw) {
+  $parsed = json_decode($raw, true);
+  if (is_array($parsed)) {
+    $input = $parsed;
+  }
+}
+
+// Get action from GET, POST, or JSON body
 $action = '';
 if (isset($_GET['action'])) {
   $action = $_GET['action'];
 } elseif (isset($_POST['action'])) {
   $action = $_POST['action'];
-} else {
-  $raw = file_get_contents('php://input');
-  if ($raw) {
-    $json = json_decode($raw, true);
-    if (isset($json['action'])) {
-      $action = $json['action'];
-    }
-  }
-}
-
-// Parse JSON body for POST
-$input = array();
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $raw = file_get_contents('php://input');
-  if ($raw) {
-    $input = json_decode($raw, true);
-    if (!is_array($input)) {
-      $input = array();
-    }
-  }
+} elseif (isset($input['action'])) {
+  $action = $input['action'];
 }
 
 // Icon mapping for display
