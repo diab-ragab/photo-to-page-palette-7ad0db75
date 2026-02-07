@@ -1,16 +1,27 @@
 <?php
 /**
- * Daily Zen Reward API - 24h Cooldown (IP + Device Token)
- * PHP 5.x compatible
+ * daily_zen.php - Daily Zen Reward API (HARD anti-abuse + auto punishments)
+ *
+ * - 24h cooldown from LAST successful claim (per account)
+ * - Strong anti-farming: blocks multi-account claims from same Device/Fingerprint/Subnet in last 24h
+ * - Automatic punishments (strikes):
+ *    Strike 1 => 5 days Free-Zen ban
+ *    Strike 2 => 15 days Free-Zen ban
+ *    Strike 3 => Permanent Free-Zen ban
+ * - Discord reports in TWO channels (webhooks):
+ *    1) Claims channel: who received Zen
+ *    2) Security channel: warnings / bans / abuse detections
+ *
+ * PHP 5.x compatible.
  */
 
 require_once __DIR__ . '/bootstrap.php';
-handleCors(array('GET', 'POST', 'OPTIONS'));
 
 header('Content-Type: application/json; charset=utf-8');
 
 define('DAILY_ZEN_REWARD', 100000);
 define('COOLDOWN_SECONDS', 24 * 60 * 60);
+
 define('SERVER_SECRET_SALT', 'wOi3ndG4m3_z3N_s4Lt_X9kP2mQ7vL5nR8tY1wZ6');
 
 // Cookie
@@ -18,8 +29,17 @@ define('DEVICE_TOKEN_NAME', 'woi_device_token');
 define('DEVICE_TOKEN_EXPIRY', 180 * 24 * 60 * 60);
 
 // Limits
-define('MAX_FAILED_ATTEMPTS_PER_IP_PER_HOUR', 2);
+define('MAX_FAILED_ATTEMPTS_PER_IP_PER_HOUR', 10);
 define('MAX_RISK_SCORE_BLOCK', 60);
+
+// Discord reporting (2 channels)
+define('DISCORD_CLAIMS_WEBHOOK_URL', '');
+define('DISCORD_SECURITY_WEBHOOK_URL', '');
+define('DISCORD_WEBHOOK_ENABLED', false);
+
+// Punishment escalation
+define('BAN_DAYS_FIRST', 5);
+define('BAN_DAYS_SECOND', 15);
 
 // Allowed origins
 $ALLOWED_ORIGINS = array(
@@ -29,6 +49,8 @@ $ALLOWED_ORIGINS = array(
 );
 
 if (session_id() === '') { @session_start(); }
+
+/* ───────────────────────── Helpers ───────────────────────── */
 
 function jsonOut($arr, $code = 200) {
   http_response_code($code);
@@ -73,7 +95,6 @@ function setDeviceCookie($token) {
   $maxAge = DEVICE_TOKEN_EXPIRY;
   $expires = time() + $maxAge;
 
-  // PHP5 compatible header cookie
   $cookie = DEVICE_TOKEN_NAME . '=' . rawurlencode($token)
     . '; Path=/'
     . '; Max-Age=' . $maxAge
@@ -179,9 +200,26 @@ function isRateLimited($pdo, $ip) {
   }
 }
 
-/**
- * Ensure tables exist with claimed_at DATETIME
- */
+function discordPostTo($webhookUrl, $title, $lines) {
+  if (!DISCORD_WEBHOOK_ENABLED || !$webhookUrl) return;
+
+  $content = "**" . $title . "**\n" . implode("\n", $lines);
+  $payload = json_encode(array('content' => $content));
+  if (!$payload) return;
+
+  $ctx = stream_context_create(array(
+    'http' => array(
+      'method'  => 'POST',
+      'header'  => "Content-Type: application/json\r\n",
+      'content' => $payload,
+      'timeout' => 3
+    )
+  ));
+  @file_get_contents($webhookUrl, false, $ctx);
+}
+
+/* ───────────────────── Tables & cooldown ───────────────────── */
+
 function ensureTablesExist($pdo) {
   $pdo->exec("
     CREATE TABLE IF NOT EXISTS daily_zen_claims (
@@ -197,6 +235,7 @@ function ensureTablesExist($pdo) {
       claimed_at DATETIME NOT NULL,
       INDEX idx_account_time (account_id, claimed_at),
       INDEX idx_device_time (device_token_hash, claimed_at),
+      INDEX idx_fingerprint_time (fingerprint_hash, claimed_at),
       INDEX idx_ip_time (ip_address, claimed_at),
       INDEX idx_subnet_time (ip_subnet, claimed_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8
@@ -212,60 +251,120 @@ function ensureTablesExist($pdo) {
       details TEXT,
       created_at DATETIME NOT NULL,
       INDEX idx_ip_time (ip_address, created_at),
-      INDEX idx_event_type (event_type, created_at)
+      INDEX idx_event_type (event_type, created_at),
+      INDEX idx_account_time (account_id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+  ");
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS daily_zen_penalties (
+      account_id INT PRIMARY KEY,
+      strike_count INT NOT NULL DEFAULT 0,
+      ban_until DATETIME NULL,
+      perm_ban TINYINT(1) NOT NULL DEFAULT 0,
+      last_reason VARCHAR(255) NULL,
+      last_evidence TEXT NULL,
+      updated_at DATETIME NOT NULL,
+      created_at DATETIME NOT NULL,
+      INDEX idx_ban_until (ban_until),
+      INDEX idx_updated (updated_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8
   ");
 }
 
-/**
- * Cooldown by IP (rolling 24h)
- */
-function secondsUntilNextClaimByIP($pdo, $ip) {
+function secondsUntilNextClaim($pdo, $accountId) {
   $stmt = $pdo->prepare("
-    SELECT claimed_at
+    SELECT
+      claimed_at,
+      GREATEST(0, UNIX_TIMESTAMP(DATE_ADD(claimed_at, INTERVAL " . COOLDOWN_SECONDS . " SECOND)) - UNIX_TIMESTAMP(NOW())) as remaining_seconds
     FROM daily_zen_claims
-    WHERE ip_address = ?
+    WHERE account_id = ?
     ORDER BY claimed_at DESC
     LIMIT 1
   ");
-  $stmt->execute(array($ip));
+  $stmt->execute(array($accountId));
   $row = $stmt->fetch();
-
   if (!$row || empty($row['claimed_at'])) return 0;
-
-  $lastClaim = strtotime($row['claimed_at']);
-  $nextClaim = $lastClaim + COOLDOWN_SECONDS;
-  $remaining = $nextClaim - time();
-
-  return ($remaining > 0) ? $remaining : 0;
+  return (int)$row['remaining_seconds'];
 }
 
-/**
- * ✅ Cooldown by Device Token hash (rolling 24h)
- */
-function secondsUntilNextClaimByDevice($pdo, $deviceHash) {
-  $stmt = $pdo->prepare("
-    SELECT claimed_at
-    FROM daily_zen_claims
-    WHERE device_token_hash = ?
-    ORDER BY claimed_at DESC
-    LIMIT 1
-  ");
-  $stmt->execute(array($deviceHash));
-  $row = $stmt->fetch();
+function getPenalty($pdo, $accountId) {
+  try {
+    $stmt = $pdo->prepare("SELECT strike_count, perm_ban, ban_until FROM daily_zen_penalties WHERE account_id = ? LIMIT 1");
+    $stmt->execute(array($accountId));
+    $row = $stmt->fetch();
+    if (!$row) return array('strike'=>0,'perm'=>false,'ban_until'=>null,'ban_until_ts'=>0);
 
-  if (!$row || empty($row['claimed_at'])) return 0;
-
-  $lastClaim = strtotime($row['claimed_at']);
-  $nextClaim = $lastClaim + COOLDOWN_SECONDS;
-  $remaining = $nextClaim - time();
-
-  return ($remaining > 0) ? $remaining : 0;
+    $banUntilTs = !empty($row['ban_until']) ? strtotime($row['ban_until']) : 0;
+    return array(
+      'strike' => (int)$row['strike_count'],
+      'perm'   => ((int)$row['perm_ban'] === 1),
+      'ban_until' => $row['ban_until'],
+      'ban_until_ts' => (int)$banUntilTs
+    );
+  } catch (Exception $e) {
+    return array('strike'=>0,'perm'=>false,'ban_until'=>null,'ban_until_ts'=>0);
+  }
 }
 
-/**
- * Send Zen via procedure usecash
- */
+function secondsUntilBanEnds($banUntilTs) {
+  if (!$banUntilTs) return 0;
+  $now = time();
+  return max(0, $banUntilTs - $now);
+}
+
+function applyViolation($pdo, $user, $deviceHash, $ip, $reason, $evidence) {
+  $p = getPenalty($pdo, $user['account_id']);
+  $strike = (int)$p['strike'] + 1;
+
+  $perm = false;
+  $banDays = 0;
+
+  if ($strike === 1) {
+    $banDays = BAN_DAYS_FIRST;
+  } elseif ($strike === 2) {
+    $banDays = BAN_DAYS_SECOND;
+  } else {
+    $perm = true;
+  }
+
+  try {
+    if ($perm) {
+      $stmt = $pdo->prepare("INSERT INTO daily_zen_penalties (account_id, strike_count, ban_until, perm_ban, last_reason, last_evidence, updated_at, created_at)
+        VALUES (?, ?, NULL, 1, ?, ?, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE strike_count = VALUES(strike_count), perm_ban = 1, ban_until = NULL, last_reason = VALUES(last_reason), last_evidence = VALUES(last_evidence), updated_at = NOW()");
+      $stmt->execute(array($user['account_id'], $strike, $reason, $evidence));
+    } else {
+      $stmt = $pdo->prepare("INSERT INTO daily_zen_penalties (account_id, strike_count, ban_until, perm_ban, last_reason, last_evidence, updated_at, created_at)
+        VALUES (?, ?, DATE_ADD(NOW(), INTERVAL " . (int)$banDays . " DAY), 0, ?, ?, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE strike_count = VALUES(strike_count), perm_ban = 0, ban_until = DATE_ADD(NOW(), INTERVAL " . (int)$banDays . " DAY), last_reason = VALUES(last_reason), last_evidence = VALUES(last_evidence), updated_at = NOW()");
+      $stmt->execute(array($user['account_id'], $strike, $reason, $evidence));
+    }
+  } catch (Exception $e) {}
+
+  logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'punishment', $reason);
+
+  discordPostTo(DISCORD_SECURITY_WEBHOOK_URL, '[DAILY ZEN] BAN / WARNING', array(
+    "User: **" . $user['username'] . "** (account_id: " . $user['account_id'] . ")",
+    "Strike: **" . $strike . "**",
+    $perm ? "Action: **PERMANENT Free-Zen BAN**" : "Action: **" . $banDays . " days Free-Zen BAN**",
+    "Reason: `" . $reason . "`",
+    "IP: `" . $ip . "`",
+    "Device: `" . substr($deviceHash, 0, 10) . "...`",
+    "Evidence: " . $evidence
+  ));
+
+  $p2 = getPenalty($pdo, $user['account_id']);
+  return array(
+    'strike' => $strike,
+    'perm' => $perm || $p2['perm'],
+    'ban_until_ts' => $p2['ban_until_ts'],
+    'ban_days' => $banDays
+  );
+}
+
+/* ───────────────────── Zen delivery (usecash) ───────────────────── */
+
 function sendZenReward($mysqli, $username, $amount) {
   $stmt = $mysqli->prepare("SELECT ID FROM users WHERE name = ? LIMIT 1");
   $stmt->bind_param("s", $username);
@@ -302,7 +401,7 @@ function sendZenReward($mysqli, $username, $amount) {
   return array('success'=>false,'error'=>'Zen delivery failed (code: '.$error.')');
 }
 
-/* ───────────────────────────────────────────── */
+/* ───────────────────────── Main ───────────────────────── */
 
 requireCloudflare();
 
@@ -328,21 +427,27 @@ try {
       ), 401);
     }
 
-    // ✅ لازم نطلع/نثبت device token حتى في GET
-    $deviceToken = getOrCreateDeviceToken();
-    $deviceHash  = hashDeviceToken($deviceToken);
+    $pen = getPenalty($pdo, $user['account_id']);
+    $banSeconds = secondsUntilBanEnds($pen['ban_until_ts']);
+    $isBanned = ($pen['perm'] || $banSeconds > 0);
 
-    // ✅ الأقسى بين IP و Device
-    $remainIP     = secondsUntilNextClaimByIP($pdo, $ip);
-    $remainDevice = secondsUntilNextClaimByDevice($pdo, $deviceHash);
-    $remain       = max($remainIP, $remainDevice);
+    $remain = secondsUntilNextClaim($pdo, $user['account_id']);
+
+    $serverStmt = $pdo->query("SELECT UNIX_TIMESTAMP(NOW()) as server_time");
+    $serverRow = $serverStmt->fetch();
+    $serverTime = (int)$serverRow['server_time'];
 
     jsonOut(array(
       'success'=>true,
-      'can_claim'=>($remain === 0),
+      'can_claim'=>(($remain === 0) && !$isBanned),
       'has_claimed'=>($remain > 0),
       'reward_amount'=>DAILY_ZEN_REWARD,
       'seconds_until_next_claim'=>$remain,
+      'is_banned'=>$isBanned,
+      'perm_ban'=>$pen['perm'],
+      'ban_seconds_remaining'=>$banSeconds,
+      'strike_count'=>$pen['strike'],
+      'server_time'=>$serverTime,
       'csrf_token'=>getCsrfToken()
     ));
   }
@@ -365,17 +470,28 @@ try {
     $deviceToken = getOrCreateDeviceToken();
     $deviceHash  = hashDeviceToken($deviceToken);
 
-    // ✅ IP + Device Token cooldown (الأقسى يمشي)
-    $remainIP     = secondsUntilNextClaimByIP($pdo, $ip);
-    $remainDevice = secondsUntilNextClaimByDevice($pdo, $deviceHash);
-    $remain       = max($remainIP, $remainDevice);
-
-    if ($remain > 0) {
-      $reason = ($remainIP >= $remainDevice) ? 'ip_cooldown_active' : 'device_cooldown_active';
-      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', $reason);
+    // Hard block if punished
+    $pen = getPenalty($pdo, $user['account_id']);
+    $banSeconds = secondsUntilBanEnds($pen['ban_until_ts']);
+    if ($pen['perm'] || $banSeconds > 0) {
+      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'blocked', 'banned_free_zen');
       jsonOut(array(
         'success'=>false,
-        'error'=>'Cooldown active. Try again later.',
+        'error'=>$pen['perm'] ? 'Your account is permanently banned from Free Zen.' : 'Your account is temporarily banned from Free Zen.',
+        'is_banned'=>true,
+        'perm_ban'=>$pen['perm'],
+        'ban_seconds_remaining'=>$banSeconds,
+        'strike_count'=>$pen['strike']
+      ), 403);
+    }
+
+    // 24h cooldown (from last successful claim)
+    $remain = secondsUntilNextClaim($pdo, $user['account_id']);
+    if ($remain > 0) {
+      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'cooldown_active');
+      jsonOut(array(
+        'success'=>false,
+        'error'=>'You can claim again after 24 hours.',
         'seconds_until_next_claim'=>$remain
       ), 429);
     }
@@ -396,14 +512,51 @@ try {
 
     $signals = isset($input['signals']) && is_array($input['signals']) ? $input['signals'] : array();
     $risk = isset($signals['risk']) ? (int)$signals['risk'] : 0;
-
     $isHeadless = !empty($signals['headless']);
+
+    // High-risk automated browser => punishment
     if ($isHeadless && $risk >= MAX_RISK_SCORE_BLOCK) {
-      logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'blocked', 'headless_high_risk');
-      jsonOut(array('success'=>false,'error'=>'Automated browser detected. Use a normal browser.'), 403);
+      $vi = applyViolation($pdo, $user, $deviceHash, $ip, 'headless_high_risk', 'headless=true risk='.$risk);
+      jsonOut(array(
+        'success'=>false,
+        'error'=>'Automated browser detected. You are blocked from Free Zen.',
+        'is_banned'=>true,
+        'perm_ban'=>$vi['perm'],
+        'ban_seconds_remaining'=>secondsUntilBanEnds($vi['ban_until_ts']),
+        'strike_count'=>$vi['strike']
+      ), 403);
     }
 
-    // Send Zen first
+    // Strong anti-farming: any other account claimed within last 24h on same device/fingerprint/subnet
+    try {
+      $stmt = $pdo->prepare("
+        SELECT account_id, claimed_at
+        FROM daily_zen_claims
+        WHERE claimed_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+          AND account_id <> ?
+          AND (device_token_hash = ? OR fingerprint_hash = ? OR ip_subnet = ?)
+        ORDER BY claimed_at DESC
+        LIMIT 1
+      ");
+      $stmt->execute(array($user['account_id'], $deviceHash, $fingerprintHash, $subnet));
+      $hit = $stmt->fetch();
+      if ($hit) {
+        $ev = 'hit_account_id='.$hit['account_id'].' claimed_at='.$hit['claimed_at'].' subnet='.$subnet;
+        $vi = applyViolation($pdo, $user, $deviceHash, $ip, 'multi_account_farming', $ev);
+        jsonOut(array(
+          'success'=>false,
+          'error'=>'Abuse detected: multi-account / device / network farming. You are blocked from Free Zen.',
+          'is_banned'=>true,
+          'perm_ban'=>$vi['perm'],
+          'ban_seconds_remaining'=>secondsUntilBanEnds($vi['ban_until_ts']),
+          'strike_count'=>$vi['strike']
+        ), 403);
+      }
+    } catch (Exception $e) {
+      // If query fails, continue (do not false-ban)
+    }
+
+    // Deliver Zen (usecash)
     $cfg = getConfig();
     $db  = $cfg['db'];
 
@@ -421,7 +574,7 @@ try {
       jsonOut(array('success'=>false,'error'=>$res['error']), 500);
     }
 
-    // Log claim with claimed_at = NOW()
+    // Log claim
     try {
       $stmt = $pdo->prepare("
         INSERT INTO daily_zen_claims
@@ -443,11 +596,26 @@ try {
 
     logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'successful_claim', 'reward:'.DAILY_ZEN_REWARD);
 
+    // Discord claim report
+    discordPostTo(DISCORD_CLAIMS_WEBHOOK_URL, '[DAILY ZEN] CLAIM', array(
+      "User: **" . $user['username'] . "** (account_id: " . $user['account_id'] . ")",
+      "Reward: **" . DAILY_ZEN_REWARD . "** Zen",
+      "IP: `" . $ip . "`",
+      "Subnet: `" . $subnet . "`",
+      "Device: `" . substr($deviceHash, 0, 10) . "...`",
+      "Risk: `" . $risk . "`"
+    ));
+
+    $serverStmt = $pdo->query("SELECT UNIX_TIMESTAMP(NOW()) as server_time");
+    $serverRow = $serverStmt->fetch();
+    $serverTime = (int)$serverRow['server_time'];
+
     jsonOut(array(
       'success'=>true,
       'message'=>'Daily Zen claimed successfully!',
       'reward_amount'=>DAILY_ZEN_REWARD,
-      'seconds_until_next_claim'=>COOLDOWN_SECONDS
+      'seconds_until_next_claim'=>COOLDOWN_SECONDS,
+      'server_time'=>$serverTime
     ));
   }
 

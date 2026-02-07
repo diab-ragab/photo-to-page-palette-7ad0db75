@@ -19,6 +19,10 @@ interface DailyZenStatus {
   seconds_until_next_claim: number;
   server_time?: number;
   csrf_token?: string;
+  is_banned?: boolean;
+  perm_ban?: boolean;
+  ban_seconds_remaining?: number;
+  strike_count?: number;
   error?: string;
 }
 
@@ -28,6 +32,10 @@ interface ClaimResult {
   reward_amount?: number;
   seconds_until_next_claim?: number;
   server_time?: number;
+  is_banned?: boolean;
+  perm_ban?: boolean;
+  ban_seconds_remaining?: number;
+  strike_count?: number;
   error?: string;
 }
 
@@ -43,7 +51,6 @@ export function setCsrfToken(token: string) {
 
 /**
  * Calculate the corrected remaining seconds based on server time offset
- * This ensures the countdown is accurate regardless of client clock
  */
 export function getCorrectedRemainingSeconds(
   serverSecondsRemaining: number,
@@ -53,15 +60,10 @@ export function getCorrectedRemainingSeconds(
     return serverSecondsRemaining;
   }
   
-  // Calculate server time offset
   const localNow = Math.floor(Date.now() / 1000);
   serverTimeOffset = serverTimestamp - localNow;
   
-  // The server told us X seconds remaining at server_time
-  // Calculate when it will be ready: server_time + seconds_remaining
   const readyAt = serverTimestamp + serverSecondsRemaining;
-  
-  // Calculate remaining from current local time adjusted for offset
   const correctedLocalNow = localNow + serverTimeOffset;
   const remaining = readyAt - correctedLocalNow;
   
@@ -70,7 +72,6 @@ export function getCorrectedRemainingSeconds(
 
 /**
  * Get the current server-adjusted remaining time
- * Used for countdown updates
  */
 export function getServerAdjustedTime(): number {
   return Math.floor(Date.now() / 1000) + serverTimeOffset;
@@ -101,9 +102,7 @@ function getAuthHeaders(includeCsrf = false): Record<string, string> {
 export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
   const sessionToken = localStorage.getItem('woi_session_token');
   
-  // Don't make API call if not logged in
   if (!sessionToken) {
-    console.log('[DailyZen] No session token found, skipping API call');
     return {
       success: false,
       can_claim: false,
@@ -115,7 +114,6 @@ export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
   }
   
   try {
-    // Cache-bust to avoid CDN/browser serving stale cooldown values
     const rid = Date.now();
     const response = await fetch(`${API_BASE}/daily_zen.php?rid=${rid}`, {
       method: 'GET',
@@ -126,12 +124,10 @@ export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
     
     const data = await response.json();
     
-    // Store CSRF token for subsequent POST requests
     if (data.csrf_token) {
       setCsrfToken(data.csrf_token);
     }
     
-    // Calculate corrected remaining time based on server time
     if (data.success && data.server_time && data.seconds_until_next_claim > 0) {
       data.seconds_until_next_claim = getCorrectedRemainingSeconds(
         data.seconds_until_next_claim,
@@ -155,20 +151,17 @@ export async function checkDailyZenStatus(): Promise<DailyZenStatus> {
 
 /**
  * Claim daily Zen reward
- * Generates enhanced browser fingerprint with risk signals
  */
 export async function claimDailyZen(): Promise<ClaimResult> {
   try {
-    // Get detailed fingerprint with risk assessment
     const fingerprintData = await getDetailedFingerprint();
     
     const response = await fetch(`${API_BASE}/daily_zen.php`, {
       method: 'POST',
-      headers: getAuthHeaders(true), // Include CSRF token
+      headers: getAuthHeaders(true),
       credentials: 'include',
       body: JSON.stringify({
         fingerprint: fingerprintData.hash,
-        // Send risk signals for server-side validation
         signals: {
           vm: fingerprintData.signals.isVM,
           headless: fingerprintData.signals.isHeadless,
@@ -176,7 +169,6 @@ export async function claimDailyZen(): Promise<ClaimResult> {
           risk: fingerprintData.signals.riskScore,
           indicators: fingerprintData.signals.vmIndicators,
         },
-        // Additional browser data for validation
         screen: `${screen.width}x${screen.height}`,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         languages: navigator.languages?.join(',') || navigator.language,
@@ -185,7 +177,6 @@ export async function claimDailyZen(): Promise<ClaimResult> {
     
     const data = await response.json();
     
-    // Calculate corrected remaining time based on server time
     if (data.success && data.server_time && data.seconds_until_next_claim) {
       data.seconds_until_next_claim = getCorrectedRemainingSeconds(
         data.seconds_until_next_claim,
@@ -209,7 +200,6 @@ export async function claimDailyZen(): Promise<ClaimResult> {
 export function formatCountdown(seconds: number): string {
   if (seconds <= 0) return '00:00:00';
   
-  // Clamp to max 24 hours to prevent display errors
   const clampedSeconds = Math.min(seconds, 86400);
   
   const hours = Math.floor(clampedSeconds / 3600);
