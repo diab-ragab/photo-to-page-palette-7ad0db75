@@ -41,20 +41,7 @@ set_error_handler('_bundles_error_handler');
 
 // Bootstrap + CORS
 require_once __DIR__ . '/bootstrap.php';
-if (function_exists('handleCors')) {
-  handleCors(array('GET', 'POST', 'OPTIONS'));
-} else {
-  header('Access-Control-Allow-Origin: *');
-  header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-  header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Session-Token');
-}
-
-if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-  http_response_code(204);
-  exit;
-}
-
-require_once __DIR__ . '/db.php';
+handleCors(array('GET', 'POST', 'OPTIONS'));
 require_once __DIR__ . '/session_helper.php';
 
 // DB

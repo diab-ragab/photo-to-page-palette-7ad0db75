@@ -11,7 +11,6 @@ error_reporting(E_ALL);
 define('VERSION', '2026-01-31-A');
 
 require_once __DIR__ . '/bootstrap.php';
-require_once __DIR__ . '/db.php';
 
 /**
  * Prevent any accidental output from breaking JSON

@@ -40,8 +40,6 @@ register_shutdown_function(function() use (&$RID){
 require_once __DIR__ . '/bootstrap.php';
 handleCors(array('GET','POST','OPTIONS'));
 
-require_once __DIR__ . '/db.php';
-
 // ----- METHOD ROUTING -----
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 

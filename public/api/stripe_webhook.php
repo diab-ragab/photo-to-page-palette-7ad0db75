@@ -11,9 +11,7 @@
  * Endpoint URL: https://woiendgame.online/api/stripe_webhook.php
  */
 
-ini_set('display_errors', '0');
-ini_set('log_errors', '1');
-error_reporting(E_ALL);
+require_once __DIR__ . '/bootstrap.php';
 
 $RID = bin2hex(random_bytes(6));
 
@@ -37,21 +35,13 @@ function json_fail($code, $msg) {
 
 header('Content-Type: application/json; charset=utf-8');
 
-// Database connection
-$DBHost     = getenv('DB_HOST') ? getenv('DB_HOST') : '192.168.1.88';
-$DBUser     = getenv('DB_USER') ? getenv('DB_USER') : 'root';
-$DBPassword = getenv('DB_PASS') ? getenv('DB_PASS') : 'root';
-$DBName     = getenv('DB_NAME') ? getenv('DB_NAME') : 'shengui';
-
-// Get your Stripe webhook secret from environment or config
-$webhookSecret = getenv('STRIPE_WEBHOOK_SECRET') ? getenv('STRIPE_WEBHOOK_SECRET') : '';
+// Use centralized config for DB and Stripe
+$cfg = getConfig();
+$webhookSecret = isset($cfg['stripe']['webhook_secret']) ? $cfg['stripe']['webhook_secret'] : '';
 
 try {
-    $pdo = new PDO("mysql:host={$DBHost};dbname={$DBName};charset=utf8", $DBUser, $DBPassword, array(
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ));
-} catch (PDOException $e) {
+    $pdo = getDB();
+} catch (Exception $e) {
     json_fail(503, 'Service temporarily unavailable');
 }
 

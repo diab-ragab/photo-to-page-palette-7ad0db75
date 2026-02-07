@@ -38,7 +38,6 @@ register_shutdown_function(function() use (&$RID){
 
 require_once __DIR__ . '/bootstrap.php';
 handleCors(array('GET', 'OPTIONS'));
-require_once __DIR__ . '/db.php';
 
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
 if ($method !== 'GET') fail(405, "Method not allowed", $RID);
