@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { History, Coins, Crown, Zap, Gift, X, Calendar } from 'lucide-react';
+import { History, Coins, Crown, Zap, Gift, X, Calendar, TrendingUp } from 'lucide-react';
 import { fetchSpinHistory, type SpinHistory as SpinHistoryType } from '@/lib/spinWheelApi';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -15,6 +15,13 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   nothing: <X className="h-3 w-3" />,
 };
 
+interface LifetimeRewards {
+  coins: number;
+  zen: number;
+  vip: number;
+  totalSpins: number;
+}
+
 export function SpinHistoryList() {
   const [history, setHistory] = useState<SpinHistoryType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +30,8 @@ export function SpinHistoryList() {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await fetchSpinHistory(20);
+        // Fetch more history to calculate lifetime totals
+        const data = await fetchSpinHistory(50);
         setHistory(data || []);
       } catch (err) {
         console.error('Failed to load spin history:', err);
@@ -34,6 +42,28 @@ export function SpinHistoryList() {
     };
     load();
   }, []);
+
+  // Calculate lifetime rewards
+  const lifetimeRewards = useMemo<LifetimeRewards>(() => {
+    const totals = { coins: 0, zen: 0, vip: 0, totalSpins: history.length };
+    
+    history.forEach((entry) => {
+      const value = entry.reward_value || 0;
+      switch (entry.reward_type) {
+        case 'coins':
+          totals.coins += value;
+          break;
+        case 'zen':
+          totals.zen += value;
+          break;
+        case 'vip':
+          totals.vip += value;
+          break;
+      }
+    });
+    
+    return totals;
+  }, [history]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -88,6 +118,8 @@ export function SpinHistoryList() {
     );
   }
 
+  const hasRewards = lifetimeRewards.coins > 0 || lifetimeRewards.zen > 0 || lifetimeRewards.vip > 0;
+
   return (
     <Card className="bg-card border-primary/20">
       <CardHeader className="pb-2 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
@@ -97,9 +129,42 @@ export function SpinHistoryList() {
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="h-[280px]">
+        {/* Lifetime Rewards Summary */}
+        {hasRewards && (
+          <div className="p-3 border-b border-border bg-gradient-to-r from-amber-500/5 via-transparent to-cyan-500/5">
+            <div className="flex items-center gap-1 mb-2">
+              <TrendingUp className="h-3 w-3 text-primary" />
+              <span className="text-xs font-medium text-muted-foreground">Lifetime Earnings</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {lifetimeRewards.coins > 0 && (
+                <Badge variant="outline" className="gap-1 text-xs border-amber-500/50 text-amber-500 bg-amber-500/10">
+                  <Coins className="h-3 w-3" />
+                  {formatReward(lifetimeRewards.coins)} Coins
+                </Badge>
+              )}
+              {lifetimeRewards.zen > 0 && (
+                <Badge variant="outline" className="gap-1 text-xs border-cyan-500/50 text-cyan-500 bg-cyan-500/10">
+                  <Zap className="h-3 w-3" />
+                  {formatReward(lifetimeRewards.zen)} Zen
+                </Badge>
+              )}
+              {lifetimeRewards.vip > 0 && (
+                <Badge variant="outline" className="gap-1 text-xs border-purple-500/50 text-purple-500 bg-purple-500/10">
+                  <Crown className="h-3 w-3" />
+                  {formatReward(lifetimeRewards.vip)} VIP
+                </Badge>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              from {lifetimeRewards.totalSpins} spin{lifetimeRewards.totalSpins !== 1 ? 's' : ''}
+            </p>
+          </div>
+        )}
+
+        <ScrollArea className="h-[220px]">
           <div className="p-3 space-y-1">
-            {history.map((entry, index) => {
+            {history.slice(0, 20).map((entry, index) => {
               const isNothing = entry.reward_type === 'nothing';
               
               return (
