@@ -28,85 +28,74 @@ function safeBoolSetting($v, $default = true) {
 }
 
 /**
- * Check if a table has a specific column
+ * Get account name string from website users table
+ * Tries common column names: name, login, username
  */
-function tableHasColumn($pdo, $table, $column) {
-    try {
-        $stmt = $pdo->query("SHOW COLUMNS FROM `" . str_replace('`', '', $table) . "`");
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            if (strcasecmp($row['Field'], $column) === 0) return true;
+function getWebsiteAccountName($pdo, $userId) {
+    $userId = (int)$userId;
+    $candidates = array('name', 'login', 'username');
+    foreach ($candidates as $col) {
+        try {
+            $stmt = $pdo->prepare("SELECT `$col` AS acct FROM users WHERE ID = ? OR id = ? LIMIT 1");
+            $stmt->execute(array($userId, $userId));
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row && isset($row['acct']) && $row['acct'] !== '') {
+                return (string)$row['acct'];
+            }
+        } catch (Exception $e) {
+            // column might not exist, try next
         }
-    } catch (Exception $e) {}
-    return false;
+    }
+    return '';
 }
 
 /**
- * Get the account identifier for game database queries
- * Matches the logic in user_characters.php for consistency
+ * Detect if AccountID column in basetab_sg is numeric or string
  */
-function resolveAccountKey($pdo, $userId) {
-    global $RID;
-    $userId = (int)$userId;
-    
-    // Check if AccountID column is numeric or string type
-    $accountIdIsNumeric = false;
+function isAccountIdNumeric($pdo) {
     try {
         $stmt = $pdo->query("SHOW COLUMNS FROM basetab_sg LIKE 'AccountID'");
         $col = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($col && isset($col['Type'])) {
             $t = strtolower($col['Type']);
             if (strpos($t, 'int') !== false || strpos($t, 'bigint') !== false) {
-                $accountIdIsNumeric = true;
+                return true;
             }
         }
-    } catch (Exception $e) {
-        error_log("RID=$RID SPIN_ACCOUNT_TYPE_CHECK_ERROR: " . $e->getMessage());
-    }
-    
-    error_log("RID=$RID SPIN_ACCOUNT_TYPE: numeric=" . ($accountIdIsNumeric ? 'true' : 'false') . " userId=$userId");
-    
-    if ($accountIdIsNumeric) {
+    } catch (Exception $e) {}
+    return false;
+}
+
+/**
+ * Resolve account key for basetab_sg queries
+ * Returns numeric user_id if AccountID is numeric, else account name string
+ */
+function resolveAccountKey($pdo, $userId) {
+    $userId = (int)$userId;
+    if (isAccountIdNumeric($pdo)) {
         return $userId;
     }
-    
-    // Get account name from users table (try different column names)
-    $candidates = array('name', 'login', 'username');
-    foreach ($candidates as $col) {
-        try {
-            $sql = "SELECT `$col` AS acct FROM users WHERE id = ? LIMIT 1";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute(array($userId));
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($row && isset($row['acct']) && $row['acct'] !== '') {
-                error_log("RID=$RID SPIN_ACCOUNT_NAME_RESOLVED: col=$col value=" . $row['acct']);
-                return (string)$row['acct'];
-            }
-        } catch (Exception $e) {
-            // Column doesn't exist, try next
-        }
-    }
-    
-    error_log("RID=$RID SPIN_ACCOUNT_NAME_FALLBACK: using userId=$userId");
-    return $userId;
+    $name = getWebsiteAccountName($pdo, $userId);
+    return ($name !== '') ? $name : $userId;
 }
 
 /**
  * Return user's characters list
  */
 function getUserCharacters($pdo, $userId) {
-    global $RID;
     $accountKey = resolveAccountKey($pdo, $userId);
-    
-    error_log("RID=$RID SPIN_GET_CHARACTERS: userId=$userId accountKey=$accountKey");
     
     // Detect level column
     $levelCol = 'Level';
     $levelCandidates = array('Level', 'level', 'Lev', 'lev', 'cLevel');
     foreach ($levelCandidates as $lc) {
-        if (tableHasColumn($pdo, 'basetab_sg', $lc)) {
-            $levelCol = $lc;
-            break;
-        }
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM basetab_sg LIKE '$lc'");
+            if ($stmt->fetch()) {
+                $levelCol = $lc;
+                break;
+            }
+        } catch (Exception $e) {}
     }
     
     $stmt = $pdo->prepare("
@@ -116,11 +105,7 @@ function getUserCharacters($pdo, $userId) {
         ORDER BY `$levelCol` DESC, RoleID ASC
     ");
     $stmt->execute(array($accountKey));
-    $chars = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    error_log("RID=$RID SPIN_CHARACTERS_FOUND: count=" . count($chars));
-    
-    return $chars;
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 /**
