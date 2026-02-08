@@ -12,6 +12,12 @@ export interface WheelSegment {
   sort_order: number;
 }
 
+export interface SpinCharacter {
+  RoleID: number;
+  Name: string;
+  Level: number;
+}
+
 export interface SpinStatus {
   success: boolean;
   can_spin: boolean;
@@ -78,9 +84,17 @@ export async function fetchSpinStatus(): Promise<SpinStatus> {
   return fetchJsonOrThrow<SpinStatus>(`${API_BASE}/spin_wheel.php?action=status`);
 }
 
-export async function performSpin(): Promise<SpinResult> {
+export async function fetchSpinCharacters(): Promise<SpinCharacter[]> {
+  const data = await fetchJsonOrThrow<{ success: boolean; characters: SpinCharacter[] }>(
+    `${API_BASE}/spin_wheel.php?action=characters`
+  );
+  return data.characters || [];
+}
+
+export async function performSpin(roleId: number): Promise<SpinResult> {
   return fetchJsonOrThrow<SpinResult>(`${API_BASE}/spin_wheel.php?action=spin`, {
-    method: 'POST'
+    method: 'POST',
+    body: JSON.stringify({ role_id: roleId })
   });
 }
 
