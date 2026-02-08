@@ -17,6 +17,12 @@ export type FetchJsonError = Error & {
   status?: number;
   contentType?: string | null;
   textPreview?: string;
+  /** Parsed JSON body when server returned JSON on a non-2xx status */
+  serverJson?: any;
+  /** Convenience: serverJson.message when available */
+  serverMessage?: string;
+  /** Convenience: serverJson.rid when available */
+  rid?: string;
 };
 
 /** Options for retry and toast behavior */
@@ -126,6 +132,24 @@ export async function fetchJsonOrThrow<T>(
         err.status = response.status;
         err.contentType = contentType;
         err.textPreview = text.slice(0, 800);
+
+        // If server returned JSON even on an error status, parse it so UI can show the real message.
+        if (contentType?.includes("application/json") && text) {
+          try {
+            const parsed = JSON.parse(text);
+            err.serverJson = parsed;
+            if (parsed && typeof parsed.message === 'string' && parsed.message.trim() !== '') {
+              err.serverMessage = parsed.message;
+              // Prefer the server-provided message for this error instance
+              err.message = parsed.message;
+            }
+            if (parsed && typeof parsed.rid === 'string' && parsed.rid.trim() !== '') {
+              err.rid = parsed.rid;
+            }
+          } catch (_e) {
+            // ignore JSON parse failures, keep textPreview
+          }
+        }
 
         // Retry on 5xx/429, otherwise throw immediately
         if (isRetryable(response.status) && attempt < retries) {
