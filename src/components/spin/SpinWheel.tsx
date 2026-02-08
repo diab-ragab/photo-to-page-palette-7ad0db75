@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { Crown } from 'lucide-react';
 import type { WheelSegment } from '@/lib/spinWheelApi';
 
 interface SpinWheelProps {
@@ -12,6 +13,19 @@ interface SpinWheelProps {
 export function SpinWheel({ segments, spinning, winnerIndex, onSpinComplete }: SpinWheelProps) {
   const [rotation, setRotation] = useState(0);
   const [glowing, setGlowing] = useState(false);
+  
+  // Find the jackpot segment (highest value, excluding 'nothing')
+  const jackpotIndex = useMemo(() => {
+    let maxValue = 0;
+    let maxIdx = -1;
+    segments.forEach((seg, idx) => {
+      if (seg.reward_type !== 'nothing' && seg.reward_value > maxValue) {
+        maxValue = seg.reward_value;
+        maxIdx = idx;
+      }
+    });
+    return maxIdx;
+  }, [segments]);
   
   useEffect(() => {
     if (spinning && winnerIndex !== null) {
@@ -103,6 +117,7 @@ export function SpinWheel({ segments, spinning, winnerIndex, onSpinComplete }: S
           </defs>
           
           {segments.map((segment, index) => {
+            const isJackpot = index === jackpotIndex;
             const startAngle = index * segmentAngle;
             const endAngle = startAngle + segmentAngle;
             const startRad = (startAngle - 90) * (Math.PI / 180);
@@ -122,14 +137,26 @@ export function SpinWheel({ segments, spinning, winnerIndex, onSpinComplete }: S
             const textX = 50 + 32 * Math.cos(midRad);
             const textY = 50 + 32 * Math.sin(midRad);
             
+            // Crown icon position for jackpot
+            const crownX = 50 + 42 * Math.cos(midRad);
+            const crownY = 50 + 42 * Math.sin(midRad);
+            
             return (
               <g key={segment.id}>
                 <path 
                   d={path} 
                   fill={`url(#segment-grad-${segment.id})`}
-                  stroke="rgba(255,255,255,0.3)" 
-                  strokeWidth="0.3" 
+                  stroke={isJackpot ? '#fbbf24' : 'rgba(255,255,255,0.3)'}
+                  strokeWidth={isJackpot ? '1' : '0.3'}
                 />
+                {/* Jackpot shimmer effect */}
+                {isJackpot && (
+                  <path 
+                    d={path} 
+                    fill="url(#jackpot-shimmer)"
+                    opacity="0.3"
+                  />
+                )}
                 {/* Segment highlight */}
                 <path 
                   d={path} 
@@ -140,7 +167,7 @@ export function SpinWheel({ segments, spinning, winnerIndex, onSpinComplete }: S
                   x={textX}
                   y={textY}
                   fill="white"
-                  fontSize="4"
+                  fontSize={isJackpot ? '4.5' : '4'}
                   fontWeight="bold"
                   textAnchor="middle"
                   dominantBaseline="middle"
@@ -150,6 +177,19 @@ export function SpinWheel({ segments, spinning, winnerIndex, onSpinComplete }: S
                 >
                   {segment.label.length > 12 ? segment.label.slice(0, 10) + '...' : segment.label}
                 </text>
+                {/* Jackpot crown indicator */}
+                {isJackpot && (
+                  <text
+                    x={crownX}
+                    y={crownY}
+                    fontSize="5"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    transform={`rotate(${midAngle + 90}, ${crownX}, ${crownY})`}
+                  >
+                    👑
+                  </text>
+                )}
               </g>
             );
           })}
@@ -167,6 +207,12 @@ export function SpinWheel({ segments, spinning, winnerIndex, onSpinComplete }: S
               <stop offset="80%" stopColor="hsl(var(--muted))" />
               <stop offset="100%" stopColor="hsl(var(--background))" />
             </radialGradient>
+            {/* Jackpot shimmer gradient */}
+            <linearGradient id="jackpot-shimmer" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#fef3c7" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#fbbf24" stopOpacity="0.8" />
+            </linearGradient>
           </defs>
           <circle cx="50" cy="50" r="5" fill="hsl(var(--primary))" />
           <circle cx="50" cy="50" r="2" fill="hsl(var(--primary-foreground))" />
