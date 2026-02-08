@@ -159,6 +159,17 @@ function ensureSpinTables($pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
 
+    // Migration: add role_id column if missing (for tables created before this column existed)
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM user_spins LIKE 'role_id'");
+        if (!$stmt->fetch()) {
+            $pdo->exec("ALTER TABLE user_spins ADD COLUMN role_id INT NOT NULL DEFAULT 0 AFTER user_id");
+            $pdo->exec("ALTER TABLE user_spins ADD INDEX idx_role_spun (role_id, spun_at)");
+        }
+    } catch (Exception $e) {
+        // ignore if already exists or permissions issue
+    }
+
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS spin_settings (
             setting_key VARCHAR(50) PRIMARY KEY,
