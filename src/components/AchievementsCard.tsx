@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { hapticSuccess } from "@/hooks/useHapticFeedback";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -278,6 +279,7 @@ export const AchievementsCard = () => {
     try {
       const result = await achievementsApi.claimReward(achievementId);
       if (result.success) {
+        hapticSuccess();
         toast.success("🎉 Reward claimed!", {
           description: `+${result.coins.toLocaleString()} Coins, +${result.vip.toLocaleString()} VIP Points`,
         });
