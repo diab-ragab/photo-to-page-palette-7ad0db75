@@ -293,19 +293,34 @@ export function LuckyWheel() {
   };
 
   const handleSpin = async () => {
-    if (spinning || !status?.can_spin) return;
+    console.log('[LuckyWheel] handleSpin called', { spinning, can_spin: status?.can_spin, selectedRoleId });
+    
+    if (spinning) {
+      console.log('[LuckyWheel] Already spinning, ignoring');
+      return;
+    }
+    
+    if (!status?.can_spin) {
+      console.log('[LuckyWheel] Cannot spin - status.can_spin is false', status);
+      toast.error('Cannot spin right now. Please try again later.');
+      return;
+    }
     
     if (!selectedRoleId) {
+      console.log('[LuckyWheel] No character selected');
       toast.error('Please select a character first');
       return;
     }
 
     try {
+      console.log('[LuckyWheel] Starting spin with roleId:', selectedRoleId);
       setSpinning(true);
       const spinResult = await performSpin(selectedRoleId);
+      console.log('[LuckyWheel] Spin result:', spinResult);
       setResult(spinResult);
       setWinnerIndex(spinResult.winner_index);
     } catch (err: any) {
+      console.error('[LuckyWheel] Spin error:', err);
       const message = err.message || 'Failed to spin';
       
       // Handle specific backend errors
