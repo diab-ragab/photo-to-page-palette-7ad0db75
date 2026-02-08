@@ -219,7 +219,8 @@ if ($method === 'GET' && $action === 'segments') {
 // Auth required actions
 if ($action === 'spin' || $action === 'status' || $action === 'history' || $action === 'characters') {
     $user = requireAuth();
-    $userId = (int)$user['id'];
+    // session_helper returns 'user_id', not 'id'
+    $userId = isset($user['user_id']) ? (int)$user['user_id'] : (int)$user['id'];
 }
 
 // GET characters list
