@@ -163,7 +163,14 @@ export const useVoteSystem = () => {
           const hasVotedBefore = !!lastVoteTime;
 
           // Use server-calculated seconds_remaining for accurate countdown
-          const secondsRemaining = status?.seconds_remaining ?? null;
+          // Fallback: calculate from time_remaining (milliseconds) if seconds_remaining is missing
+          let secondsRemaining: number | null = null;
+          if (status?.seconds_remaining !== undefined && status?.seconds_remaining !== null) {
+            secondsRemaining = status.seconds_remaining;
+          } else if (status?.time_remaining !== undefined && status?.time_remaining !== null) {
+            // time_remaining is in milliseconds, convert to seconds
+            secondsRemaining = Math.floor(status.time_remaining / 1000);
+          }
 
           return {
             ...site,
