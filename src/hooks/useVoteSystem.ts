@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { hapticSuccess } from '@/hooks/useHapticFeedback';
 import { API_BASE, getAuthHeaders } from '@/lib/apiFetch';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateFingerprint } from '@/lib/fingerprint';
@@ -236,6 +237,7 @@ export const useVoteSystem = () => {
           title: "Vote Successful! 🎉",
           description: `You earned ${result.coins_earned} coins${bonusText} and ${result.vip_points_earned} VIP points!`
         });
+        hapticSuccess();
 
         // Update vote data
         setVoteData(prev => ({
