@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { hapticSuccess } from '@/hooks/useHapticFeedback';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -284,6 +285,7 @@ export function LuckyWheel() {
   const handleSpinComplete = () => {
     setSpinning(false);
     setShowResult(true);
+    hapticSuccess();
   };
 
   const handleCloseResult = () => {
