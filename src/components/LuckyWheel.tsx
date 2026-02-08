@@ -25,6 +25,8 @@ import {
   type SpinResult
 } from '@/lib/spinWheelApi';
 import { SpinCharacterSelector } from '@/components/spin/SpinCharacterSelector';
+import { SpinWheel } from '@/components/spin/SpinWheel';
+import { SpinLeaderboard } from '@/components/spin/SpinLeaderboard';
 import { toast } from 'sonner';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -34,103 +36,6 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   gift: <Gift className="h-4 w-4" />,
   x: <X className="h-4 w-4" />,
 };
-
-interface WheelProps {
-  segments: WheelSegment[];
-  spinning: boolean;
-  winnerIndex: number | null;
-  onSpinComplete: () => void;
-}
-
-function Wheel({ segments, spinning, winnerIndex, onSpinComplete }: WheelProps) {
-  const [rotation, setRotation] = useState(0);
-  
-  useEffect(() => {
-    if (spinning && winnerIndex !== null) {
-      const segmentAngle = 360 / segments.length;
-      const spins = 5;
-      const targetAngle = 360 * spins + (360 - (winnerIndex * segmentAngle + segmentAngle / 2) - 90);
-      setRotation(targetAngle);
-      
-      const timer = setTimeout(() => {
-        onSpinComplete();
-      }, 4000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [spinning, winnerIndex, segments.length, onSpinComplete]);
-
-  const segmentAngle = 360 / segments.length;
-
-  return (
-    <div className="relative w-64 h-64 mx-auto">
-      {/* Pointer */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-20">
-        <div 
-          className="w-0 h-0 border-l-[12px] border-r-[12px] border-t-[20px] border-l-transparent border-r-transparent"
-          style={{ borderTopColor: 'hsl(var(--primary))' }}
-        />
-      </div>
-      
-      {/* Wheel */}
-      <motion.div
-        className="w-full h-full rounded-full overflow-hidden border-4 border-primary/30 shadow-lg shadow-primary/20"
-        style={{
-          transform: `rotate(${rotation}deg)`,
-          transition: spinning ? 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none'
-        }}
-      >
-        <svg viewBox="0 0 100 100" className="w-full h-full">
-          {segments.map((segment, index) => {
-            const startAngle = index * segmentAngle;
-            const endAngle = startAngle + segmentAngle;
-            const startRad = (startAngle - 90) * (Math.PI / 180);
-            const endRad = (endAngle - 90) * (Math.PI / 180);
-            
-            const x1 = 50 + 50 * Math.cos(startRad);
-            const y1 = 50 + 50 * Math.sin(startRad);
-            const x2 = 50 + 50 * Math.cos(endRad);
-            const y2 = 50 + 50 * Math.sin(endRad);
-            
-            const largeArc = segmentAngle > 180 ? 1 : 0;
-            
-            const path = `M 50 50 L ${x1} ${y1} A 50 50 0 ${largeArc} 1 ${x2} ${y2} Z`;
-            
-            const midAngle = (startAngle + endAngle) / 2 - 90;
-            const midRad = midAngle * (Math.PI / 180);
-            const textX = 50 + 32 * Math.cos(midRad);
-            const textY = 50 + 32 * Math.sin(midRad);
-            
-            return (
-              <g key={segment.id}>
-                <path d={path} fill={segment.color} stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
-                <text
-                  x={textX}
-                  y={textY}
-                  fill="white"
-                  fontSize="4"
-                  fontWeight="bold"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  transform={`rotate(${midAngle + 90}, ${textX}, ${textY})`}
-                  style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
-                >
-                  {segment.label.length > 12 ? segment.label.slice(0, 10) + '...' : segment.label}
-                </text>
-              </g>
-            );
-          })}
-          <circle cx="50" cy="50" r="8" fill="hsl(var(--background))" stroke="hsl(var(--primary))" strokeWidth="2" />
-          <circle cx="50" cy="50" r="4" fill="hsl(var(--primary))" />
-        </svg>
-      </motion.div>
-      
-      {spinning && (
-        <div className="absolute inset-0 rounded-full animate-pulse bg-primary/20 blur-xl -z-10" />
-      )}
-    </div>
-  );
-}
 
 interface RewardPopupProps {
   result: SpinResult;
@@ -152,17 +57,45 @@ function RewardPopup({ result, characterName, onClose }: RewardPopupProps) {
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        initial={{ scale: 0.5, opacity: 0, rotateY: -90 }}
+        animate={{ scale: 1, opacity: 1, rotateY: 0 }}
         exit={{ scale: 0.5, opacity: 0 }}
         transition={{ type: 'spring', damping: 15 }}
-        className="bg-card border border-primary/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl"
+        className="bg-card border border-primary/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Confetti effect for wins */}
+        {!isNothing && (
+          <div className="absolute inset-0 pointer-events-none">
+            {[...Array(20)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-2 h-2 rounded-full"
+                style={{
+                  backgroundColor: ['#f59e0b', '#ec4899', '#8b5cf6', '#22c55e', '#3b82f6'][i % 5],
+                  left: `${Math.random() * 100}%`,
+                  top: '-10%'
+                }}
+                animate={{
+                  y: ['0%', '500%'],
+                  x: [0, (Math.random() - 0.5) * 100],
+                  rotate: [0, 360 * (Math.random() > 0.5 ? 1 : -1)],
+                  opacity: [1, 0]
+                }}
+                transition={{
+                  duration: 2 + Math.random(),
+                  delay: Math.random() * 0.5,
+                  ease: 'easeOut'
+                }}
+              />
+            ))}
+          </div>
+        )}
+        
         {!isNothing && result.winner && (
           <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
             transition={{ delay: 0.2, type: 'spring' }}
             className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
             style={{ backgroundColor: (result.winner.color || '#3b82f6') + '30' }}
@@ -173,11 +106,21 @@ function RewardPopup({ result, characterName, onClose }: RewardPopupProps) {
           </motion.div>
         )}
         
-        <h3 className="text-2xl font-bold mb-2">
+        <motion.h3 
+          className="text-2xl font-bold mb-2"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
           {isNothing ? '😅 Better luck next time!' : '🎉 Congratulations!'}
-        </h3>
+        </motion.h3>
         
-        <p className="text-lg mb-2">
+        <motion.p 
+          className="text-lg mb-2"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
           {isNothing || !result.winner ? (
             'No reward this time'
           ) : (
@@ -189,22 +132,32 @@ function RewardPopup({ result, characterName, onClose }: RewardPopupProps) {
               !
             </>
           )}
-        </p>
+        </motion.p>
 
         {/* Mail delivery notice for coins/zen */}
         {!isNothing && isMailReward && result.reward_given && (
-          <p className="text-sm text-muted-foreground mb-4 flex items-center justify-center gap-1">
+          <motion.p 
+            className="text-sm text-muted-foreground mb-4 flex items-center justify-center gap-1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
             <Gift className="h-4 w-4" />
             Sent via in-game mail to <span className="font-medium text-foreground">{characterName}</span>
-          </p>
+          </motion.p>
         )}
 
         {/* VIP points notice */}
         {!isNothing && rewardType === 'vip' && result.reward_given && (
-          <p className="text-sm text-muted-foreground mb-4 flex items-center justify-center gap-1">
+          <motion.p 
+            className="text-sm text-muted-foreground mb-4 flex items-center justify-center gap-1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
             <Crown className="h-4 w-4" />
             VIP points added to your account
-          </p>
+          </motion.p>
         )}
         
         {result.spins_remaining > 0 && (
@@ -410,88 +363,96 @@ export function LuckyWheel() {
 
   return (
     <>
-      <Card className="bg-card border-primary/20 overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Sparkles className="h-5 w-5 text-amber-500" />
-              Lucky Spin
-            </CardTitle>
-            <Badge variant="outline" className="gap-1">
-              <History className="h-3 w-3" />
-              {status.spins_remaining}/{status.spins_per_day} spins
-            </Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-6 flex flex-col items-center gap-6">
-          {/* Character Selector */}
-          <div className="w-full max-w-xs">
-            <SpinCharacterSelector
-              onSelect={handleCharacterSelect}
-              selectedRoleId={selectedRoleId}
-            />
-          </div>
-
-          <Wheel
-            segments={segments}
-            spinning={spinning}
-            winnerIndex={winnerIndex}
-            onSpinComplete={handleSpinComplete}
-          />
-
-          {/* Reward receiver label */}
-          {selectedCharacterName && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <User className="h-4 w-4" />
-              <span>Reward receiver: <span className="font-medium text-foreground">{selectedCharacterName}</span></span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Main Wheel Card */}
+        <Card className="bg-card border-primary/20 overflow-hidden lg:col-span-2">
+          <CardHeader className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Sparkles className="h-5 w-5 text-amber-500" />
+                Lucky Spin
+              </CardTitle>
+              <Badge variant="outline" className="gap-1">
+                <History className="h-3 w-3" />
+                {status.spins_remaining}/{status.spins_per_day} spins
+              </Badge>
             </div>
-          )}
+          </CardHeader>
 
-          {status.can_spin ? (
-            <Button
-              size="lg"
-              onClick={handleSpin}
-              disabled={!canSpinNow}
-              className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/30 disabled:opacity-50"
-            >
-              <Sparkles className={`h-5 w-5 ${spinning ? 'animate-spin' : ''}`} />
-              {spinning ? 'Spinning...' : !selectedRoleId ? 'Select Character' : 'Spin Now!'}
-            </Button>
-          ) : (
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">Next spin available in:</p>
-              <div className="flex items-center gap-2 justify-center text-lg font-mono font-bold text-primary">
-                <Clock className="h-5 w-5" />
-                {countdown || 'Loading...'}
+          <CardContent className="p-6 flex flex-col items-center gap-6">
+            {/* Character Selector */}
+            <div className="w-full max-w-xs">
+              <SpinCharacterSelector
+                onSelect={handleCharacterSelect}
+                selectedRoleId={selectedRoleId}
+              />
+            </div>
+
+            <SpinWheel
+              segments={segments}
+              spinning={spinning}
+              winnerIndex={winnerIndex}
+              onSpinComplete={handleSpinComplete}
+            />
+
+            {/* Reward receiver label */}
+            {selectedCharacterName && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span>Reward receiver: <span className="font-medium text-foreground">{selectedCharacterName}</span></span>
+              </div>
+            )}
+
+            {status.can_spin ? (
+              <Button
+                size="lg"
+                onClick={handleSpin}
+                disabled={!canSpinNow}
+                className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/30 disabled:opacity-50"
+              >
+                <Sparkles className={`h-5 w-5 ${spinning ? 'animate-spin' : ''}`} />
+                {spinning ? 'Spinning...' : !selectedRoleId ? 'Select Character' : 'Spin Now!'}
+              </Button>
+            ) : (
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-2">Next spin available in:</p>
+                <div className="flex items-center gap-2 justify-center text-lg font-mono font-bold text-primary">
+                  <Clock className="h-5 w-5" />
+                  {countdown || 'Loading...'}
+                </div>
+              </div>
+            )}
+
+            {/* Legend */}
+            <div className="w-full pt-4 border-t border-border">
+              <p className="text-xs text-muted-foreground text-center mb-3">Possible Rewards</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {segments.slice(0, 6).map((seg) => (
+                  <Badge
+                    key={seg.id}
+                    variant="outline"
+                    className="gap-1 text-xs"
+                    style={{ borderColor: seg.color, color: seg.color }}
+                  >
+                    {ICON_MAP[seg.icon] || <Gift className="h-3 w-3" />}
+                    {seg.label}
+                  </Badge>
+                ))}
+                {segments.length > 6 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{segments.length - 6} more
+                  </Badge>
+                )}
               </div>
             </div>
-          )}
+          </CardContent>
+        </Card>
 
-          {/* Legend */}
-          <div className="w-full pt-4 border-t border-border">
-            <p className="text-xs text-muted-foreground text-center mb-3">Possible Rewards</p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {segments.slice(0, 6).map((seg) => (
-                <Badge
-                  key={seg.id}
-                  variant="outline"
-                  className="gap-1 text-xs"
-                  style={{ borderColor: seg.color, color: seg.color }}
-                >
-                  {ICON_MAP[seg.icon] || <Gift className="h-3 w-3" />}
-                  {seg.label}
-                </Badge>
-              ))}
-              {segments.length > 6 && (
-                <Badge variant="outline" className="text-xs">
-                  +{segments.length - 6} more
-                </Badge>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Leaderboard */}
+        <div className="lg:col-span-1">
+          <SpinLeaderboard />
+        </div>
+      </div>
 
       {/* Result Popup */}
       <AnimatePresence>
