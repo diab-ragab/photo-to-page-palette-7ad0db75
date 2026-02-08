@@ -119,18 +119,26 @@ export function SpinCharacterSelector({ onSelect, selectedRoleId }: SpinCharacte
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+      <label 
+        htmlFor="spin-character-select"
+        className="text-sm font-medium flex items-center gap-2 text-muted-foreground"
+      >
         <User className="w-4 h-4" />
         Reward Receiver
       </label>
       <Select 
         value={selectedRoleId?.toString() || ""} 
         onValueChange={handleSelect}
+        name="spin-character"
       >
-        <SelectTrigger className="w-full bg-background">
+        <SelectTrigger 
+          id="spin-character-select"
+          className="w-full bg-background"
+          aria-label="Select reward receiver character"
+        >
           <SelectValue placeholder="Select a character..." />
         </SelectTrigger>
-        <SelectContent className="bg-popover border border-border">
+        <SelectContent className="bg-popover border border-border z-50">
           {characters.map((char) => (
             <SelectItem key={char.RoleID} value={char.RoleID.toString()}>
               <div className="flex items-center gap-2">
