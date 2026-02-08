@@ -22,6 +22,7 @@ export function SpinCharacterSelector({ onSelect, selectedRoleId }: SpinCharacte
   const [characters, setCharacters] = useState<SpinCharacter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   const loadCharacters = async () => {
     setIsLoading(true);
@@ -30,6 +31,7 @@ export function SpinCharacterSelector({ onSelect, selectedRoleId }: SpinCharacte
     try {
       const chars = await fetchSpinCharacters();
       setCharacters(chars);
+      setHasInitialized(true);
 
       if (chars.length > 0) {
         // Check for stored selection
@@ -59,7 +61,10 @@ export function SpinCharacterSelector({ onSelect, selectedRoleId }: SpinCharacte
   };
 
   useEffect(() => {
-    loadCharacters();
+    if (!hasInitialized) {
+      loadCharacters();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSelect = (value: string) => {
