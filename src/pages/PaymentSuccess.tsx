@@ -9,6 +9,7 @@ import { SEO } from "@/components/SEO";
 import { useEffect, useState } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { API_BASE } from "@/lib/apiFetch";
+import { hapticSuccess } from "@/hooks/useHapticFeedback";
 
 const PaymentSuccess = () => {
   const { t } = useLanguage();
@@ -45,6 +46,7 @@ const PaymentSuccess = () => {
         .then(data => {
           console.log("Payment confirmed:", data);
           setConfirmed(true);
+          hapticSuccess();
           // Clear cart after successful payment
           clearCart();
           if (data.order_id) {
