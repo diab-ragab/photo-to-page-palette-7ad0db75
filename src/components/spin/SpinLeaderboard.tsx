@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trophy, Medal, Award, Sparkles, Coins, Crown, Zap, Gift } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Trophy, Medal, Award, Sparkles, Coins, Crown, Zap, Gift, History } from 'lucide-react';
 import { fetchJsonOrThrow, API_BASE } from '@/lib/apiFetch';
+import { SpinHistoryList } from './SpinHistory';
 
 interface SpinLeaderboardEntry {
   role_id: number;
@@ -109,44 +112,67 @@ export function SpinLeaderboard() {
   }
 
   return (
-    <Card className="bg-card border-primary/20">
-      <CardHeader className="pb-2 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Trophy className="h-4 w-4 text-amber-500" />
-          Recent Winners
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-3 space-y-1">
-        {entries.map((entry, index) => (
-          <div 
-            key={`${entry.role_id}-${entry.spun_at}`}
-            className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-          >
-            {/* Rank */}
-            <div className="w-6 flex justify-center">
-              {index < 3 ? RANK_ICONS[index] : (
-                <span className="text-xs text-muted-foreground">#{index + 1}</span>
-              )}
-            </div>
-            
-            {/* Character name */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{entry.char_name}</p>
-              <p className="text-xs text-muted-foreground">{formatTime(entry.spun_at)}</p>
-            </div>
-            
-            {/* Reward */}
-            <Badge 
-              variant="outline" 
-              className="gap-1 text-xs shrink-0"
-              style={{ borderColor: entry.color, color: entry.color }}
-            >
-              {ICON_MAP[entry.reward_type] || <Gift className="h-3 w-3" />}
-              {formatReward(entry.reward_value)}
-            </Badge>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+    <Tabs defaultValue="winners" className="w-full">
+      <TabsList className="grid w-full grid-cols-2 mb-2">
+        <TabsTrigger value="winners" className="gap-1 text-xs">
+          <Trophy className="h-3 w-3" />
+          Winners
+        </TabsTrigger>
+        <TabsTrigger value="history" className="gap-1 text-xs">
+          <History className="h-3 w-3" />
+          My History
+        </TabsTrigger>
+      </TabsList>
+      
+      <TabsContent value="winners" className="mt-0">
+        <Card className="bg-card border-primary/20">
+          <CardHeader className="pb-2 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Trophy className="h-4 w-4 text-amber-500" />
+              Recent Winners
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[280px]">
+              <div className="p-3 space-y-1">
+                {entries.map((entry, index) => (
+                  <div 
+                    key={`${entry.role_id}-${entry.spun_at}`}
+                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    {/* Rank */}
+                    <div className="w-6 flex justify-center">
+                      {index < 3 ? RANK_ICONS[index] : (
+                        <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                      )}
+                    </div>
+                    
+                    {/* Character name */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{entry.char_name}</p>
+                      <p className="text-xs text-muted-foreground">{formatTime(entry.spun_at)}</p>
+                    </div>
+                    
+                    {/* Reward */}
+                    <Badge 
+                      variant="outline" 
+                      className="gap-1 text-xs shrink-0"
+                      style={{ borderColor: entry.color, color: entry.color }}
+                    >
+                      {ICON_MAP[entry.reward_type] || <Gift className="h-3 w-3" />}
+                      {formatReward(entry.reward_value)}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      
+      <TabsContent value="history" className="mt-0">
+        <SpinHistoryList />
+      </TabsContent>
+    </Tabs>
   );
 }
