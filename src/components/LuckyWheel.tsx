@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { hapticSuccess } from '@/hooks/useHapticFeedback';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,8 @@ import {
 import { SpinCharacterSelector } from '@/components/spin/SpinCharacterSelector';
 import { SpinWheel } from '@/components/spin/SpinWheel';
 import { SpinLeaderboard } from '@/components/spin/SpinLeaderboard';
+import { JackpotCelebration } from '@/components/spin/JackpotCelebration';
+import { useJackpotSound } from '@/hooks/useJackpotSound';
 import { toast } from 'sonner';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -183,11 +185,28 @@ export function LuckyWheel() {
   const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
   const [result, setResult] = useState<SpinResult | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [showJackpot, setShowJackpot] = useState(false);
   const [countdown, setCountdown] = useState('');
   
   // Character selection state
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
+  
+  // Sound effects
+  const { playJackpotSound, playRegularWinSound, playSpinSound } = useJackpotSound();
+
+  // Find jackpot index (highest value segment)
+  const jackpotIndex = useMemo(() => {
+    let maxValue = 0;
+    let maxIdx = -1;
+    segments.forEach((seg, idx) => {
+      if (seg.reward_type !== 'nothing' && seg.reward_value > maxValue) {
+        maxValue = seg.reward_value;
+        maxIdx = idx;
+      }
+    });
+    return maxIdx;
+  }, [segments]);
 
   const loadData = useCallback(async () => {
     setError(false);
@@ -268,6 +287,10 @@ export function LuckyWheel() {
     try {
       console.log('[LuckyWheel] Starting spin with roleId:', selectedRoleId);
       setSpinning(true);
+      
+      // Play spin sound
+      playSpinSound();
+      
       const spinResult = await performSpin(selectedRoleId);
       console.log('[LuckyWheel] Spin result:', spinResult);
       setResult(spinResult);
@@ -313,12 +336,34 @@ export function LuckyWheel() {
 
   const handleSpinComplete = () => {
     setSpinning(false);
-    setShowResult(true);
+    
+    // Check if jackpot was hit
+    const isJackpot = winnerIndex === jackpotIndex && result?.winner?.reward_type !== 'nothing';
+    
+    if (isJackpot) {
+      // Jackpot celebration
+      playJackpotSound();
+      setShowJackpot(true);
+      
+      // Hide jackpot banner after 3 seconds, then show result
+      setTimeout(() => {
+        setShowJackpot(false);
+        setShowResult(true);
+      }, 3000);
+    } else if (result?.winner?.reward_type !== 'nothing') {
+      // Regular win
+      playRegularWinSound();
+      setShowResult(true);
+    } else {
+      // No win
+      setShowResult(true);
+    }
+    
     hapticSuccess();
   };
-
   const handleCloseResult = () => {
     setShowResult(false);
+    setShowJackpot(false);
     setResult(null);
     setWinnerIndex(null);
     loadData();
@@ -453,6 +498,17 @@ export function LuckyWheel() {
           <SpinLeaderboard />
         </div>
       </div>
+
+      {/* Jackpot Celebration */}
+      <AnimatePresence>
+        {showJackpot && result?.winner && (
+          <JackpotCelebration
+            isVisible={showJackpot}
+            rewardLabel={result.winner.label || `${result.winner.reward_value} ${result.winner.reward_type}`}
+            rewardColor={result.winner.color || '#fbbf24'}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Result Popup */}
       <AnimatePresence>
