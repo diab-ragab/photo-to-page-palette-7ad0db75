@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { hapticSuccess } from '@/hooks/useHapticFeedback';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -137,6 +138,7 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCanClaim(false);
         setHasClaimed(true);
         setShowSuccess(true);
+        hapticSuccess();
         
         const serverSeconds = result.seconds_until_next_claim || 86400;
         setCountdown(serverSeconds);
