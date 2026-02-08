@@ -92,10 +92,15 @@ export async function fetchSpinCharacters(): Promise<SpinCharacter[]> {
 }
 
 export async function performSpin(roleId: number): Promise<SpinResult> {
-  return fetchJsonOrThrow<SpinResult>(`${API_BASE}/spin_wheel.php?action=spin`, {
-    method: 'POST',
-    body: JSON.stringify({ role_id: roleId })
-  });
+  return fetchJsonOrThrow<SpinResult>(
+    `${API_BASE}/spin_wheel.php?action=spin`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ role_id: roleId })
+    },
+    true,
+    { showErrorToast: false }
+  );
 }
 
 export async function fetchSpinHistory(limit = 10): Promise<SpinHistory[]> {

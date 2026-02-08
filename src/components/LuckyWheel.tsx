@@ -321,10 +321,17 @@ export function LuckyWheel() {
       setWinnerIndex(spinResult.winner_index);
     } catch (err: any) {
       console.error('[LuckyWheel] Spin error:', err);
-      const message = err.message || 'Failed to spin';
-      
+
+      const statusCode = typeof err?.status === 'number' ? err.status : undefined;
+      const rid = typeof err?.rid === 'string' ? err.rid : (typeof err?.serverJson?.rid === 'string' ? err.serverJson.rid : undefined);
+      const rawMessage = (typeof err?.serverMessage === 'string' && err.serverMessage.trim() !== '')
+        ? err.serverMessage
+        : (err?.message || 'Failed to spin');
+
+      const message = `${rawMessage}${statusCode ? ` (HTTP ${statusCode})` : ''}${rid ? ` (RID: ${rid})` : ''}`;
+
       // Handle specific backend errors
-      if (message.includes('Invalid character') || message.includes('role_id')) {
+      if (rawMessage.includes('Invalid character') || rawMessage.includes('role_id')) {
         toast.error('Invalid character selection. Please choose again.');
         setSelectedRoleId(null);
         setSelectedCharacterName(null);
@@ -332,7 +339,7 @@ export function LuckyWheel() {
       } else {
         toast.error(message);
       }
-      
+
       setSpinning(false);
     }
   };
