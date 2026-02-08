@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Clock, Flame, Percent, ShoppingCart, Sparkles, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { hapticSuccess } from "@/hooks/useHapticFeedback";
 import { bundlesApi, Bundle, getIconEmoji } from "@/lib/bundlesApi";
 import { CharacterSelector } from "@/components/shop/CharacterSelector";
 import { useAuth } from "@/contexts/AuthContext";
@@ -186,6 +187,7 @@ export const LimitedTimeBundles = () => {
         selectedRoleId,
         selectedCharacterName || ""
       );
+      hapticSuccess();
       window.location.href = url;
     } catch (err: any) {
       toast({
