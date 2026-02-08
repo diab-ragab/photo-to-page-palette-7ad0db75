@@ -143,6 +143,8 @@ interface RewardPopupProps {
 
 function RewardPopup({ result, onClose }: RewardPopupProps) {
   const isNothing = result.winner?.reward_type === 'nothing';
+  const rewardType = result.winner?.reward_type;
+  const isMailReward = rewardType === 'coins' || rewardType === 'zen';
   
   return (
     <motion.div
@@ -178,7 +180,7 @@ function RewardPopup({ result, onClose }: RewardPopupProps) {
           {isNothing ? '😅 Better luck next time!' : '🎉 Congratulations!'}
         </h3>
         
-        <p className="text-lg mb-4">
+        <p className="text-lg mb-2">
           {isNothing || !result.winner ? (
             'No reward this time'
           ) : (
@@ -191,6 +193,22 @@ function RewardPopup({ result, onClose }: RewardPopupProps) {
             </>
           )}
         </p>
+
+        {/* Mail delivery notice for coins/zen */}
+        {!isNothing && isMailReward && result.reward_given && (
+          <p className="text-sm text-muted-foreground mb-4 flex items-center justify-center gap-1">
+            <Gift className="h-4 w-4" />
+            Sent to your in-game mailbox
+          </p>
+        )}
+
+        {/* VIP points notice */}
+        {!isNothing && rewardType === 'vip' && result.reward_given && (
+          <p className="text-sm text-muted-foreground mb-4 flex items-center justify-center gap-1">
+            <Crown className="h-4 w-4" />
+            Added to your VIP points
+          </p>
+        )}
         
         {result.spins_remaining > 0 && (
           <p className="text-sm text-muted-foreground mb-4">

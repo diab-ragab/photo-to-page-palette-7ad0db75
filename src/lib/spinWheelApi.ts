@@ -24,12 +24,20 @@ export interface SpinStatus {
   enabled: boolean;
 }
 
+export interface RewardMail {
+  success: boolean;
+  insert_id?: number;
+  role_id?: number;
+  message?: string;
+}
+
 export interface SpinResult {
   success: boolean;
   winner: WheelSegment;
   winner_index: number;
   segment_count: number;
   reward_given: boolean;
+  reward_mail?: RewardMail | null;
   spins_remaining: number;
 }
 
