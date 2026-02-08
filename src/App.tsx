@@ -17,6 +17,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
@@ -40,6 +41,7 @@ const queryClient = new QueryClient();
 
 const AnimatedRoutes = () => {
   const location = useLocation();
+  useHapticFeedback();
   
   return (
     <AnimatePresence mode="wait">
