@@ -12,7 +12,8 @@ import {
   Zap, 
   Gift,
   X,
-  History
+  History,
+  User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -23,6 +24,7 @@ import {
   type SpinStatus,
   type SpinResult
 } from '@/lib/spinWheelApi';
+import { SpinCharacterSelector } from '@/components/spin/SpinCharacterSelector';
 import { toast } from 'sonner';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -45,14 +47,11 @@ function Wheel({ segments, spinning, winnerIndex, onSpinComplete }: WheelProps) 
   
   useEffect(() => {
     if (spinning && winnerIndex !== null) {
-      // Calculate target rotation
       const segmentAngle = 360 / segments.length;
-      // Spin multiple times + land on winner
       const spins = 5;
       const targetAngle = 360 * spins + (360 - (winnerIndex * segmentAngle + segmentAngle / 2) - 90);
       setRotation(targetAngle);
       
-      // Trigger completion after animation
       const timer = setTimeout(() => {
         onSpinComplete();
       }, 4000);
@@ -97,7 +96,6 @@ function Wheel({ segments, spinning, winnerIndex, onSpinComplete }: WheelProps) 
             
             const path = `M 50 50 L ${x1} ${y1} A 50 50 0 ${largeArc} 1 ${x2} ${y2} Z`;
             
-            // Text position (middle of segment)
             const midAngle = (startAngle + endAngle) / 2 - 90;
             const midRad = midAngle * (Math.PI / 180);
             const textX = 50 + 32 * Math.cos(midRad);
@@ -122,13 +120,11 @@ function Wheel({ segments, spinning, winnerIndex, onSpinComplete }: WheelProps) 
               </g>
             );
           })}
-          {/* Center circle */}
           <circle cx="50" cy="50" r="8" fill="hsl(var(--background))" stroke="hsl(var(--primary))" strokeWidth="2" />
           <circle cx="50" cy="50" r="4" fill="hsl(var(--primary))" />
         </svg>
       </motion.div>
       
-      {/* Glow effect when spinning */}
       {spinning && (
         <div className="absolute inset-0 rounded-full animate-pulse bg-primary/20 blur-xl -z-10" />
       )}
@@ -138,10 +134,11 @@ function Wheel({ segments, spinning, winnerIndex, onSpinComplete }: WheelProps) 
 
 interface RewardPopupProps {
   result: SpinResult;
+  characterName: string;
   onClose: () => void;
 }
 
-function RewardPopup({ result, onClose }: RewardPopupProps) {
+function RewardPopup({ result, characterName, onClose }: RewardPopupProps) {
   const isNothing = result.winner?.reward_type === 'nothing';
   const rewardType = result.winner?.reward_type;
   const isMailReward = rewardType === 'coins' || rewardType === 'zen';
@@ -198,7 +195,7 @@ function RewardPopup({ result, onClose }: RewardPopupProps) {
         {!isNothing && isMailReward && result.reward_given && (
           <p className="text-sm text-muted-foreground mb-4 flex items-center justify-center gap-1">
             <Gift className="h-4 w-4" />
-            Sent to your in-game mailbox
+            Sent via in-game mail to <span className="font-medium text-foreground">{characterName}</span>
           </p>
         )}
 
@@ -206,7 +203,7 @@ function RewardPopup({ result, onClose }: RewardPopupProps) {
         {!isNothing && rewardType === 'vip' && result.reward_given && (
           <p className="text-sm text-muted-foreground mb-4 flex items-center justify-center gap-1">
             <Crown className="h-4 w-4" />
-            Added to your VIP points
+            VIP points added to your account
           </p>
         )}
         
@@ -234,6 +231,10 @@ export function LuckyWheel() {
   const [result, setResult] = useState<SpinResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [countdown, setCountdown] = useState('');
+  
+  // Character selection state
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setError(false);
@@ -270,7 +271,7 @@ export function LuckyWheel() {
 
       if (diff <= 0) {
         setCountdown('');
-        loadData(); // Refresh status
+        loadData();
         return;
       }
 
@@ -286,16 +287,37 @@ export function LuckyWheel() {
     return () => clearInterval(interval);
   }, [status, loadData]);
 
+  const handleCharacterSelect = (roleId: number | null, name: string | null) => {
+    setSelectedRoleId(roleId);
+    setSelectedCharacterName(name);
+  };
+
   const handleSpin = async () => {
     if (spinning || !status?.can_spin) return;
+    
+    if (!selectedRoleId) {
+      toast.error('Please select a character first');
+      return;
+    }
 
     try {
       setSpinning(true);
-      const spinResult = await performSpin();
+      const spinResult = await performSpin(selectedRoleId);
       setResult(spinResult);
       setWinnerIndex(spinResult.winner_index);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to spin');
+      const message = err.message || 'Failed to spin';
+      
+      // Handle specific backend errors
+      if (message.includes('Invalid character') || message.includes('role_id')) {
+        toast.error('Invalid character selection. Please choose again.');
+        setSelectedRoleId(null);
+        setSelectedCharacterName(null);
+        localStorage.removeItem('spin_selected_role_id');
+      } else {
+        toast.error(message);
+      }
+      
       setSpinning(false);
     }
   };
@@ -310,7 +332,7 @@ export function LuckyWheel() {
     setShowResult(false);
     setResult(null);
     setWinnerIndex(null);
-    loadData(); // Refresh status
+    loadData();
   };
 
   if (loading) {
@@ -348,6 +370,8 @@ export function LuckyWheel() {
     );
   }
 
+  const canSpinNow = status.can_spin && selectedRoleId !== null && !spinning;
+
   return (
     <>
       <Card className="bg-card border-primary/20 overflow-hidden">
@@ -365,6 +389,14 @@ export function LuckyWheel() {
         </CardHeader>
 
         <CardContent className="p-6 flex flex-col items-center gap-6">
+          {/* Character Selector */}
+          <div className="w-full max-w-xs">
+            <SpinCharacterSelector
+              onSelect={handleCharacterSelect}
+              selectedRoleId={selectedRoleId}
+            />
+          </div>
+
           <Wheel
             segments={segments}
             spinning={spinning}
@@ -372,15 +404,23 @@ export function LuckyWheel() {
             onSpinComplete={handleSpinComplete}
           />
 
+          {/* Reward receiver label */}
+          {selectedCharacterName && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <User className="h-4 w-4" />
+              <span>Reward receiver: <span className="font-medium text-foreground">{selectedCharacterName}</span></span>
+            </div>
+          )}
+
           {status.can_spin ? (
             <Button
               size="lg"
               onClick={handleSpin}
-              disabled={spinning}
-              className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/30"
+              disabled={!canSpinNow}
+              className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/30 disabled:opacity-50"
             >
               <Sparkles className={`h-5 w-5 ${spinning ? 'animate-spin' : ''}`} />
-              {spinning ? 'Spinning...' : 'Spin Now!'}
+              {spinning ? 'Spinning...' : !selectedRoleId ? 'Select Character' : 'Spin Now!'}
             </Button>
           ) : (
             <div className="text-center">
@@ -420,7 +460,11 @@ export function LuckyWheel() {
       {/* Result Popup */}
       <AnimatePresence>
         {showResult && result && result.winner && (
-          <RewardPopup result={result} onClose={handleCloseResult} />
+          <RewardPopup 
+            result={result} 
+            characterName={selectedCharacterName || 'your character'} 
+            onClose={handleCloseResult} 
+          />
         )}
       </AnimatePresence>
     </>
