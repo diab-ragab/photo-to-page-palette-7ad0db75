@@ -18,7 +18,7 @@ export const VoteSiteCard = ({ site, onVote, loading }: VoteSiteCardProps) => {
 
   // Calculate time remaining using server-provided seconds_remaining
   useEffect(() => {
-    // If can vote or no cooldown data, no timer needed
+    // If can vote, no timer needed
     if (site.canVote) {
       setTimeRemaining(null);
       countdownEndTimeRef.current = null;
@@ -26,9 +26,16 @@ export const VoteSiteCard = ({ site, onVote, loading }: VoteSiteCardProps) => {
     }
 
     // Use server-calculated seconds_remaining for accurate countdown
+    // Falls back to 0 if not provided (will show "Loading..." briefly then update)
     const serverSeconds = site.secondsRemaining;
     if (serverSeconds === null || serverSeconds === undefined || serverSeconds <= 0) {
-      setTimeRemaining(null);
+      // No valid seconds remaining but not canVote - show a placeholder
+      // This handles the transition state
+      if (!site.canVote && site.lastVoteTime) {
+        setTimeRemaining("--:--:--");
+      } else {
+        setTimeRemaining(null);
+      }
       countdownEndTimeRef.current = null;
       return;
     }
