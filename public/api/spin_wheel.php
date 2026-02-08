@@ -62,7 +62,7 @@ function ensureSpinTables($pdo) {
     
     foreach ($defaults as $key => $value) {
         $stmt = $pdo->prepare("INSERT IGNORE INTO spin_settings (setting_key, setting_value) VALUES (?, ?)");
-        $stmt->execute([$key, $value]);
+        $stmt->execute(array($key, $value));
     }
     
     // Insert default segments if empty
@@ -133,12 +133,12 @@ if ($method === 'GET' && $action === 'status') {
         SELECT COUNT(*) FROM user_spins 
         WHERE user_id = ? AND spun_at > DATE_SUB(NOW(), INTERVAL ? HOUR)
     ");
-    $stmt->execute([$userId, $cooldownHours]);
+    $stmt->execute(array($userId, $cooldownHours));
     $spinsUsed = (int)$stmt->fetchColumn();
     
     // Get last spin time
     $stmt = $pdo->prepare("SELECT spun_at FROM user_spins WHERE user_id = ? ORDER BY spun_at DESC LIMIT 1");
-    $stmt->execute([$userId]);
+    $stmt->execute(array($userId));
     $lastSpin = $stmt->fetchColumn();
     
     $canSpin = $enabled && ($spinsUsed < $spinsPerDay);
@@ -183,7 +183,7 @@ if ($method === 'POST' && $action === 'spin') {
         SELECT COUNT(*) FROM user_spins 
         WHERE user_id = ? AND spun_at > DATE_SUB(NOW(), INTERVAL ? HOUR)
     ");
-    $stmt->execute([$userId, $cooldownHours]);
+    $stmt->execute(array($userId, $cooldownHours));
     $spinsUsed = (int)$stmt->fetchColumn();
     
     if ($spinsUsed >= $spinsPerDay) {
@@ -226,7 +226,7 @@ if ($method === 'POST' && $action === 'spin') {
         INSERT INTO user_spins (user_id, segment_id, reward_type, reward_value, spun_at) 
         VALUES (?, ?, ?, ?, NOW())
     ");
-    $stmt->execute([$userId, $winner['id'], $winner['reward_type'], $winner['reward_value']]);
+    $stmt->execute(array($userId, $winner['id'], $winner['reward_type'], $winner['reward_value']));
     
     // Award reward
     $rewardGiven = false;
@@ -238,7 +238,7 @@ if ($method === 'POST' && $action === 'spin') {
                     VALUES (?, ?, 0, 0) 
                     ON DUPLICATE KEY UPDATE coins = coins + ?
                 ");
-                $stmt->execute([$userId, $winner['reward_value'], $winner['reward_value']]);
+                $stmt->execute(array($userId, $winner['reward_value'], $winner['reward_value']));
                 $rewardGiven = true;
                 break;
                 
@@ -248,7 +248,7 @@ if ($method === 'POST' && $action === 'spin') {
                     VALUES (?, 0, ?, 0) 
                     ON DUPLICATE KEY UPDATE vip_points = vip_points + ?
                 ");
-                $stmt->execute([$userId, $winner['reward_value'], $winner['reward_value']]);
+                $stmt->execute(array($userId, $winner['reward_value'], $winner['reward_value']));
                 $rewardGiven = true;
                 break;
                 
@@ -260,7 +260,7 @@ if ($method === 'POST' && $action === 'spin') {
                         VALUES (?, ?) 
                         ON DUPLICATE KEY UPDATE Gold = Gold + ?
                     ");
-                    $stmt->execute([$userId, $winner['reward_value'], $winner['reward_value']]);
+                    $stmt->execute(array($userId, $winner['reward_value'], $winner['reward_value']));
                     $rewardGiven = true;
                 } catch (Exception $e) {
                     // Table might not exist
@@ -302,7 +302,7 @@ if ($method === 'GET' && $action === 'history') {
         ORDER BY us.spun_at DESC
         LIMIT ?
     ");
-    $stmt->execute([$userId, $limit]);
+    $stmt->execute(array($userId, $limit));
     $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     jsonResponse(array('success' => true, 'history' => $history, 'rid' => $RID));
@@ -333,7 +333,7 @@ if ($method === 'POST' && $action === 'admin_segments') {
             (label, reward_type, reward_value, probability, color, icon, is_active, sort_order, created_at) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
-        $stmt->execute([
+        $stmt->execute(array(
             $input['label'],
             $input['reward_type'],
             (int)$input['reward_value'],
@@ -342,7 +342,7 @@ if ($method === 'POST' && $action === 'admin_segments') {
             isset($input['icon']) ? $input['icon'] : 'gift',
             isset($input['is_active']) ? (int)$input['is_active'] : 1,
             isset($input['sort_order']) ? (int)$input['sort_order'] : 0
-        ]);
+        ));
         
         jsonResponse(array('success' => true, 'id' => $pdo->lastInsertId(), 'rid' => $RID));
     }
@@ -360,7 +360,7 @@ if ($method === 'POST' && $action === 'admin_segments') {
                 sort_order = ?
             WHERE id = ?
         ");
-        $stmt->execute([
+        $stmt->execute(array(
             $input['label'],
             $input['reward_type'],
             (int)$input['reward_value'],
@@ -370,14 +370,14 @@ if ($method === 'POST' && $action === 'admin_segments') {
             isset($input['is_active']) ? (int)$input['is_active'] : 1,
             isset($input['sort_order']) ? (int)$input['sort_order'] : 0,
             (int)$input['id']
-        ]);
+        ));
         
         jsonResponse(array('success' => true, 'rid' => $RID));
     }
     
     if ($op === 'delete') {
         $stmt = $pdo->prepare("DELETE FROM spin_wheel_segments WHERE id = ?");
-        $stmt->execute([(int)$input['id']]);
+        $stmt->execute(array((int)$input['id']));
         
         jsonResponse(array('success' => true, 'rid' => $RID));
     }
@@ -403,7 +403,7 @@ if ($method === 'POST' && $action === 'admin_settings') {
             VALUES (?, ?) 
             ON DUPLICATE KEY UPDATE setting_value = ?
         ");
-        $stmt->execute([$key, $value, $value]);
+        $stmt->execute(array($key, $value, $value));
     }
     
     jsonResponse(array('success' => true, 'rid' => $RID));
