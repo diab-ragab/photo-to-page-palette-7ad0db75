@@ -158,23 +158,23 @@ export const useVoteSystem = () => {
         const mergedSites: VoteSiteStatus[] = safeSites.map((site) => {
           const status = siteStatuses[site.id] || null;
 
-          // Important: treat "no last_vote_time" as "never voted" (vote should be available)
+          // Important: treat "no status" as "never voted" (vote should be available)
           const lastVoteTime = status?.last_vote_time || null;
-          const hasVotedBefore = !!lastVoteTime;
+          
+          // Determine if user can vote:
+          // - If no status entry at all = never voted = can vote
+          // - If status exists, use server's can_vote value
+          const canVote = status === null ? true : status.can_vote === true;
 
-          // Use server-calculated seconds_remaining for accurate countdown
-          // Fallback: calculate from time_remaining (milliseconds) if seconds_remaining is missing
+          // Backend returns time_remaining in MILLISECONDS, convert to seconds
           let secondsRemaining: number | null = null;
-          if (status?.seconds_remaining !== undefined && status?.seconds_remaining !== null) {
-            secondsRemaining = status.seconds_remaining;
-          } else if (status?.time_remaining !== undefined && status?.time_remaining !== null) {
-            // time_remaining is in milliseconds, convert to seconds
+          if (status?.time_remaining !== undefined && status?.time_remaining !== null && status.time_remaining > 0) {
             secondsRemaining = Math.floor(status.time_remaining / 1000);
           }
 
           return {
             ...site,
-            canVote: hasVotedBefore ? status?.can_vote === true : true,
+            canVote,
             lastVoteTime,
             nextVoteTime: status?.next_vote_time || null,
             timeRemaining: status?.time_remaining || null,
@@ -219,10 +219,38 @@ export const useVoteSystem = () => {
   }, [isLoggedIn, user?.username]);
 
   const submitVote = async (siteId: number) => {
-    if (!isLoggedIn || !user?.username) return;
+    if (!isLoggedIn || !user?.username) {
+      toast({
+        title: "Login Required",
+        description: "Please login to vote and earn rewards!",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const site = voteSites.find(s => s.id === siteId);
-    if (!site || !site.canVote) return;
+    if (!site) return;
+    
+    // If user can't vote (cooldown active), show message instead of submitting
+    if (!site.canVote) {
+      const remaining = site.secondsRemaining;
+      if (remaining && remaining > 0) {
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+        toast({
+          title: "Cooldown Active",
+          description: `You can vote again on ${site.name} in ${hours}h ${minutes}m`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Cannot Vote Yet",
+          description: "Please wait for the cooldown to end.",
+          variant: "destructive"
+        });
+      }
+      return;
+    }
 
     setLoading(true);
     try {

@@ -11,6 +11,7 @@ error_reporting(E_ALL);
 define('VERSION', '2026-01-31-A');
 
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/db.php';
 
 /**
  * Prevent any accidental output from breaking JSON
@@ -291,17 +292,13 @@ try {
 
       // statuses (cooldown)
       $siteStatuses = [];
-      // Get current database time (avoids timezone mismatch between PHP and MySQL)
-      $dbNow = (int)$pdo->query("SELECT UNIX_TIMESTAMP(NOW())")->fetchColumn();
-
       foreach ($sites as $site) {
         $siteId = (int)$site['id'];
         $cooldownHours = (int)$site['cooldown_hours'];
 
         try {
-          // Use UNIX_TIMESTAMP to get consistent time values from DB
           $stmt = $pdo->prepare("
-            SELECT UNIX_TIMESTAMP(vote_time) as vote_ts, vote_time
+            SELECT vote_time
             FROM vote_log
             WHERE username = ? AND site_id = ?
             ORDER BY vote_time DESC
@@ -310,35 +307,29 @@ try {
           $stmt->execute([$username, $siteId]);
           $lastVote = $stmt->fetch(PDO::FETCH_ASSOC);
 
-          if ($lastVote && $lastVote['vote_ts']) {
-            $lastVoteTs = (int)$lastVote['vote_ts'];
-            $cooldownSecs = $cooldownHours * 3600;
-            $nextVoteTs = $lastVoteTs + $cooldownSecs;
-            $remaining = $nextVoteTs - $dbNow;
+          if ($lastVote && $lastVote['vote_time']) {
+            $lastVoteTime = strtotime($lastVote['vote_time']);
+            $nextVoteTime = $lastVoteTime + ($cooldownHours * 3600);
+            $now = time();
 
-            if ($remaining > 0) {
+            if ($now < $nextVoteTime) {
               $siteStatuses[$siteId] = [
                 'can_vote' => false,
-                'last_vote_time' => date('c', $lastVoteTs),
-                'next_vote_time' => date('c', $nextVoteTs),
-                'time_remaining' => $remaining * 1000,
-                'seconds_remaining' => $remaining
+                'last_vote_time' => date('c', $lastVoteTime),
+                'next_vote_time' => date('c', $nextVoteTime),
+                'time_remaining' => ($nextVoteTime - $now) * 1000
               ];
             } else {
               $siteStatuses[$siteId] = [
                 'can_vote' => true,
-                'last_vote_time' => date('c', $lastVoteTs),
+                'last_vote_time' => date('c', $lastVoteTime),
                 'next_vote_time' => null,
-                'time_remaining' => null,
-                'seconds_remaining' => 0
+                'time_remaining' => null
               ];
             }
           }
         } catch (Exception $e) {}
       }
-
-      // Include server time for client-side synchronization
-      $serverTime = time();
 
       jsonOut([
         'success' => true,
@@ -346,7 +337,6 @@ try {
         'vip_points' => $vipPoints,
         'total_votes' => $totalVotes,
         'site_statuses' => $siteStatuses,
-        'server_time' => $serverTime,
         'streak' => [
           'current' => $currentStreak,
           'longest' => $longestStreak,

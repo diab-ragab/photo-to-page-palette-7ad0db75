@@ -77,6 +77,12 @@ export const VoteSiteCard = ({ site, onVote, loading }: VoteSiteCardProps) => {
   }, [site.secondsRemaining, site.cooldown_hours, site.canVote]);
 
   const handleVote = async () => {
+    // If can't vote, don't open site - the button shouldn't be clickable anyway
+    // This is a safety check
+    if (!site.canVote) {
+      return;
+    }
+    
     setIsVoting(true);
     // Open vote site in new tab
     window.open(site.url, "_blank", "noopener,noreferrer");
