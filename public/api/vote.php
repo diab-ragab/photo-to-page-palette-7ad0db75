@@ -407,6 +407,7 @@ try {
 
       // streak logic
       $today = date('Y-m-d');
+      $yesterday = date('Y-m-d', strtotime('-1 day'));
       $currentStreak = 0; $longestStreak = 0; $streakIncreased = false;
 
       try {
@@ -420,16 +421,25 @@ try {
           $lastVoteDate = $streakData['last_vote_date'];
           $streakExpiresAt = $streakData['streak_expires_at'];
 
-          if ($streakExpiresAt && strtotime($streakExpiresAt) < time()) {
-            $currentStreak = 0;
-          }
+          // Check if streak expired (36h window passed)
+          $streakExpired = $streakExpiresAt && strtotime($streakExpiresAt) < time();
 
-          if ($lastVoteDate !== $today) {
+          if ($lastVoteDate === $today) {
+            // Already voted today - streak unchanged (don't increment again)
+            $streakIncreased = false;
+          } elseif ($lastVoteDate === $yesterday || !$streakExpired) {
+            // Voted yesterday OR still within 36h window - continue streak
             $currentStreak++;
             $streakIncreased = true;
             if ($currentStreak > $longestStreak) $longestStreak = $currentStreak;
+          } else {
+            // Streak broken - start fresh
+            $currentStreak = 1;
+            $streakIncreased = true;
+            // Keep longest streak as-is
           }
         } else {
+          // First vote ever
           $currentStreak = 1;
           $longestStreak = 1;
           $streakIncreased = true;
