@@ -66,6 +66,13 @@ const REWARD_TYPES = [
 
 const ICONS = ['coins', 'crown', 'zap', 'gift', 'x'];
 
+// Format Zen values: 1M for millions, k for thousands
+const formatZen = (value: number): string => {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+  return value.toLocaleString();
+};
+
 const COLORS = [
   '#22c55e', '#3b82f6', '#8b5cf6', '#f59e0b', 
   '#ec4899', '#ef4444', '#06b6d4', '#64748b'
@@ -227,8 +234,8 @@ export function SpinWheelManager() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-card border-amber-500/20">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card className="bg-card border-primary/20">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-amber-500/10">
@@ -279,6 +286,20 @@ export function SpinWheelManager() {
               <div>
                 <p className="text-xs text-muted-foreground">VIP Given</p>
                 <p className="text-lg font-bold">{(stats?.rewards_given?.vip || 0).toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-card border-cyan-500/20">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-cyan-500/10">
+                <Zap className="h-5 w-5 text-cyan-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Zen Given</p>
+                <p className="text-lg font-bold">{formatZen(stats?.rewards_given?.zen || 0)}</p>
               </div>
             </div>
           </CardContent>

@@ -585,4 +585,51 @@ if ($method === 'GET' && $action === 'admin_stats') {
     jsonResponse(array('success' => true, 'stats' => $stats, 'rid' => $RID));
 }
 
+// Public leaderboard: recent winners with character names
+if ($method === 'GET' && $action === 'leaderboard') {
+    $limit = isset($_GET['limit']) ? min(20, max(1, (int)$_GET['limit'])) : 10;
+    
+    // Detect level column for ordering
+    $levelCol = 'Level';
+    $levelCandidates = array('Level', 'level', 'cLevel');
+    foreach ($levelCandidates as $lc) {
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM basetab_sg LIKE '$lc'");
+            if ($stmt->fetch()) {
+                $levelCol = $lc;
+                break;
+            }
+        } catch (Exception $e) {}
+    }
+    
+    // Get recent winning spins with character names
+    $stmt = $pdo->prepare("
+        SELECT 
+            us.role_id,
+            us.reward_type,
+            us.reward_value,
+            us.spun_at,
+            sws.label,
+            sws.color,
+            b.Name AS char_name
+        FROM user_spins us
+        LEFT JOIN spin_wheel_segments sws ON sws.id = us.segment_id
+        LEFT JOIN basetab_sg b ON b.RoleID = us.role_id
+        WHERE us.reward_type != 'nothing' AND us.reward_value > 0
+        ORDER BY us.spun_at DESC
+        LIMIT ?
+    ");
+    $stmt->execute(array($limit));
+    $leaderboard = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Fallback if char_name is null
+    foreach ($leaderboard as $idx => $entry) {
+        if (!isset($entry['char_name']) || $entry['char_name'] === null || $entry['char_name'] === '') {
+            $leaderboard[$idx]['char_name'] = 'Unknown';
+        }
+    }
+    
+    jsonResponse(array('success' => true, 'leaderboard' => $leaderboard, 'rid' => $RID));
+}
+
 jsonResponse(array('success' => false, 'message' => 'Invalid action', 'rid' => $RID), 400);
