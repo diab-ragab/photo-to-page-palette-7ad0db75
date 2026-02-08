@@ -434,10 +434,21 @@ if ($method === 'POST' && $action === 'spin') {
         if (method_exists($pdo, 'rollBack')) {
             try { $pdo->rollBack(); } catch (Exception $x) {}
         }
-        error_log("SPIN_WHEEL_ERROR rid=$RID msg=" . $e->getMessage());
+        $exMsg = $e->getMessage();
+        error_log("SPIN_WHEEL_ERROR rid=$RID msg=$exMsg");
+
         $msg = 'Server error';
-        if ($e->getMessage() === 'MAIL_INSERT_FAILED') $msg = 'Mail delivery failed';
-        jsonResponse(array('success' => false, 'message' => $msg, 'rid' => $RID), 500);
+        if ($exMsg === 'MAIL_INSERT_FAILED') {
+            $msg = 'Mail delivery failed';
+        }
+
+        // Include debug info so frontend/logs can show exactly what went wrong
+        jsonResponse(array(
+            'success' => false,
+            'message' => $msg,
+            '_debug'  => $exMsg,
+            'rid'     => $RID
+        ), 500);
     }
 }
 

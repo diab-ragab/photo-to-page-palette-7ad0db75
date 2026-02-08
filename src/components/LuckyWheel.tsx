@@ -323,15 +323,29 @@ export function LuckyWheel() {
       console.error('[LuckyWheel] Spin error:', err);
 
       const statusCode = typeof err?.status === 'number' ? err.status : undefined;
-      const rid = typeof err?.rid === 'string' ? err.rid : (typeof err?.serverJson?.rid === 'string' ? err.serverJson.rid : undefined);
+      const serverJson = err?.serverJson || {};
+      const rid = typeof serverJson.rid === 'string' ? serverJson.rid : undefined;
+      const debugInfo = typeof serverJson._debug === 'string' ? serverJson._debug : undefined;
+
       const rawMessage = (typeof err?.serverMessage === 'string' && err.serverMessage.trim() !== '')
         ? err.serverMessage
         : (err?.message || 'Failed to spin');
 
-      const message = `${rawMessage}${statusCode ? ` (HTTP ${statusCode})` : ''}${rid ? ` (RID: ${rid})` : ''}`;
+      let message = rawMessage;
+      if (debugInfo && debugInfo !== rawMessage) {
+        message += ` — ${debugInfo}`;
+      }
+      if (statusCode) {
+        message += ` (HTTP ${statusCode})`;
+      }
+      if (rid) {
+        message += ` (RID: ${rid})`;
+      }
+
+      console.error('[LuckyWheel] Error details:', { statusCode, rid, debugInfo, rawMessage, serverJson });
 
       // Handle specific backend errors
-      if (rawMessage.includes('Invalid character') || rawMessage.includes('role_id')) {
+      if (rawMessage.includes('Invalid character') || rawMessage.includes('role_id') || (debugInfo && debugInfo.includes('role'))) {
         toast.error('Invalid character selection. Please choose again.');
         setSelectedRoleId(null);
         setSelectedCharacterName(null);
