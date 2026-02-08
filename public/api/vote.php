@@ -1,17 +1,16 @@
 <?php
 /**
  * vote.php - Voting system API
- * MySQL 5.1 compatible
+ * PHP 5.1/MySQL 5.1 compatible - NO short array syntax
  */
 
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
-define('VERSION', '2026-01-31-A');
+define('VERSION', '2026-02-08-A');
 
 require_once __DIR__ . '/bootstrap.php';
-require_once __DIR__ . '/db.php';
 
 /**
  * Prevent any accidental output from breaking JSON
@@ -21,13 +20,13 @@ if (ob_get_level() === 0) { ob_start(); }
 // ---------- CORS / OPTIONS ----------
 $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
 
-$allowedOrigins = [
+$allowedOrigins = array(
   'https://woiendgame.online',
   'https://www.woiendgame.online',
   'https://woiendgame.lovable.app',
   'http://localhost:5173',
-  'http://localhost:3000',
-];
+  'http://localhost:3000'
+);
 
 $isLovableOrigin = is_string($origin) &&
   preg_match('/^https:\/\/[a-z0-9-]+\.(lovableproject\.com|lovable\.app)$/i', $origin);
@@ -86,9 +85,10 @@ function jsonOut($data) {
   exit;
 }
 
-function jsonFail($code, $msg, $extra = []) {
+function jsonFail($code, $msg, $extra = null) {
+  if ($extra === null) { $extra = array(); }
   http_response_code($code);
-  jsonOut(array_merge(['success' => false, 'message' => $msg], $extra));
+  jsonOut(array_merge(array('success' => false, 'message' => $msg), $extra));
 }
 
 // ---------- DB ----------
@@ -155,18 +155,18 @@ try {
 
 // Streak tier configuration
 function getStreakTier($streak) {
-  if ($streak >= 30) return ['tier' => 'legend', 'name' => 'Legend', 'multiplier' => 2.0, 'color' => '#FFD700'];
-  if ($streak >= 14) return ['tier' => 'champion', 'name' => 'Champion', 'multiplier' => 1.75, 'color' => '#C0C0C0'];
-  if ($streak >= 7)  return ['tier' => 'warrior', 'name' => 'Warrior', 'multiplier' => 1.5, 'color' => '#CD7F32'];
-  if ($streak >= 3)  return ['tier' => 'rising', 'name' => 'Rising', 'multiplier' => 1.25, 'color' => '#10B981'];
-  return ['tier' => 'starter', 'name' => 'Starter', 'multiplier' => 1.0, 'color' => '#6B7280'];
+  if ($streak >= 30) return array('tier' => 'legend', 'name' => 'Legend', 'multiplier' => 2.0, 'color' => '#FFD700');
+  if ($streak >= 14) return array('tier' => 'champion', 'name' => 'Champion', 'multiplier' => 1.75, 'color' => '#C0C0C0');
+  if ($streak >= 7)  return array('tier' => 'warrior', 'name' => 'Warrior', 'multiplier' => 1.5, 'color' => '#CD7F32');
+  if ($streak >= 3)  return array('tier' => 'rising', 'name' => 'Rising', 'multiplier' => 1.25, 'color' => '#10B981');
+  return array('tier' => 'starter', 'name' => 'Starter', 'multiplier' => 1.0, 'color' => '#6B7280');
 }
 
 function getNextTier($streak) {
-  if ($streak < 3)  return ['days_needed' => 3 - $streak,  'tier' => 'rising',   'multiplier' => 1.25];
-  if ($streak < 7)  return ['days_needed' => 7 - $streak,  'tier' => 'warrior',  'multiplier' => 1.5];
-  if ($streak < 14) return ['days_needed' => 14 - $streak, 'tier' => 'champion', 'multiplier' => 1.75];
-  if ($streak < 30) return ['days_needed' => 30 - $streak, 'tier' => 'legend',   'multiplier' => 2.0];
+  if ($streak < 3)  return array('days_needed' => 3 - $streak,  'tier' => 'rising',   'multiplier' => 1.25);
+  if ($streak < 7)  return array('days_needed' => 7 - $streak,  'tier' => 'warrior',  'multiplier' => 1.5);
+  if ($streak < 14) return array('days_needed' => 14 - $streak, 'tier' => 'champion', 'multiplier' => 1.75);
+  if ($streak < 30) return array('days_needed' => 30 - $streak, 'tier' => 'legend',   'multiplier' => 2.0);
   return null;
 }
 
@@ -191,31 +191,31 @@ try {
       try { $dbHost = $pdo->query("SELECT @@hostname")->fetchColumn(); } catch (Exception $e) {}
 
       $voteSitesCount = null;
-      $sample = [];
+      $sample = array();
       try {
         $voteSitesCount = (int)$pdo->query("SELECT COUNT(*) FROM vote_sites")->fetchColumn();
         $stmt = $pdo->query("SELECT id,name,is_active,cooldown_hours,url FROM vote_sites ORDER BY id DESC LIMIT 10");
         $sample = $stmt->fetchAll(PDO::FETCH_ASSOC);
       } catch (Exception $e) {
-        $sample = ['error' => $e->getMessage()];
+        $sample = array('error' => $e->getMessage());
       }
 
-      jsonOut([
+      jsonOut(array(
         'success' => true,
-        'db' => ['database' => $dbName, 'hostname' => $dbHost],
+        'db' => array('database' => $dbName, 'hostname' => $dbHost),
         'vote_sites_count' => $voteSitesCount,
         'vote_sites_sample' => $sample
-      ]);
+      ));
     } break;
 
     case 'get_vote_status': {
-      if ($username === '') jsonOut(['success' => false, 'message' => 'Username required']);
+      if ($username === '') jsonOut(array('success' => false, 'message' => 'Username required'));
 
       // lookup user
       $user = null;
       try {
         $stmt = $pdo->prepare("SELECT ID FROM users WHERE {$usernameColumn} = ? LIMIT 1");
-        $stmt->execute([$username]);
+        $stmt->execute(array($username));
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
       } catch (Exception $e) {
         error_log("RID={$RID} USERS_LOOKUP_FAIL=" . $e->getMessage());
@@ -227,7 +227,7 @@ try {
         // currency
         try {
           $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE user_id = ? LIMIT 1");
-          $stmt->execute([(int)$user['ID']]);
+          $stmt->execute(array((int)$user['ID']));
           $currency = $stmt->fetch(PDO::FETCH_ASSOC);
           if ($currency) {
             $coins = (int)$currency['coins'];
@@ -236,7 +236,7 @@ try {
         } catch (Exception $e) {
           try {
             $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE username = ? LIMIT 1");
-            $stmt->execute([$username]);
+            $stmt->execute(array($username));
             $currency = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($currency) {
               $coins = (int)$currency['coins'];
@@ -248,7 +248,7 @@ try {
         // total votes
         try {
           $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM vote_log WHERE username = ?");
-          $stmt->execute([$username]);
+          $stmt->execute(array($username));
           $voteCount = $stmt->fetch(PDO::FETCH_ASSOC);
           $totalVotes = (int)(isset($voteCount['total']) ? $voteCount['total'] : 0);
         } catch (Exception $e) {}
@@ -260,7 +260,7 @@ try {
 
       try {
         $stmt = $pdo->prepare("SELECT * FROM vote_streaks WHERE username = ? LIMIT 1");
-        $stmt->execute([$username]);
+        $stmt->execute(array($username));
         $streakData = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($streakData) {
@@ -272,7 +272,7 @@ try {
           if ($streakExpiresAt && strtotime($streakExpiresAt) < time()) {
             $currentStreak = 0;
             $stmt = $pdo->prepare("UPDATE vote_streaks SET current_streak = 0, streak_expires_at = NULL, updated_at = NOW() WHERE username = ?");
-            $stmt->execute([$username]);
+            $stmt->execute(array($username));
           }
         }
       } catch (Exception $e) {}
@@ -281,17 +281,17 @@ try {
       $nextTier = getNextTier($currentStreak);
 
       // active sites
-      $sites = [];
+      $sites = array();
       try {
         $stmt = $pdo->query("SELECT id, cooldown_hours FROM vote_sites WHERE is_active = 1");
         $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
       } catch (Exception $e) {
         error_log("RID={$RID} VOTE_SITES_QUERY_FAIL=" . $e->getMessage());
-        $sites = [];
+        $sites = array();
       }
 
       // statuses (cooldown)
-      $siteStatuses = [];
+      $siteStatuses = array();
       foreach ($sites as $site) {
         $siteId = (int)$site['id'];
         $cooldownHours = (int)$site['cooldown_hours'];
@@ -304,7 +304,7 @@ try {
             ORDER BY vote_time DESC
             LIMIT 1
           ");
-          $stmt->execute([$username, $siteId]);
+          $stmt->execute(array($username, $siteId));
           $lastVote = $stmt->fetch(PDO::FETCH_ASSOC);
 
           if ($lastVote && $lastVote['vote_time']) {
@@ -313,31 +313,31 @@ try {
             $now = time();
 
             if ($now < $nextVoteTime) {
-              $siteStatuses[$siteId] = [
+              $siteStatuses[$siteId] = array(
                 'can_vote' => false,
                 'last_vote_time' => date('c', $lastVoteTime),
                 'next_vote_time' => date('c', $nextVoteTime),
                 'time_remaining' => ($nextVoteTime - $now) * 1000
-              ];
+              );
             } else {
-              $siteStatuses[$siteId] = [
+              $siteStatuses[$siteId] = array(
                 'can_vote' => true,
                 'last_vote_time' => date('c', $lastVoteTime),
                 'next_vote_time' => null,
                 'time_remaining' => null
-              ];
+              );
             }
           }
         } catch (Exception $e) {}
       }
 
-      jsonOut([
+      jsonOut(array(
         'success' => true,
         'coins' => $coins,
         'vip_points' => $vipPoints,
         'total_votes' => $totalVotes,
         'site_statuses' => $siteStatuses,
-        'streak' => [
+        'streak' => array(
           'current' => $currentStreak,
           'longest' => $longestStreak,
           'last_vote_date' => $lastVoteDate,
@@ -345,12 +345,12 @@ try {
           'tier' => $tierInfo,
           'next_tier' => $nextTier,
           'multiplier' => $tierInfo['multiplier']
-        ]
-      ]);
+        )
+      ));
     } break;
 
     case 'submit_vote': {
-      if ($username === '') jsonOut(['success' => false, 'message' => 'Username required']);
+      if ($username === '') jsonOut(array('success' => false, 'message' => 'Username required'));
 
       $siteId = 0;
       if (isset($_POST['site_id'])) $siteId = (int)$_POST['site_id'];
@@ -359,13 +359,13 @@ try {
       $fingerprint = '';
       if (isset($_POST['fingerprint'])) $fingerprint = trim($_POST['fingerprint']);
 
-      if (!$siteId) jsonOut(['success' => false, 'message' => 'Site ID required']);
+      if (!$siteId) jsonOut(array('success' => false, 'message' => 'Site ID required'));
 
       // site info
       $stmt = $pdo->prepare("SELECT * FROM vote_sites WHERE id = ? AND is_active = 1 LIMIT 1");
-      $stmt->execute([$siteId]);
+      $stmt->execute(array($siteId));
       $site = $stmt->fetch(PDO::FETCH_ASSOC);
-      if (!$site) jsonOut(['success' => false, 'message' => 'Invalid vote site']);
+      if (!$site) jsonOut(array('success' => false, 'message' => 'Invalid vote site'));
 
       // cooldown check
       $cooldownHours = (int)$site['cooldown_hours'];
@@ -376,7 +376,7 @@ try {
         ORDER BY vote_time DESC
         LIMIT 1
       ");
-      $stmt->execute([$username, $siteId]);
+      $stmt->execute(array($username, $siteId));
       $lastVote = $stmt->fetch(PDO::FETCH_ASSOC);
 
       if ($lastVote && $lastVote['vote_time']) {
@@ -386,11 +386,11 @@ try {
           $remaining = $nextVoteTime - time();
           $hours = floor($remaining / 3600);
           $minutes = floor(($remaining % 3600) / 60);
-          jsonOut([
+          jsonOut(array(
             'success' => false,
             'message' => "You can vote again in {$hours}h {$minutes}m",
             'next_vote_time' => date('c', $nextVoteTime)
-          ]);
+          ));
         }
       }
 
@@ -398,7 +398,7 @@ try {
       $userId = 0;
       try {
         $stmt = $pdo->prepare("SELECT ID FROM users WHERE {$usernameColumn} = ? LIMIT 1");
-        $stmt->execute([$username]);
+        $stmt->execute(array($username));
         $u = $stmt->fetch(PDO::FETCH_ASSOC);
         $userId = $u ? (int)$u['ID'] : 0;
       } catch (Exception $e) {
@@ -412,7 +412,7 @@ try {
 
       try {
         $stmt = $pdo->prepare("SELECT * FROM vote_streaks WHERE username = ? LIMIT 1");
-        $stmt->execute([$username]);
+        $stmt->execute(array($username));
         $streakData = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($streakData) {
@@ -475,7 +475,7 @@ try {
             coins_earned, vip_earned, streak_bonus, vote_time
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
-        $stmt->execute([
+        $stmt->execute(array(
           $userId,
           $username,
           $siteId,
@@ -484,10 +484,10 @@ try {
           $coinsReward,
           $vipReward,
           $multiplier
-        ]);
+        ));
       } catch (Exception $e) {
         error_log("RID={$RID} VOTE_LOG_INSERT_FAIL=" . $e->getMessage());
-        jsonFail(500, 'Failed to record vote', ['reason' => 'vote_log insert failed']);
+        jsonFail(500, 'Failed to record vote', array('reason' => 'vote_log insert failed'));
       }
 
       // update currency (schema-safe)
@@ -502,7 +502,7 @@ try {
               coins = coins + VALUES(coins),
               vip_points = vip_points + VALUES(vip_points)
           ");
-          $stmt->execute([$userId, $coinsReward, $vipReward]);
+          $stmt->execute(array($userId, $coinsReward, $vipReward));
         } elseif (in_array('username', $cols, true)) {
           $stmt = $pdo->prepare("
             INSERT INTO user_currency (username, coins, vip_points)
@@ -511,7 +511,7 @@ try {
               coins = coins + VALUES(coins),
               vip_points = vip_points + VALUES(vip_points)
           ");
-          $stmt->execute([$username, $coinsReward, $vipReward]);
+          $stmt->execute(array($username, $coinsReward, $vipReward));
         }
       } catch (Exception $e) {
         error_log("RID={$RID} USER_CURRENCY_UPDATE_FAIL=" . $e->getMessage());
@@ -532,7 +532,7 @@ try {
             total_bonus_earned = total_bonus_earned + ?,
             updated_at = NOW()
         ");
-        $stmt->execute([$username, $currentStreak, $longestStreak, $today, $streakExpiresAt, $bonusTotal, $bonusTotal]);
+        $stmt->execute(array($username, $currentStreak, $longestStreak, $today, $streakExpiresAt, $bonusTotal, $bonusTotal));
       } catch (Exception $e) {
         error_log("RID={$RID} STREAK_UPDATE_FAIL=" . $e->getMessage());
       }
@@ -546,10 +546,10 @@ try {
 
         if (in_array('user_id', $cols, true) && $userId > 0) {
           $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE user_id = ? LIMIT 1");
-          $stmt->execute([$userId]);
+          $stmt->execute(array($userId));
         } else {
           $stmt = $pdo->prepare("SELECT coins, vip_points FROM user_currency WHERE username = ? LIMIT 1");
-          $stmt->execute([$username]);
+          $stmt->execute(array($username));
         }
 
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -562,7 +562,7 @@ try {
       $nextVoteTime = time() + ($cooldownHours * 3600);
       $nextTier = getNextTier($currentStreak);
 
-      jsonOut([
+      jsonOut(array(
         'success' => true,
         'message' => 'Vote recorded successfully!',
         'coins_earned' => $coinsReward,
@@ -572,7 +572,7 @@ try {
         'new_coins_total' => $newCoins,
         'new_vip_total' => $newVip,
         'next_vote_time' => date('c', $nextVoteTime),
-        'streak' => [
+        'streak' => array(
           'current' => $currentStreak,
           'longest' => $longestStreak,
           'increased' => $streakIncreased,
@@ -580,8 +580,8 @@ try {
           'next_tier' => $nextTier,
           'multiplier' => $multiplier,
           'expires_at' => $streakExpiresAt
-        ]
-      ]);
+        )
+      ));
     } break;
 
     case 'get_streak_leaderboard': {
@@ -597,23 +597,23 @@ try {
           ORDER BY current_streak DESC, longest_streak DESC
           LIMIT ?
         ");
-        $stmt->execute([$limit]);
+        $stmt->execute(array($limit));
         $leaders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($leaders as &$leader) {
-          $leader['tier'] = getStreakTier((int)$leader['current_streak']);
+        foreach ($leaders as $k => $leader) {
+          $leaders[$k]['tier'] = getStreakTier((int)$leader['current_streak']);
         }
 
-        jsonOut(['success' => true, 'leaderboard' => $leaders]);
+        jsonOut(array('success' => true, 'leaderboard' => $leaders));
       } catch (Exception $e) {
-        jsonOut(['success' => true, 'leaderboard' => []]);
+        jsonOut(array('success' => true, 'leaderboard' => array()));
       }
     } break;
 
     default:
-      jsonOut(['success' => false, 'message' => 'Invalid action']);
+      jsonOut(array('success' => false, 'message' => 'Invalid action'));
   }
 } catch (Exception $e) {
   error_log("RID={$RID} FATAL=" . $e->getMessage());
-  jsonFail(500, 'Server error', ['reason' => 'unexpected exception']);
+  jsonFail(500, 'Server error', array('reason' => 'unexpected exception'));
 }
