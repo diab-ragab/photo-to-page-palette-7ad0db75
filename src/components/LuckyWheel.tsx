@@ -142,7 +142,7 @@ interface RewardPopupProps {
 }
 
 function RewardPopup({ result, onClose }: RewardPopupProps) {
-  const isNothing = result.winner.reward_type === 'nothing';
+  const isNothing = result.winner?.reward_type === 'nothing';
   
   return (
     <motion.div
@@ -160,16 +160,16 @@ function RewardPopup({ result, onClose }: RewardPopupProps) {
         className="bg-card border border-primary/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {!isNothing && (
+        {!isNothing && result.winner && (
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: 'spring' }}
             className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: result.winner.color + '30' }}
+            style={{ backgroundColor: (result.winner.color || '#3b82f6') + '30' }}
           >
-            <span className="text-4xl" style={{ color: result.winner.color }}>
-              {ICON_MAP[result.winner.icon] || <Gift className="h-10 w-10" />}
+            <span className="text-4xl" style={{ color: result.winner.color || '#3b82f6' }}>
+              {ICON_MAP[result.winner.icon || 'gift'] || <Gift className="h-10 w-10" />}
             </span>
           </motion.div>
         )}
@@ -179,13 +179,13 @@ function RewardPopup({ result, onClose }: RewardPopupProps) {
         </h3>
         
         <p className="text-lg mb-4">
-          {isNothing ? (
+          {isNothing || !result.winner ? (
             'No reward this time'
           ) : (
             <>
               You won{' '}
-              <span className="font-bold" style={{ color: result.winner.color }}>
-                {result.winner.label}
+              <span className="font-bold" style={{ color: result.winner.color || '#3b82f6' }}>
+                {result.winner.label || 'a prize'}
               </span>
               !
             </>
@@ -401,7 +401,7 @@ export function LuckyWheel() {
 
       {/* Result Popup */}
       <AnimatePresence>
-        {showResult && result && (
+        {showResult && result && result.winner && (
           <RewardPopup result={result} onClose={handleCloseResult} />
         )}
       </AnimatePresence>
