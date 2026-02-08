@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Gem, Coins, Check, Crown, Sparkles, Loader2 } from "lucide-react";
 import { SkeletonGrid, ApiEmptyState, ApiErrorState } from "@/components/ui/api-loading-state";
 import { useToast } from "@/hooks/use-toast";
+import { hapticSuccess } from "@/hooks/useHapticFeedback";
 import { fetchActivePackages, TopUpPackage } from "@/lib/currencyTopupApi";
 
 type CurrencyType = "zen" | "coins";
@@ -131,7 +132,7 @@ export const CurrencyTopUp = () => {
     const pkg = filteredPackages.find(p => p.id === selectedPackage);
     if (!pkg) return;
 
-    // In production, redirect to checkout
+    hapticSuccess();
     toast({
       title: "Redirecting to checkout... 💳",
       description: `${formatNumber(pkg.amount + pkg.bonus_amount)} ${currencyType === "zen" ? "Zen" : "Coins"} for €${pkg.price.toFixed(2)}`,
