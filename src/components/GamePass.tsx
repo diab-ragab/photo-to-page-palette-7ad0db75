@@ -339,6 +339,13 @@ export const GamePass = () => {
     const fetchUserPassStatus = async () => {
       if (!user) return;
 
+      // Check if we have a session token before making the request
+      const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken");
+      if (!token) {
+        // No token means not authenticated - silent fail, don't show error
+        return;
+      }
+
       try {
         const response = await fetch(`${API_BASE}/gamepass.php?action=status&rid=${Date.now()}`, {
           method: "GET",
@@ -353,8 +360,8 @@ export const GamePass = () => {
         const data = contentType.includes("application/json") ? await response.json() : null;
 
         if (!response.ok) {
-          if (response.status === 401) {
-            toast.error("Session expired", { description: "Please log in again." });
+          // 401/403 = session expired or invalid - logout silently (no toast spam)
+          if (response.status === 401 || response.status === 403) {
             logout();
             return;
           }
@@ -374,7 +381,7 @@ export const GamePass = () => {
           if (Array.isArray(data.rewards) && data.rewards.length > 0) setRewards(convertApiRewards(data.rewards));
         }
       } catch {
-        toast.error("Game Pass status failed (network error).");
+        // Network error - silent fail for status check
       }
     };
 
