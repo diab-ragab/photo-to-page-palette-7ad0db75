@@ -8,17 +8,8 @@
  * POST ?action=claim
  */
 
-require_once __DIR__ . '/bootstrap.php';
-handleCors(array('GET', 'POST', 'OPTIONS'));
-require_once __DIR__ . '/session_helper.php';
-require_once __DIR__ . '/mail_delivery.php';
-
-header('Content-Type: application/json; charset=utf-8');
-
-ini_set('display_errors', '0');
-ini_set('log_errors', '1');
-error_reporting(E_ALL);
-
+// IMPORTANT: initialize buffering + error handlers BEFORE including dependencies
+// so PHP warnings/notices/fatal shutdowns don't corrupt JSON output.
 $RID = substr(md5(uniqid(mt_rand(), true)), 0, 12);
 ob_start();
 
@@ -35,15 +26,44 @@ function json_fail($code, $msg) {
   json_out($code, array('success' => false, 'error' => $msg, 'rid' => $RID));
 }
 
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL);
+
 set_exception_handler(function($e) {
   error_log("GAMEPASS EX: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
   json_fail(500, "Server error");
 });
 
 set_error_handler(function($severity, $message, $file, $line) {
+  // Do NOT convert warnings/notices into exceptions; they are common on PHP 5.x
+  // and would cause unnecessary 500s.
+  if (!($severity & (E_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR))) {
+    error_log("GAMEPASS WARN: $message in $file:$line");
+    return true; // handled
+  }
+
   error_log("GAMEPASS ERR: $message in $file:$line");
   throw new ErrorException($message, 0, $severity, $file, $line);
 });
+
+register_shutdown_function(function() {
+  $err = error_get_last();
+  if (!$err) return;
+
+  $fatalTypes = array(E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR);
+  if (in_array($err['type'], $fatalTypes, true)) {
+    error_log("GAMEPASS FATAL: {$err['message']} in {$err['file']}:{$err['line']}");
+    json_fail(500, 'Server error');
+  }
+});
+
+require_once __DIR__ . '/bootstrap.php';
+handleCors(array('GET', 'POST', 'OPTIONS'));
+require_once __DIR__ . '/session_helper.php';
+require_once __DIR__ . '/mail_delivery.php';
+
+header('Content-Type: application/json; charset=utf-8');
 
 $pdo = getDB();
 $action = isset($_GET['action']) ? $_GET['action'] : (isset($_POST['action']) ? $_POST['action'] : '');

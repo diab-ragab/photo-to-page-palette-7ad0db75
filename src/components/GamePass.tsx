@@ -310,44 +310,68 @@ export const GamePass = () => {
     const fetchRewards = async () => {
       setIsLoadingRewards(true);
       try {
-        const response = await fetch(`${API_BASE}/gamepass.php?action=rewards`);
-        const data = await response.json();
-        if (data.success && data.rewards?.length > 0) {
+        const response = await fetch(`${API_BASE}/gamepass.php?action=rewards&rid=${Date.now()}`, {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        const contentType = response.headers.get("content-type") || "";
+        const data = contentType.includes("application/json") ? await response.json() : null;
+
+        if (response.ok && data?.success && Array.isArray(data.rewards) && data.rewards.length > 0) {
           setRewards(convertApiRewards(data.rewards));
           if (data.current_day) setCurrentDay(data.current_day);
         }
-      } catch { /* Silent */ }
-      finally { setIsLoadingRewards(false); }
+      } catch {
+        // silent (landing page should still render)
+      } finally {
+        setIsLoadingRewards(false);
+      }
     };
+
     fetchRewards();
   }, []);
 
   useEffect(() => {
     const fetchUserPassStatus = async () => {
       if (!user) return;
+
       try {
-        const response = await fetch(`${API_BASE}/gamepass.php?action=status`, {
+        const response = await fetch(`${API_BASE}/gamepass.php?action=status&rid=${Date.now()}`, {
           method: "GET",
           credentials: "include",
           headers: {
-            "Accept": "application/json",
+            Accept: "application/json",
             ...getAuthHeaders(),
           },
         });
-        const data = await response.json();
-        if (data.success) {
-          setHasElitePass(data.is_premium || false);
+
+        const contentType = response.headers.get("content-type") || "";
+        const data = contentType.includes("application/json") ? await response.json() : null;
+
+        if (!response.ok) {
+          const rid = typeof data?.rid === "string" ? ` (RID: ${data.rid})` : "";
+          const msg = data?.error || `Game Pass status failed (${response.status}).`;
+          toast.error(`${msg}${rid}`);
+          return;
+        }
+
+        if (data?.success) {
+          setHasElitePass(!!data.is_premium);
           setClaimedDays({ free: data.claimed_days?.free || [], elite: data.claimed_days?.elite || [] });
           if (data.current_day) setCurrentDay(data.current_day);
           if (data.user_zen !== undefined) setUserZen(data.user_zen);
-          // Only update zenCostPerDay if it's a positive number
-          if (data.zen_cost_per_day && data.zen_cost_per_day > 0) {
-            setZenCostPerDay(data.zen_cost_per_day);
-          }
-          if (data.rewards?.length > 0) setRewards(convertApiRewards(data.rewards));
+          if (data.zen_cost_per_day && data.zen_cost_per_day > 0) setZenCostPerDay(data.zen_cost_per_day);
+          if (Array.isArray(data.rewards) && data.rewards.length > 0) setRewards(convertApiRewards(data.rewards));
         }
-      } catch { /* Silent */ }
+      } catch {
+        toast.error("Game Pass status failed (network error).");
+      }
     };
+
     fetchUserPassStatus();
   }, [user]);
 
