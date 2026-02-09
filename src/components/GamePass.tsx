@@ -433,9 +433,23 @@ export const GamePass = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/gamepass.php?action=claim&rid=${Date.now()}`, {
+      // Include auth + payload in BOTH URL params and JSON body.
+      // Some hosts/proxies can drop POST bodies or convert POST→GET; gamepass.php supports $_REQUEST fallbacks.
+      const claimParams = new URLSearchParams({
+        action: "claim",
+        rid: String(Date.now()),
+        sessionToken,
+        day: String(day),
+        tier,
+        roleId: String(selectedRoleId),
+        payWithZen: payWithZen ? "1" : "0",
+      });
+      const url = `${API_BASE}/gamepass.php?${claimParams.toString()}`;
+
+      const response = await fetch(url, {
         method: "POST",
         credentials: "include",
+        referrerPolicy: "no-referrer",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
