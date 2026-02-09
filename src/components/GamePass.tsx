@@ -415,9 +415,22 @@ export const GamePass = () => {
       return;
     }
 
+    // Require a session token for state-changing actions.
+    // (Some hosting setups can strip auth headers; we also include sessionToken in body as a fallback.)
+    const sessionToken =
+      localStorage.getItem("woi_session_token") ||
+      localStorage.getItem("sessionToken") ||
+      "";
+
+    if (!sessionToken) {
+      toast.error("Not logged in", { description: "Please log in again, then try claiming the reward." });
+      logout();
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/gamepass.php?action=claim`, {
+      const response = await fetch(`${API_BASE}/gamepass.php?action=claim&rid=${Date.now()}`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -425,21 +438,30 @@ export const GamePass = () => {
           "Accept": "application/json",
           ...getAuthHeaders(),
         },
-        body: JSON.stringify({ day, tier, roleId: selectedRoleId, payWithZen }),
+        body: JSON.stringify({
+          day,
+          tier,
+          roleId: selectedRoleId,
+          payWithZen,
+          // Fallback auth: session_helper.php can read sessionToken from JSON body
+          sessionToken,
+        }),
       });
 
       const contentType = response.headers.get("content-type") || "";
       const rawText = await response.text().catch(() => "");
-      const data = contentType.includes("application/json") ? (() => {
-        try {
-          return rawText ? JSON.parse(rawText) : null;
-        } catch {
-          return null;
-        }
-      })() : null;
+      const data = contentType.includes("application/json")
+        ? (() => {
+            try {
+              return rawText ? JSON.parse(rawText) : null;
+            } catch {
+              return null;
+            }
+          })()
+        : null;
 
       if (!response.ok) {
-        if (response.status === 401) {
+        if (response.status === 401 || response.status === 403) {
           toast.error("Session expired", { description: "Please log in again." });
           logout();
           return;
@@ -462,8 +484,16 @@ export const GamePass = () => {
           description: `Sent to ${selectedCharacterName || "your character"}!${zenMsg}`,
         });
       } else {
+        const errText: string = (data?.error || data?.message || "Please try again.") as string;
         const rid = typeof data?.rid === "string" ? ` (RID: ${data.rid})` : "";
-        toast.error("Failed to claim", { description: `${data?.error || "Please try again."}${rid}` });
+
+        if (/not authenticated/i.test(errText)) {
+          toast.error("Not authenticated", { description: `Please log in again.${rid}` });
+          logout();
+          return;
+        }
+
+        toast.error("Failed to claim", { description: `${errText}${rid}` });
       }
     } catch {
       toast.error("Connection error");
