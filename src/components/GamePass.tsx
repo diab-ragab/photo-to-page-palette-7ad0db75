@@ -347,7 +347,10 @@ export const GamePass = () => {
       }
 
       try {
-        const response = await fetch(`${API_BASE}/gamepass.php?action=status&rid=${Date.now()}`, {
+        // Include sessionToken as query param fallback (some proxies strip custom headers)
+        const url = `${API_BASE}/gamepass.php?action=status&rid=${Date.now()}&sessionToken=${encodeURIComponent(token)}`;
+        
+        const response = await fetch(url, {
           method: "GET",
           credentials: "include",
           headers: {
