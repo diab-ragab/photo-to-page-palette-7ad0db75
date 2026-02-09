@@ -287,16 +287,15 @@ try {
       $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '';
       error_log("GAMEPASS_CLAIM method=$method");
       
-      // Read input from php://input for POST, or from $_GET for GET
-      $rawInput = file_get_contents('php://input');
-      $input = json_decode($rawInput, true);
-      if (!is_array($input)) {
+      // Use cached JSON from bootstrap.php (php://input can only be read once!)
+      $input = getJsonInput();
+      if (empty($input)) {
         // Fallback to GET/POST params
-        $input = array();
         if (isset($_REQUEST['day'])) $input['day'] = $_REQUEST['day'];
         if (isset($_REQUEST['tier'])) $input['tier'] = $_REQUEST['tier'];
         if (isset($_REQUEST['roleId'])) $input['roleId'] = $_REQUEST['roleId'];
         if (isset($_REQUEST['payWithZen'])) $input['payWithZen'] = $_REQUEST['payWithZen'];
+        if (isset($_REQUEST['sessionToken'])) $input['sessionToken'] = $_REQUEST['sessionToken'];
       }
 
       $user = getCurrentUser();

@@ -8,6 +8,31 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
+/**
+ * CRITICAL: Cache JSON input from php://input immediately.
+ * PHP only allows reading this stream ONCE per request.
+ * Store in $GLOBALS so session_helper.php and endpoint scripts can both access it.
+ */
+if (!isset($GLOBALS['__rawInput'])) {
+    $GLOBALS['__rawInput'] = file_get_contents('php://input');
+    $GLOBALS['__jsonInput'] = null;
+    if (is_string($GLOBALS['__rawInput']) && $GLOBALS['__rawInput'] !== '') {
+        $decoded = json_decode($GLOBALS['__rawInput'], true);
+        if (is_array($decoded)) {
+            $GLOBALS['__jsonInput'] = $decoded;
+        }
+    }
+}
+
+/**
+ * Helper to get the cached JSON input (or empty array)
+ */
+function getJsonInput() {
+    return isset($GLOBALS['__jsonInput']) && is_array($GLOBALS['__jsonInput'])
+        ? $GLOBALS['__jsonInput']
+        : array();
+}
+
 // Polyfill for http_response_code (PHP 5.3 compatibility)
 if (!function_exists('http_response_code')) {
     function http_response_code($code = null) {
