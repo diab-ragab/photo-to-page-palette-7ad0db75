@@ -125,9 +125,15 @@ export const AuthModals = ({
       }
       
       if (result.success) {
-        // Store session token if provided
+        // Store session token and CSRF token if provided
         if (result.sessionToken) {
           localStorage.setItem("woi_session_token", result.sessionToken);
+          // Also store as legacy key for backward compatibility
+          localStorage.setItem("sessionToken", result.sessionToken);
+        }
+        if (result.csrf_token) {
+          localStorage.setItem("woi_csrf_token", result.csrf_token);
+          localStorage.setItem("csrfToken", result.csrf_token);
         }
         
         login(validation.data.login, result.user?.email || "", rememberMe);
