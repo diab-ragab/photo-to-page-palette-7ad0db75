@@ -47,19 +47,10 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}"],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/woiendgame\.online\/api\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 300,
-              },
-            },
-          },
-        ],
+        // Important: do NOT runtime-cache cross-origin API calls.
+        // When the network is flaky/offline, Workbox's runtime caching can throw
+        // `no-response` errors that show up as FetchEvent promise rejections.
+        // API calls are handled directly by the app's fetch layer.
       },
     }),
   ].filter(Boolean),
