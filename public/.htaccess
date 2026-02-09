@@ -1,96 +1,104 @@
 # =========================
-# WOI Endgame - Full .htaccess
+# WOI Endgame - Full .htaccess (API-safe + SPA + update allowed)
 # =========================
 
-# =========================
-# MIME Types for JavaScript modules
-# =========================
-<IfModule mod_mime.c>
-    AddType application/javascript .js .mjs
-    AddType text/css .css
-</IfModule>
-
-# Force RewriteEngine
-<IfModule mod_rewrite.c>
-    RewriteEngine On
-    RewriteBase /
-
-    # =========================
-    # HTTPS Redirect (use 307 to preserve POST body)
-    # =========================
-    RewriteCond %{HTTPS} off
-    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=307,L]
-
-    # =========================
-    # Handle OPTIONS preflight for API paths
-    # =========================
-    RewriteCond %{REQUEST_METHOD} OPTIONS
-    RewriteRule ^api(/|$) - [L]
-
-    RewriteCond %{REQUEST_METHOD} OPTIONS
-    RewriteRule ^api-reference(/|$) - [L]
-
-    # =========================
-    # Never rewrite API paths - let PHP handle them
-    # =========================
-    RewriteRule ^api(/|$) - [L]
-    RewriteRule ^api-reference(/|$) - [L]
-
-    # =========================
-    # Serve real files and directories
-    # =========================
-    RewriteCond %{REQUEST_FILENAME} -f [OR]
-    RewriteCond %{REQUEST_FILENAME} -d
-    RewriteRule ^ - [L]
-
-    # =========================
-    # SPA fallback (React Router)
-    # All other routes go to index.html
-    # =========================
-    RewriteRule ^.*$ index.html [L]
-</IfModule>
-
-# =========================
-# Fallback if mod_rewrite is not available
-# =========================
-<IfModule !mod_rewrite.c>
-    ErrorDocument 404 /index.html
-</IfModule>
-
-# =========================
-# Security: Block access to sensitive files
-# =========================
-<FilesMatch "(^\.htaccess|\.env|config\.php|db\.php|bootstrap\.php|env\.php)$">
-    Order Allow,Deny
-    Deny from all
-</FilesMatch>
-
-# =========================
-# Security: Disable directory listing
-# =========================
 Options -Indexes
 
-# =========================
-# Cache static assets
-# =========================
-<IfModule mod_expires.c>
-    ExpiresActive On
-    ExpiresByType image/png "access plus 1 month"
-    ExpiresByType image/jpg "access plus 1 month"
-    ExpiresByType image/jpeg "access plus 1 month"
-    ExpiresByType image/gif "access plus 1 month"
-    ExpiresByType image/svg+xml "access plus 1 month"
-    ExpiresByType image/webp "access plus 1 month"
-    ExpiresByType text/css "access plus 1 week"
-    ExpiresByType application/javascript "access plus 1 week"
-    ExpiresByType font/woff2 "access plus 1 month"
+<IfModule mod_mime.c>
+  AddType application/javascript .js .mjs
+  AddType text/css .css
 </IfModule>
 
-# =========================
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # -------------------------
+  # Force HTTPS
+  # -------------------------
+  RewriteCond %{HTTPS} off
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=307,L]
+
+  # -------------------------
+  # HARD BYPASS for API + UPDATE
+  # (prevent SPA/ErrorDocument from swallowing them)
+  # -------------------------
+  RewriteCond %{REQUEST_URI} ^/api(/|$) [NC,OR]
+  RewriteCond %{REQUEST_URI} ^/api-reference(/|$) [NC,OR]
+  RewriteCond %{REQUEST_URI} ^/update(/|$) [NC]
+  RewriteRule ^ - [L]
+
+  # -------------------------
+  # Never rewrite PHP requests to SPA
+  # -------------------------
+  RewriteRule \.php$ - [L,NC]
+
+  # -------------------------
+  # Serve real files/dirs
+  # -------------------------
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # -------------------------
+  # SPA fallback
+  # -------------------------
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# IMPORTANT:
+# Do not use ErrorDocument 404 /index.html
+# It converts any 404 (including /api if file missing) to SPA 404 page.
+# If mod_rewrite is not working, keep normal 404 (easier to diagnose)
+# <IfModule !mod_rewrite.c>
+#   ErrorDocument 404 /index.html
+# </IfModule>
+
+# -------------------------
+# Block sensitive files (direct web access)
+# -------------------------
+<IfModule mod_authz_core.c>
+  <FilesMatch "(\.env|config\.php|db\.php|bootstrap\.php|env\.php)$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+  <FilesMatch "(\.env|config\.php|db\.php|bootstrap\.php|env\.php)$">
+    Order Allow,Deny
+    Deny from all
+  </FilesMatch>
+</IfModule>
+
+# -------------------------
+# Caching
+# -------------------------
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/jpg "access plus 1 month"
+  ExpiresByType image/jpeg "access plus 1 month"
+  ExpiresByType image/gif "access plus 1 month"
+  ExpiresByType image/svg+xml "access plus 1 month"
+  ExpiresByType image/webp "access plus 1 month"
+  ExpiresByType text/css "access plus 1 week"
+  ExpiresByType application/javascript "access plus 1 week"
+  ExpiresByType font/woff2 "access plus 1 month"
+</IfModule>
+
+# -------------------------
 # Compression
-# =========================
+# -------------------------
 <IfModule mod_deflate.c>
-    AddOutputFilterByType DEFLATE text/html text/plain text/css
-    AddOutputFilterByType DEFLATE application/javascript application/json
-    AddOutputFilterByType DEFLATE image/svg+xml
+  AddOutputFilterByType DEFLATE text/html text/plain text/css
+  AddOutputFilterByType DEFLATE application/javascript application/json
+  AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# -------------------------
+# OPTIONAL: remove CSP report-only if it's set by Apache (not Cloudflare)
+# -------------------------
+<IfModule mod_headers.c>
+  Header always unset Content-Security-Policy
+  Header always unset Content-Security-Policy-Report-Only
 </IfModule>
