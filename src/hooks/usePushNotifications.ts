@@ -44,24 +44,31 @@ export const usePushNotifications = () => {
     }
   }, []);
 
-  // Register service worker
+  // Register service worker ONLY when notifications are enabled.
+  // This prevents Workbox/PWA SW behavior from interfering with normal API fetches
+  // for users who never opt into notifications.
+  const ensureSwRegistration = useCallback(async (): Promise<ServiceWorkerRegistration | null> => {
+    if (!isSupported) return null;
+    if (swRegistration) return swRegistration;
+
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      setSwRegistration(registration);
+      console.log('[Notifications] Service worker registered');
+      return registration;
+    } catch (error) {
+      console.error('[Notifications] SW registration failed:', error);
+      return null;
+    }
+  }, [isSupported, swRegistration]);
+
   useEffect(() => {
     if (!isSupported) return;
-    
-    const registerSW = async () => {
-      try {
-        const registration = await navigator.serviceWorker.register('/sw.js', {
-          scope: '/'
-        });
-        setSwRegistration(registration);
-        console.log('[Notifications] Service worker registered');
-      } catch (error) {
-        console.error('[Notifications] SW registration failed:', error);
-      }
-    };
-    
-    registerSW();
-  }, [isSupported]);
+    if (permission !== 'granted') return;
+    if (!preferences.enabled) return;
+
+    void ensureSwRegistration();
+  }, [isSupported, permission, preferences.enabled, ensureSwRegistration]);
 
   // Request permission
   const requestPermission = useCallback(async (): Promise<boolean> => {

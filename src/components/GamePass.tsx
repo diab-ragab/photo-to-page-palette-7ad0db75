@@ -276,7 +276,7 @@ const iconMap: Record<string, string> = {
 const getIconDisplay = (icon: string): string => iconMap[icon] || icon;
 
 export const GamePass = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [hasElitePass, setHasElitePass] = useState(false);
   const [claimedDays, setClaimedDays] = useState<{ free: number[]; elite: number[] }>({ free: [], elite: [] });
@@ -353,8 +353,14 @@ export const GamePass = () => {
         const data = contentType.includes("application/json") ? await response.json() : null;
 
         if (!response.ok) {
+          if (response.status === 401) {
+            toast.error("Session expired", { description: "Please log in again." });
+            logout();
+            return;
+          }
+
           const rid = typeof data?.rid === "string" ? ` (RID: ${data.rid})` : "";
-          const msg = data?.error || `Game Pass status failed (${response.status}).`;
+          const msg = data?.error || data?.message || `Game Pass status failed (${response.status}).`;
           toast.error(`${msg}${rid}`);
           return;
         }
@@ -373,7 +379,7 @@ export const GamePass = () => {
     };
 
     fetchUserPassStatus();
-  }, [user]);
+  }, [user, logout]);
 
   // Scroll to current day on mount
   useEffect(() => {
@@ -388,7 +394,7 @@ export const GamePass = () => {
     const tier = isElite ? "elite" : "free";
     if (claimedDays[tier].includes(day)) return;
     if (isElite && !hasElitePass) return;
-    
+
     if (!isElite && day > currentDay && !payWithZen) {
       const daysAhead = day - currentDay;
       const zenCost = daysAhead * zenCostPerDay;
@@ -396,7 +402,7 @@ export const GamePass = () => {
       setZenSkipConfirm({ day, zenCost, rewardName: reward?.freeReward.name || "Reward" });
       return;
     }
-    
+
     if (!selectedRoleId) {
       toast.error("Select a character", { description: "Please select a character to receive the reward." });
       return;
@@ -414,12 +420,34 @@ export const GamePass = () => {
         },
         body: JSON.stringify({ day, tier, roleId: selectedRoleId, payWithZen }),
       });
-      const data = await response.json();
-      
-      if (data.success) {
+
+      const contentType = response.headers.get("content-type") || "";
+      const rawText = await response.text().catch(() => "");
+      const data = contentType.includes("application/json") ? (() => {
+        try {
+          return rawText ? JSON.parse(rawText) : null;
+        } catch {
+          return null;
+        }
+      })() : null;
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error("Session expired", { description: "Please log in again." });
+          logout();
+          return;
+        }
+
+        const rid = typeof data?.rid === "string" ? ` (RID: ${data.rid})` : "";
+        const msg = data?.error || data?.message || `Server error (${response.status}).`;
+        toast.error("Failed to claim", { description: `${msg}${rid}` });
+        return;
+      }
+
+      if (data?.success) {
         // Trigger confetti animation
         setClaimAnimation({ day, tier });
-        
+
         setClaimedDays(prev => ({ ...prev, [tier]: [...prev[tier], day] }));
         if (data.user_zen !== undefined) setUserZen(data.user_zen);
         const zenMsg = data.zen_spent ? ` (-${data.zen_spent.toLocaleString()} Zen)` : "";
@@ -427,7 +455,8 @@ export const GamePass = () => {
           description: `Sent to ${selectedCharacterName || "your character"}!${zenMsg}`,
         });
       } else {
-        toast.error("Failed to claim", { description: data.error || "Please try again." });
+        const rid = typeof data?.rid === "string" ? ` (RID: ${data.rid})` : "";
+        toast.error("Failed to claim", { description: `${data?.error || "Please try again."}${rid}` });
       }
     } catch {
       toast.error("Connection error");
