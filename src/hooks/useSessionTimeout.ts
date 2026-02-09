@@ -33,7 +33,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
   // Refresh server-side session to prevent expiration
   const refreshServerSession = useCallback(async (): Promise<boolean> => {
     try {
-      const sessionToken = localStorage.getItem("woi_session_token") || "";
+      const sessionToken = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken") || "";
       if (!sessionToken) return false;
 
       const response = await fetch(`${API_BASE}/auth.php`, {
@@ -49,26 +49,35 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
 
       if (!response.ok) {
         console.warn("[Session] Server refresh failed:", response.status);
+
+        // If the backend says the session is invalid/expired, make the UI reflect that immediately.
+        if (response.status === 401 || response.status === 403) {
+          logout();
+        }
+
         return false;
       }
 
       const data = await response.json();
-      
-      // Update CSRF token if provided
+
+      // Update CSRF token if provided (store under both modern + legacy keys)
       if (data.csrf_token) {
         localStorage.setItem("woi_csrf_token", data.csrf_token);
+        localStorage.setItem("csrfToken", data.csrf_token);
       }
-
       // Some endpoints may return a different naming convention
       if (data.csrfToken) {
         localStorage.setItem("woi_csrf_token", data.csrfToken);
+        localStorage.setItem("csrfToken", data.csrfToken);
       }
-      
-      // Update session token if rotated
+
+      // Update session token if rotated (store under both modern + legacy keys)
       if (data.sessionToken) {
         localStorage.setItem("woi_session_token", data.sessionToken);
+        localStorage.setItem("sessionToken", data.sessionToken);
       } else if (data.session_token) {
         localStorage.setItem("woi_session_token", data.session_token);
+        localStorage.setItem("sessionToken", data.session_token);
       }
 
       console.log("[Session] Server session refreshed successfully");
@@ -77,7 +86,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
       console.error("[Session] Failed to refresh server session:", error);
       return false;
     }
-  }, []);
+  }, [logout]);
 
   const clearAllTimers = useCallback(() => {
     if (timeoutRef.current) {
