@@ -14,7 +14,8 @@ error_reporting(E_ALL);
 define('VERSION', '2026-02-01-A');
 
 require_once __DIR__ . '/bootstrap.php';
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/session_helper.php';
+handleCors(array('GET', 'OPTIONS'));
 
 if (ob_get_level() === 0) { ob_start(); }
 header('Content-Type: application/json; charset=utf-8');
@@ -41,14 +42,6 @@ function os_fail($code, $msg) {
   os_out($code, array('success' => false, 'message' => $msg, 'rid' => $rid));
 }
 
-function os_token() {
-  $auth = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : '';
-  if (stripos($auth, 'Bearer ') === 0) return trim(substr($auth, 7));
-  $hdr = isset($_SERVER['HTTP_X_SESSION_TOKEN']) ? $_SERVER['HTTP_X_SESSION_TOKEN'] : '';
-  if ($hdr) return trim($hdr);
-  return '';
-}
-
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '';
 if ($method === 'OPTIONS') { http_response_code(204); exit; }
 if ($method !== 'GET') os_fail(405, 'Method not allowed');
@@ -56,7 +49,7 @@ if ($method !== 'GET') os_fail(405, 'Method not allowed');
 $sessionId = isset($_GET['session_id']) ? trim((string)$_GET['session_id']) : '';
 if ($sessionId === '') os_fail(400, 'Missing session_id');
 
-$token = os_token();
+$token = getSessionToken();
 if ($token === '') os_fail(401, 'Missing session token');
 
 try {
@@ -66,18 +59,11 @@ try {
   os_fail(503, 'Service temporarily unavailable');
 }
 
-// Validate user session
-try {
-  $stmt = $pdo->prepare("SELECT user_id, expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
-  $stmt->execute(array($token));
-  $sess = $stmt->fetch(PDO::FETCH_ASSOC);
-  if (!$sess) os_fail(401, 'Invalid session');
-  if (strtotime($sess['expires_at']) <= time()) os_fail(401, 'Session expired');
-  $userId = (int)$sess['user_id'];
-} catch (Exception $e) {
-  error_log("RID={$rid} SESSION_LOOKUP_FAIL=" . $e->getMessage());
-  os_fail(500, 'Server error');
-}
+// Validate user session using centralized helper
+$sess = resolveSessionRow($token);
+if (!$sess) os_fail(401, 'Invalid session');
+if (isset($sess['expires_at']) && isSessionExpired($sess['expires_at'])) os_fail(401, 'Session expired');
+$userId = (int)$sess['user_id'];
 
 // Ensure table exists (safe)
 try {

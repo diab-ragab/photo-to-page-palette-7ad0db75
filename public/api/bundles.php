@@ -53,12 +53,14 @@ try {
   jsonFail(503, 'Database unavailable');
 }
 
-// Read JSON body once
-$raw = file_get_contents('php://input');
-$input = array();
-if ($raw) {
-  $parsed = json_decode($raw, true);
-  if (is_array($parsed)) $input = $parsed;
+// Read JSON body once (use cached input from bootstrap)
+$input = function_exists('getJsonInput') ? getJsonInput() : array();
+if (empty($input)) {
+  $raw = file_get_contents('php://input');
+  if ($raw) {
+    $parsed = json_decode($raw, true);
+    if (is_array($parsed)) $input = $parsed;
+  }
 }
 
 // Action
@@ -345,13 +347,14 @@ switch ($action) {
 
   // PUBLIC: purchase
   case 'purchase':
-    $token = getBearerToken();
+    $token = getSessionToken();
     if (!$token) jsonFail(401, 'Please login to purchase');
 
-    // Validate session
-    $stmt = $pdo->prepare("SELECT user_id FROM user_sessions WHERE session_token = ? LIMIT 1");
-    $stmt->execute(array($token));
-    $uid = (int)$stmt->fetchColumn();
+    // Validate session using centralized helper
+    $sess = resolveSessionRow($token);
+    if (!$sess) jsonFail(401, 'Invalid session');
+    if (isset($sess['expires_at']) && isSessionExpired($sess['expires_at'])) jsonFail(401, 'Session expired');
+    $uid = (int)$sess['user_id'];
     if ($uid <= 0) jsonFail(401, 'Invalid session');
 
     $bundleId = isset($input['bundle_id']) ? (int)$input['bundle_id'] : 0;

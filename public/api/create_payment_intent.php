@@ -8,7 +8,7 @@
  */
 
 require_once __DIR__ . '/bootstrap.php';
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/session_helper.php';
 handleCors(array('POST', 'OPTIONS'));
 
 $RID = bin2hex(random_bytes(6));
@@ -69,9 +69,12 @@ $stmt->execute(array($clientIP));
 // Clean old rate limit entries (older than 5 minutes)
 $pdo->exec("DELETE FROM payment_rate_limit WHERE request_time < DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
 
-// Parse request body
-$rawBody = file_get_contents('php://input');
-$body = json_decode($rawBody, true);
+// Parse request body (use cached input from bootstrap)
+$body = function_exists('getJsonInput') ? getJsonInput() : null;
+if (!$body) {
+    $rawBody = file_get_contents('php://input');
+    $body = json_decode($rawBody, true);
+}
 
 if (!$body) {
     json_fail(400, 'Invalid JSON body');

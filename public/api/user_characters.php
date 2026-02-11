@@ -5,6 +5,8 @@
  */
 
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/session_helper.php';
+handleCors(array('GET', 'OPTIONS'));
 
 $rid = 'CHR' . substr(md5(uniqid()), 0, 8);
 
@@ -16,16 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-// Get session token
-$token = '';
-if (isset($_SERVER['HTTP_X_SESSION_TOKEN'])) {
-    $token = $_SERVER['HTTP_X_SESSION_TOKEN'];
-} elseif (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-    $auth = $_SERVER['HTTP_AUTHORIZATION'];
-    if (strpos($auth, 'Bearer ') === 0) {
-        $token = substr($auth, 7);
-    }
-}
+// Get session token using centralized helper
+$token = getSessionToken();
 
 if (empty($token)) {
     http_response_code(401);
@@ -37,10 +31,8 @@ if (empty($token)) {
 try {
     $pdo = getDB();
     
-    // Verify session and get user
-    $stmt = $pdo->prepare("SELECT user_id, expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
-    $stmt->execute(array($token));
-    $sess = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Verify session using centralized helper
+    $sess = resolveSessionRow($token);
     
     if (!$sess) {
         http_response_code(401);
@@ -49,7 +41,7 @@ try {
         exit;
     }
     
-    if (strtotime($sess['expires_at']) <= time()) {
+    if (isset($sess['expires_at']) && isSessionExpired($sess['expires_at'])) {
         http_response_code(401);
         header('Content-Type: application/json');
         echo json_encode(array('success' => false, 'message' => 'Session expired'));
@@ -79,10 +71,7 @@ try {
     
     $username = $user['name'];
     
-    // Get AccountID from users table (the id is the AccountID for game linking)
-    // First try to find characters by matching account
-    
-    // Check if there's a direct AccountID link or use user_id
+    // Use user_id as AccountID for game linking
     $accountId = $userId;
     
     // Fetch active characters from basetab_sg
