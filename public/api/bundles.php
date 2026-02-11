@@ -53,13 +53,8 @@ try {
   jsonFail(503, 'Database unavailable');
 }
 
-// Read JSON body once
-$raw = file_get_contents('php://input');
-$input = array();
-if ($raw) {
-  $parsed = json_decode($raw, true);
-  if (is_array($parsed)) $input = $parsed;
-}
+// Use cached JSON body from bootstrap (php://input already consumed)
+$input = getJsonInput();
 
 // Action
 $action = '';

@@ -15,8 +15,7 @@ error_reporting(E_ALL);
 define('VERSION', '2026-02-01-A');
 
 require_once __DIR__ . '/bootstrap.php';
-
-if (ob_get_level() === 0) { ob_start(); }
+handleCors(array('POST', 'OPTIONS'));
 header('Content-Type: application/json; charset=utf-8');
 
 // ---------- helpers ----------
@@ -100,13 +99,8 @@ $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '';
 if ($method === 'OPTIONS') { http_response_code(204); exit; }
 if ($method !== 'POST') failSC(405, 'Method not allowed');
 
-// ---------- parse JSON ----------
-$raw = file_get_contents('php://input');
-$payload = array();
-if (is_string($raw) && $raw !== '') {
-  $j = json_decode($raw, true);
-  if (is_array($j)) $payload = $j;
-}
+// ---------- parse JSON (use cached input from bootstrap) ----------
+$payload = getJsonInput();
 
 $items = isset($payload['items']) && is_array($payload['items']) ? $payload['items'] : array();
 if (count($items) < 1) failSC(400, 'Cart items required');
@@ -131,8 +125,9 @@ try {
 }
 
 try {
+  $tokenHash = hash('sha256', $token);
   $stmt = $pdo->prepare("SELECT user_id, expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
-  $stmt->execute(array($token));
+  $stmt->execute(array($tokenHash));
   $sess = $stmt->fetch(PDO::FETCH_ASSOC);
   
   if (!$sess) {
@@ -151,7 +146,7 @@ try {
   if (strtotime($sess['expires_at']) <= time()) {
     // extend session for checkout (24h)
     $pdo->prepare("UPDATE user_sessions SET expires_at = DATE_ADD(NOW(), INTERVAL 24 HOUR) WHERE session_token = ?")
-        ->execute(array($token));
+        ->execute(array($tokenHash));
     error_log("RID={$rid} SESSION_EXTENDED user={$userId}");
   }
 } catch (Exception $e) {

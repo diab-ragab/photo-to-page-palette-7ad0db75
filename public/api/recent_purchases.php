@@ -3,6 +3,7 @@
 // Get recent webshop purchases for display
 
 require_once __DIR__ . '/bootstrap.php';
+handleCors(array('GET', 'OPTIONS'));
 
 header('Content-Type: application/json; charset=utf-8');
 
