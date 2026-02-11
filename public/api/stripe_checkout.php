@@ -15,6 +15,7 @@ error_reporting(E_ALL);
 define('VERSION', '2026-02-01-A');
 
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/session_helper.php';
 handleCors(array('POST', 'OPTIONS'));
 header('Content-Type: application/json; charset=utf-8');
 
@@ -42,10 +43,25 @@ function failSC($code, $msg) {
 }
 
 function getBearerTokenSC() {
+  // Use session_helper's robust header reader if available
+  if (function_exists('getSessionToken')) {
+    $t = getSessionToken();
+    if ($t !== '') return $t;
+  }
+  // Fallback: check multiple server vars
   $auth = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : '';
-  if (stripos($auth, 'Bearer ') === 0) return trim(substr($auth, 7));
+  if ($auth === '' && isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) $auth = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+  if ($auth !== '' && stripos($auth, 'Bearer ') === 0) {
+    $t = trim(substr($auth, 7));
+    if ($t !== '') return $t;
+  }
   $hdr = isset($_SERVER['HTTP_X_SESSION_TOKEN']) ? $_SERVER['HTTP_X_SESSION_TOKEN'] : '';
   if ($hdr) return trim($hdr);
+  // Query string fallback
+  if (!empty($_GET['sessionToken'])) return trim((string)$_GET['sessionToken']);
+  // JSON body fallback
+  $body = getJsonInput();
+  if (is_array($body) && !empty($body['sessionToken'])) return trim((string)$body['sessionToken']);
   return '';
 }
 
@@ -125,10 +141,23 @@ try {
 }
 
 try {
-  $tokenHash = hash('sha256', $token);
-  $stmt = $pdo->prepare("SELECT user_id, expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
-  $stmt->execute(array($tokenHash));
-  $sess = $stmt->fetch(PDO::FETCH_ASSOC);
+  // Try resolveSessionRow from session_helper (raw + hash + optional columns)
+  $sess = null;
+  if (function_exists('resolveSessionRow')) {
+    $sess = resolveSessionRow($token);
+  }
+  // Fallback: manual lookup with raw then hash
+  if (!$sess) {
+    $stmt = $pdo->prepare("SELECT user_id, expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
+    $stmt->execute(array($token));
+    $sess = $stmt->fetch(PDO::FETCH_ASSOC);
+  }
+  if (!$sess) {
+    $tokenHash = hash('sha256', $token);
+    $stmt = $pdo->prepare("SELECT user_id, expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
+    $stmt->execute(array($tokenHash));
+    $sess = $stmt->fetch(PDO::FETCH_ASSOC);
+  }
   
   if (!$sess) {
     error_log("RID={$rid} SESSION_NOT_FOUND token=" . substr($token, 0, 20) . "...");
@@ -136,7 +165,7 @@ try {
   }
   
   $userId = (int)$sess['user_id'];
-  error_log("RID={$rid} SESSION_FOUND user_id={$userId} expires=" . $sess['expires_at']);
+  error_log("RID={$rid} SESSION_FOUND user_id={$userId} expires=" . (isset($sess['expires_at']) ? $sess['expires_at'] : 'N/A'));
   
   if ($userId <= 0) {
     error_log("RID={$rid} INVALID_USER_ID session has user_id=0");

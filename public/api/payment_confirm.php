@@ -6,7 +6,6 @@
  * Body: { paymentIntentId: string, sessionId?: string, orderId?: number }
  * Returns: { success: true, status: string }
  * 
- * Handles both webshop orders and bundle orders.
  * Item ID rules for fulfillment:
  *   item_id > 0  => real game item
  *   item_id = -1 => Zen (currency)
@@ -43,15 +42,32 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_fail(405, 'Method not allowed');
 }
 
+// Get database connection
 $pdo = getDB();
 
-// Parse request body (use cached input from bootstrap)
-$body = getJsonInput();
-$rawBody = isset($GLOBALS['__rawInput']) ? $GLOBALS['__rawInput'] : '';
+// Rate limiting check
+$clientIP = isset($_SERVER['HTTP_X_FORWARDED_FOR']) 
+    ? explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0] 
+    : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown');
+$clientIP = trim($clientIP);
 
-error_log("RID={$RID} PAYMENT_CONFIRM_START body=" . substr($rawBody, 0, 200));
+$stmt = $pdo->prepare("SELECT COUNT(*) as cnt FROM payment_rate_limit WHERE ip_address = ? AND endpoint = 'confirm' AND request_time > DATE_SUB(NOW(), INTERVAL 1 MINUTE)");
+$stmt->execute(array($clientIP));
+$rateCheck = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (empty($body)) {
+if ($rateCheck && (int)$rateCheck['cnt'] >= 20) {
+    json_fail(429, 'Too many requests. Please wait a moment.');
+}
+
+// Log this request for rate limiting
+$stmt = $pdo->prepare("INSERT INTO payment_rate_limit (ip_address, endpoint, request_time) VALUES (?, 'confirm', NOW())");
+$stmt->execute(array($clientIP));
+
+// Parse request body
+$rawBody = file_get_contents('php://input');
+$body = json_decode($rawBody, true);
+
+if (!$body) {
     json_fail(400, 'Invalid JSON body');
 }
 
@@ -67,14 +83,8 @@ if (empty($stripeSecretKey)) {
     json_fail(500, 'Payment system not configured');
 }
 
-// Get session metadata to determine order type
-$orderType = 'product'; // Default
-$metadata = array();
-
-// If we have a sessionId (from Stripe Checkout), retrieve the session
+// If we have a sessionId (from Stripe Checkout), retrieve the session to get payment_intent
 if (!empty($sessionId) && strpos($sessionId, 'cs_') === 0) {
-    error_log("RID={$RID} FETCHING_SESSION session={$sessionId}");
-    
     $sessionUrl = 'https://api.stripe.com/v1/checkout/sessions/' . urlencode($sessionId);
     
     $opts = array(
@@ -98,228 +108,197 @@ if (!empty($sessionId) && strpos($sessionId, 'cs_') === 0) {
             $paymentIntentId = $sessionData['payment_intent'];
             error_log("RID={$RID} SESSION_TO_PI session={$sessionId} pi={$paymentIntentId}");
         }
-        if (isset($sessionData['metadata'])) {
-            $metadata = $sessionData['metadata'];
-            if (isset($metadata['type']) && $metadata['type'] === 'bundle') {
-                $orderType = 'bundle';
+        // Try to find order(s) by session_id in webshop_orders
+        if ($orderId <= 0) {
+            $stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE stripe_session_id = ? AND status = 'pending' ORDER BY id ASC LIMIT 1");
+            $stmt->execute(array($sessionId));
+            $webshopOrder = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($webshopOrder) {
+                $orderId = (int)$webshopOrder['id'];
+                error_log("RID={$RID} FOUND_ORDER_BY_SESSION session={$sessionId} order={$orderId}");
             }
-        }
-        if (isset($sessionData['payment_status'])) {
-            error_log("RID={$RID} SESSION_PAYMENT_STATUS status={$sessionData['payment_status']}");
         }
     }
 }
 
 if (empty($paymentIntentId)) {
-    if (!empty($sessionId)) {
-        error_log("RID={$RID} NO_PI_BUT_HAS_SESSION - checking orders directly");
-    } else {
-        json_fail(400, 'Payment intent ID required');
-    }
+    json_fail(400, 'Payment intent ID required');
 }
 
-// Validate payment intent ID format if we have one
-if (!empty($paymentIntentId) && strpos($paymentIntentId, 'pi_') !== 0) {
+// Validate payment intent ID format
+if (strpos($paymentIntentId, 'pi_') !== 0) {
     json_fail(400, 'Invalid payment intent ID format');
 }
 
-// Verify payment with Stripe
-$status = 'succeeded';
-if (!empty($paymentIntentId)) {
-    $stripeUrl = 'https://api.stripe.com/v1/payment_intents/' . urlencode($paymentIntentId);
-    
-    $opts = array(
-        'http' => array(
-            'method' => 'GET',
-            'header' => 'Authorization: Bearer ' . $stripeSecretKey,
-            'timeout' => 30,
-            'ignore_errors' => true,
-        ),
-        'ssl' => array(
-            'verify_peer' => true,
-            'verify_peer_name' => true,
-        ),
-    );
-    $context = stream_context_create($opts);
-    $response = @file_get_contents($stripeUrl, false, $context);
-    
-    $httpCode = 0;
-    if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
-        if (preg_match('/HTTP\/\d+\.?\d*\s+(\d+)/', $http_response_header[0], $m)) {
-            $httpCode = (int)$m[1];
-        }
-    }
-    
-    if ($response === false) {
-        error_log("RID={$RID} STRIPE_REQUEST_FAILED");
-        json_fail(502, 'Payment service unavailable');
-    }
-    
-    $paymentIntent = json_decode($response, true);
-    
-    if ($httpCode >= 400 || !$paymentIntent) {
-        $errorMsg = isset($paymentIntent['error']['message']) ? $paymentIntent['error']['message'] : 'Failed to verify payment';
-        error_log("RID={$RID} STRIPE_RETRIEVE_ERROR: {$errorMsg} HTTP={$httpCode}");
-        json_fail(400, $errorMsg);
-    }
-    
-    $status = isset($paymentIntent['status']) ? $paymentIntent['status'] : '';
-    if (isset($paymentIntent['metadata'])) {
-        $metadata = array_merge($metadata, $paymentIntent['metadata']);
-        if (isset($metadata['type']) && $metadata['type'] === 'bundle') {
-            $orderType = 'bundle';
-        }
-    }
-    
-    error_log("RID={$RID} PAYMENT_INTENT_STATUS pi={$paymentIntentId} status={$status} type={$orderType}");
-    
-    if ($status !== 'succeeded') {
-        json_response(array(
-            'success' => false,
-            'status' => $status,
-            'message' => 'Payment not completed. Status: ' . $status,
-        ));
+// Retrieve PaymentIntent from Stripe
+$stripeUrl = 'https://api.stripe.com/v1/payment_intents/' . urlencode($paymentIntentId);
+
+$opts = array(
+    'http' => array(
+        'method' => 'GET',
+        'header' => 'Authorization: Bearer ' . $stripeSecretKey,
+        'timeout' => 30,
+        'ignore_errors' => true,
+    ),
+    'ssl' => array(
+        'verify_peer' => true,
+        'verify_peer_name' => true,
+    ),
+);
+$context = stream_context_create($opts);
+$response = @file_get_contents($stripeUrl, false, $context);
+
+// Parse HTTP response code from headers
+$httpCode = 0;
+if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
+    if (preg_match('/HTTP\/\d+\.?\d*\s+(\d+)/', $http_response_header[0], $m)) {
+        $httpCode = (int)$m[1];
     }
 }
 
-$userId = 0;
-$processedCount = 0;
+if ($response === false) {
+    error_log("RID={$RID} STRIPE_REQUEST_FAILED");
+    json_fail(502, 'Payment service unavailable');
+}
 
-// ============ PROCESS BUNDLE ORDERS ============
-if ($orderType === 'bundle') {
-    error_log("RID={$RID} PROCESSING_BUNDLE_ORDER session={$sessionId}");
-    
-    // Find pending bundle orders for this session
-    $stmt = $pdo->prepare("
-        SELECT id, user_id, bundle_id, character_id, character_name, status 
-        FROM bundle_orders 
-        WHERE stripe_session_id = ? AND status = 'pending'
-    ");
+$paymentIntent = json_decode($response, true);
+
+if ($httpCode >= 400 || !$paymentIntent) {
+    $errorMsg = isset($paymentIntent['error']['message']) ? $paymentIntent['error']['message'] : 'Failed to verify payment';
+    error_log("RID={$RID} STRIPE_RETRIEVE_ERROR: {$errorMsg} HTTP={$httpCode}");
+    json_fail(400, $errorMsg);
+}
+
+$status = isset($paymentIntent['status']) ? $paymentIntent['status'] : '';
+$amount = isset($paymentIntent['amount']) ? (int)$paymentIntent['amount'] : 0;
+$currency = isset($paymentIntent['currency']) ? strtoupper($paymentIntent['currency']) : 'EUR';
+$metadata = isset($paymentIntent['metadata']) ? $paymentIntent['metadata'] : array();
+
+error_log("RID={$RID} PAYMENT_INTENT_STATUS pi={$paymentIntentId} status={$status} amount={$amount}");
+
+// Check if payment succeeded
+if ($status !== 'succeeded') {
+    json_response(array(
+        'success' => false,
+        'status' => $status,
+        'message' => 'Payment not completed. Status: ' . $status,
+    ));
+}
+
+// Get order ID from metadata if not provided
+if ($orderId <= 0 && isset($metadata['order_id'])) {
+    $orderId = (int)$metadata['order_id'];
+}
+
+// Get user ID from metadata
+$userId = isset($metadata['user_id']) ? (int)$metadata['user_id'] : 0;
+
+// Try to find all orders by session_id if no specific order found
+$ordersToProcess = array();
+
+if ($orderId > 0) {
+    $ordersToProcess[] = $orderId;
+} else if (!empty($sessionId)) {
+    // Find all pending orders for this session
+    $stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE stripe_session_id = ? AND status = 'pending'");
     $stmt->execute(array($sessionId));
-    $bundleOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Check if already processed
-    $stmt = $pdo->prepare("SELECT id FROM bundle_orders WHERE stripe_payment_intent = ? AND status = 'completed' LIMIT 1");
-    $stmt->execute(array($paymentIntentId));
-    $existingCompleted = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($existingCompleted) {
-        error_log("RID={$RID} BUNDLE_ALREADY_PROCESSED pi={$paymentIntentId}");
-        json_response(array(
-            'success' => true,
-            'status' => 'succeeded',
-            'message' => 'Bundle order already confirmed',
-            'order_id' => (int)$existingCompleted['id'],
-        ));
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $ordersToProcess[] = (int)$row['id'];
     }
-    
-    foreach ($bundleOrders as $bundleOrder) {
-        $boId = (int)$bundleOrder['id'];
-        $bundleId = (int)$bundleOrder['bundle_id'];
-        $characterId = (int)$bundleOrder['character_id'];
-        $characterName = isset($bundleOrder['character_name']) ? $bundleOrder['character_name'] : '';
-        $userId = (int)$bundleOrder['user_id'];
-        
-        // Mark order as completed
-        $stmt = $pdo->prepare("
-            UPDATE bundle_orders 
-            SET status = 'completed', 
-                stripe_payment_intent = ?,
-                delivered_at = NOW()
-            WHERE id = ? AND status = 'pending'
-        ");
-        $stmt->execute(array($paymentIntentId, $boId));
-        
-        if ($stmt->rowCount() > 0) {
-            // Fulfill bundle items
-            fulfillBundleOrder($pdo, $userId, $bundleId, $characterId, $characterName, $boId, $RID);
-            $orderId = $boId;
-            $processedCount++;
-            error_log("RID={$RID} BUNDLE_ORDER_COMPLETED order={$boId} user={$userId} bundle={$bundleId}");
-        }
-    }
-} else {
-    // ============ PROCESS WEBSHOP ORDERS ============
-    $ordersToProcess = array();
-    
-    if ($orderId > 0) {
-        $ordersToProcess[] = $orderId;
-    } else if (!empty($sessionId)) {
-        $stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE stripe_session_id = ? AND status = 'pending'");
-        $stmt->execute(array($sessionId));
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $ordersToProcess[] = (int)$row['id'];
-        }
-    }
-    
-    // Check for already processed
-    if (!empty($paymentIntentId)) {
-        $stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE stripe_payment_intent = ? AND status = 'completed' LIMIT 1");
-        $stmt->execute(array($paymentIntentId));
-        $existingCompleted = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($existingCompleted) {
-            error_log("RID={$RID} WEBSHOP_ALREADY_PROCESSED pi={$paymentIntentId}");
-            json_response(array(
-                'success' => true,
-                'status' => 'succeeded',
-                'message' => 'Order already confirmed',
-                'order_id' => (int)$existingCompleted['id'],
-            ));
-        }
-    }
-    
+}
+
+if (count($ordersToProcess) > 0) {
     foreach ($ordersToProcess as $oid) {
+        // Get order details including character_id
         $stmt = $pdo->prepare("SELECT id, status, user_id, product_id, quantity, character_id, character_name FROM webshop_orders WHERE id = ? LIMIT 1");
         $stmt->execute(array($oid));
         $order = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if (!$order || $order['status'] === 'completed') {
+        if (!$order) continue;
+        
+        if ($order['status'] === 'completed') {
+            // Already processed
             continue;
         }
         
-        // Mark order as completed
-        $stmt = $pdo->prepare("
-            UPDATE webshop_orders 
-            SET status = 'completed', 
-                stripe_payment_intent = ?,
-                delivered_at = NOW()
-            WHERE id = ?
-        ");
-        $stmt->execute(array($paymentIntentId, $oid));
+        // Mark order as completed (updated_at may not exist in all schemas)
+        try {
+            $stmt = $pdo->prepare("
+                UPDATE webshop_orders 
+                SET status = 'completed', 
+                    stripe_payment_intent = ?,
+                    delivered_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute(array($paymentIntentId, $oid));
+        } catch (Exception $e) {
+            // Fallback without updated_at
+            $stmt = $pdo->prepare("
+                UPDATE webshop_orders 
+                SET status = 'completed', 
+                    stripe_payment_intent = ?,
+                    delivered_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute(array($paymentIntentId, $oid));
+        }
         
-        $userId = (int)$order['user_id'];
-        $productId = (int)$order['product_id'];
-        $quantity = (int)$order['quantity'];
+        // Get user ID from order if not in metadata
+        if ($userId <= 0 && isset($order['user_id'])) {
+            $userId = (int)$order['user_id'];
+        }
+        
+        // Get character ID from order
         $characterId = isset($order['character_id']) ? (int)$order['character_id'] : 0;
         $characterName = isset($order['character_name']) ? $order['character_name'] : '';
         
+        // Fulfill order - grant digital items
+        $productId = isset($order['product_id']) ? (int)$order['product_id'] : 0;
+        $quantity = isset($order['quantity']) ? (int)$order['quantity'] : 1;
+        
         if ($productId > 0 && $characterId > 0) {
-            fulfillWebshopOrder($pdo, $userId, $productId, $quantity, $oid, $characterId, $characterName, $RID);
+            fulfillOrder($pdo, $userId, $productId, $quantity, $oid, $characterId, $characterName, $RID);
+        } else {
+            error_log("RID={$RID} FULFILL_SKIPPED order={$oid} product={$productId} character={$characterId}");
         }
         
-        error_log("RID={$RID} WEBSHOP_ORDER_COMPLETED order={$oid} user={$userId} product={$productId}");
-        $orderId = $oid;
-        $processedCount++;
+        error_log("RID={$RID} ORDER_COMPLETED order={$oid} user={$userId} product={$productId} character={$characterId} ({$characterName})");
+        $orderId = $oid; // Keep last processed order ID for response
     }
+} else {
+    // No orders found - create a fallback order record
+    $totalReal = $amount / 100; // Convert cents to currency
+    
+    $stmt = $pdo->prepare("
+        INSERT INTO webshop_orders 
+        (user_id, product_id, quantity, total_real, status, stripe_session_id, stripe_payment_intent, delivered_at, created_at)
+        VALUES (?, 0, 1, ?, 'completed', ?, ?, NOW(), NOW())
+    ");
+    $stmt->execute(array($userId, $totalReal, $sessionId, $paymentIntentId));
+    $orderId = $pdo->lastInsertId();
+    
+    error_log("RID={$RID} FALLBACK_ORDER_CREATED order={$orderId} amount={$totalReal} pi={$paymentIntentId}");
 }
 
 json_response(array(
     'success' => true,
     'status' => 'succeeded',
-    'message' => 'Payment confirmed',
+    'message' => 'Payment confirmed and order fulfilled',
     'order_id' => $orderId,
-    'processed_count' => $processedCount,
-    'order_type' => $orderType,
 ));
 
 // ============ FULFILLMENT FUNCTIONS ============
 
 /**
- * Fulfill webshop order - single product
+ * Fulfill order based on item_id rules:
+ *   item_id > 0  => real game item (send via mail with itemId)
+ *   item_id = -1 => Zen (send via zen field, no item)
+ *   item_id = -2 => Coins (send via coins field, no item)
+ *   item_id = -3 => EXP (send via exp field, no item)
  */
-function fulfillWebshopOrder($pdo, $userId, $productId, $quantity, $orderId, $characterId, $characterName, $RID) {
-    error_log("RID={$RID} FULFILL_WEBSHOP_START user={$userId} product={$productId} qty={$quantity} order={$orderId} char={$characterId}");
+function fulfillOrder($pdo, $userId, $productId, $quantity, $orderId, $characterId, $characterName, $RID) {
+    error_log("RID={$RID} FULFILL_START user={$userId} product={$productId} qty={$quantity} order={$orderId} char={$characterId} ({$characterName})");
     
     // Get product details
     $stmt = $pdo->prepare("SELECT * FROM webshop_products WHERE id = ? LIMIT 1");
@@ -336,8 +315,11 @@ function fulfillWebshopOrder($pdo, $userId, $productId, $quantity, $orderId, $ch
     $itemQuantity = isset($product['item_quantity']) ? (int)$product['item_quantity'] : 1;
     $totalGrant = $itemQuantity * $quantity;
     
-    // Use character_id from order (already validated)
+    error_log("RID={$RID} FULFILL_PRODUCT name={$productName} item_id={$itemId} item_qty={$itemQuantity} total_grant={$totalGrant}");
+    
+    // Use character_id from order (RoleID from basetab_sg)
     $roleId = $characterId;
+    error_log("RID={$RID} FULFILL_ROLE character_id={$roleId} character_name={$characterName}");
     
     if ($roleId <= 0) {
         error_log("RID={$RID} FULFILL_ERROR no_character order={$orderId} user={$userId}");
@@ -345,63 +327,7 @@ function fulfillWebshopOrder($pdo, $userId, $productId, $quantity, $orderId, $ch
         return false;
     }
     
-    // Send reward via GameMailer
-    return sendRewardMail($pdo, $roleId, $productName, $itemId, $totalGrant, $orderId, $userId, $RID);
-}
-
-/**
- * Fulfill bundle order - multiple items in bundle
- */
-function fulfillBundleOrder($pdo, $userId, $bundleId, $characterId, $characterName, $orderId, $RID) {
-    error_log("RID={$RID} FULFILL_BUNDLE_START user={$userId} bundle={$bundleId} order={$orderId} char={$characterId}");
-    
-    // Get bundle details
-    $stmt = $pdo->prepare("SELECT * FROM flash_bundles WHERE id = ? LIMIT 1");
-    $stmt->execute(array($bundleId));
-    $bundle = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$bundle) {
-        error_log("RID={$RID} FULFILL_BUNDLE_ERROR bundle_not_found id={$bundleId}");
-        return false;
-    }
-    
-    $bundleName = isset($bundle['name']) ? $bundle['name'] : 'Flash Sale Bundle';
-    $roleId = $characterId;
-    
-    if ($roleId <= 0) {
-        error_log("RID={$RID} FULFILL_BUNDLE_ERROR no_character order={$orderId} user={$userId}");
-        storePendingBundleDelivery($pdo, $orderId, $userId, $bundleId, $RID);
-        return false;
-    }
-    
-    // Get bundle items
-    $stmt = $pdo->prepare("SELECT * FROM flash_bundle_items WHERE bundle_id = ? ORDER BY sort_order ASC");
-    $stmt->execute(array($bundleId));
-    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    if (count($items) === 0) {
-        error_log("RID={$RID} FULFILL_BUNDLE_ERROR no_items bundle={$bundleId}");
-        return false;
-    }
-    
-    // Send bundle via in-game mail (all items as single mail)
-    $mailer = new GameMailer($pdo);
-    $result = $mailer->sendBundleReward($roleId, $bundleName, $items);
-    
-    if ($result['success']) {
-        error_log("RID={$RID} BUNDLE_MAIL_SENT user={$userId} role={$roleId} bundle={$bundleName} mail_id={$result['insert_id']}");
-        return true;
-    } else {
-        error_log("RID={$RID} BUNDLE_MAIL_FAILED user={$userId} role={$roleId} error={$result['message']}");
-        storePendingBundleDelivery($pdo, $orderId, $userId, $bundleId, $RID);
-        return false;
-    }
-}
-
-/**
- * Send reward mail using GameMailer
- */
-function sendRewardMail($pdo, $roleId, $productName, $itemId, $totalGrant, $orderId, $userId, $RID) {
+    // Create mailer instance
     $mailer = new GameMailer($pdo);
     
     // Determine reward type based on item_id rules
@@ -412,177 +338,39 @@ function sendRewardMail($pdo, $roleId, $productName, $itemId, $totalGrant, $orde
     $mailQty = 0;
     
     if ($itemId > 0) {
+        // Real game item
         $mailItemId = $itemId;
         $mailQty = $totalGrant;
+        error_log("RID={$RID} FULFILL_ITEM user={$userId} itemId={$itemId} qty={$totalGrant}");
     } else if ($itemId == -1) {
+        // Zen currency
         $zen = $totalGrant;
+        error_log("RID={$RID} FULFILL_ZEN user={$userId} amount={$totalGrant}");
     } else if ($itemId == -2) {
+        // Coins currency
         $coins = $totalGrant;
+        error_log("RID={$RID} FULFILL_COINS user={$userId} amount={$totalGrant}");
     } else if ($itemId == -3) {
+        // EXP
         $exp = $totalGrant;
+        error_log("RID={$RID} FULFILL_EXP user={$userId} amount={$totalGrant}");
     } else {
-        // item_id = 0 - no delivery
-        error_log("RID={$RID} FULFILL_SKIP user={$userId} item_id={$itemId}");
+        // item_id = 0 or unknown - no delivery
+        error_log("RID={$RID} FULFILL_SKIP user={$userId} item_id={$itemId} (no action)");
         return true;
     }
     
+    // Send via in-game mail
     $result = $mailer->sendOrderReward($roleId, $productName, $mailItemId, $mailQty, $coins, $zen, $exp);
     
     if ($result['success']) {
         error_log("RID={$RID} MAIL_SENT user={$userId} role={$roleId} product={$productName} mail_id={$result['insert_id']}");
-        return true;
     } else {
         error_log("RID={$RID} MAIL_FAILED user={$userId} role={$roleId} error={$result['message']}");
         storePendingDelivery($pdo, $orderId, $userId, $itemId, $totalGrant, $RID);
-        return false;
-    }
-}
-
-function getUserRoleId($pdo, $userId) {
-    // Get account name from users table
-    $stmt = $pdo->prepare("SELECT name FROM users WHERE id = ? LIMIT 1");
-    $stmt->execute(array($userId));
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$user) return 0;
-    
-    $accountName = $user['name'];
-    
-    // Get first active character
-    $stmt = $pdo->prepare("SELECT RoleID FROM basetab_sg WHERE AccountID = ? AND IsDel = 0 ORDER BY RoleID ASC LIMIT 1");
-    $stmt->execute(array($accountName));
-    $char = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    return $char ? intval($char['RoleID']) : 0;
-}
-
-function sendGameMail($pdo, $roleId, $title, $text, $coins, $zen, $exp, $itemId, $qty, $RID) {
-    $roleId = intval($roleId);
-    $coins = intval($coins);
-    $zen = intval($zen);
-    $exp = intval($exp);
-    $itemId = intval($itemId);
-    $qty = intval($qty);
-    
-    if ($roleId <= 0) {
-        return array('success' => false, 'message' => 'Invalid role ID');
     }
     
-    $title = substr(trim($title), 0, 100);
-    $text = substr(trim($text), 0, 500);
-    
-    if ($itemId === 0) $qty = 0;
-    if ($qty < 0) $qty = 0;
-    
-    // Build the mail blob
-    $blob = buildMailBlob($title, $text, $coins, $zen, $exp, $itemId, $qty);
-    
-    // Validate blob format
-    if (!preg_match('/^0x[0-9A-Fa-f]+$/', $blob)) {
-        return array('success' => false, 'message' => 'Generated blob is invalid');
-    }
-    
-    // Insert into mailtab_sg
-    $sql = "INSERT INTO mailtab_sg (SenderID, TargerID, MailInfo, CreateTime)
-            VALUES (0, {$roleId}, {$blob}, NOW())";
-    
-    try {
-        $pdo->exec($sql);
-        $insertId = $pdo->lastInsertId();
-        error_log("RID={$RID} MAIL_INSERTED role={$roleId} id={$insertId}");
-        return array('success' => true, 'message' => 'Mail sent', 'insert_id' => $insertId);
-    } catch (PDOException $e) {
-        error_log("RID={$RID} MAIL_INSERT_ERROR: " . $e->getMessage());
-        return array('success' => false, 'message' => 'Insert failed', 'error' => $e->getMessage());
-    }
-}
-
-function buildMailBlob($title, $text, $coins, $zen, $exp, $itemId, $qty) {
-    $t_len = dechex(strlen($title) + 1);
-    if (strlen($t_len) == 1) $t_len = '0' . $t_len;
-    
-    $txt_len = dechex(strlen($text) + 1);
-    if (strlen($txt_len) == 1) $txt_len = '0' . $txt_len;
-    
-    $titleHex = strToHex($title);
-    $textHex = strToHex($text);
-    
-    // Format coins (4 bytes, little-endian)
-    $coinsHex = dechex($coins);
-    if (strlen($coinsHex) == 1) $coinsHex = '0' . $coinsHex;
-    for ($i = strlen($coinsHex); $i < 8; $i++) $coinsHex = '0' . $coinsHex;
-    $coinsHex = substr($coinsHex, 6) . substr($coinsHex, 4, 2) . substr($coinsHex, 2, 2) . substr($coinsHex, 0, 2);
-    
-    // Format zen (4 bytes, little-endian)
-    $zenHex = dechex($zen);
-    if (strlen($zenHex) == 1) $zenHex = '0' . $zenHex;
-    for ($i = strlen($zenHex); $i < 8; $i++) $zenHex = '0' . $zenHex;
-    $zenHex = substr($zenHex, 6) . substr($zenHex, 4, 2) . substr($zenHex, 2, 2) . substr($zenHex, 0, 2);
-    
-    // Format exp (4 bytes, little-endian)
-    $expHex = dechex($exp);
-    if (strlen($expHex) == 1) $expHex = '0' . $expHex;
-    for ($i = strlen($expHex); $i < 8; $i++) $expHex = '0' . $expHex;
-    $expHex = substr($expHex, 6) . substr($expHex, 4, 2) . substr($expHex, 2, 2) . substr($expHex, 0, 2);
-    
-    // Build base blob
-    $blob = '0x6600010000' . $t_len . '00' . $titleHex . '00' . $txt_len . '00' . $textHex . '0001' . $coinsHex . $zenHex . $expHex;
-    
-    // Add item data
-    if ($itemId == 0) {
-        $blob .= '000000000000000000';
-    } else {
-        $qtyHex = dechex($qty);
-        if (strlen($qtyHex) == 1) $qtyHex = '0' . $qtyHex;
-        
-        $itemHex = dechex($itemId);
-        if (strlen($itemHex) == 1) $itemHex = '0' . $itemHex;
-        for ($i = strlen($itemHex); $i < 4; $i++) $itemHex = '0' . $itemHex;
-        $itemHex = substr($itemHex, 2) . substr($itemHex, 0, 2);
-        
-        $unique = uniqid();
-        $unique = substr($unique, 8, 2) . substr($unique, 6, 2);
-        
-        $itemBlob = '64464f70d314e0297a9dffff' . $itemHex . '0000' . $qtyHex . $unique . '959a2919e029';
-        $itemBlob .= '0000000000000000000000000000000000000000000000000000000000000000';
-        $itemBlob .= '0000000000000000000000000000000000000000000000000000000000000000';
-        $itemBlob .= '0000000000000000000000000000000000000000000000000000000000000000';
-        $itemBlob .= '0000000000000000000000000000000000000000000000000000000000000000';
-        
-        $blob .= $itemBlob;
-    }
-    
-    return $blob;
-}
-
-function strToHex($string) {
-    $hex = '';
-    for ($i = 0; $i < strlen($string); $i++) {
-        $hexCode = dechex(ord($string[$i]));
-        $hex .= substr('0' . $hexCode, -2);
-    }
-    return strtoupper($hex);
-}
-
-function updateUserCurrency($pdo, $userId, $field, $amount, $RID) {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS user_currency (
-        user_id INT PRIMARY KEY,
-        coins INT DEFAULT 0,
-        zen INT DEFAULT 0,
-        vip_points INT DEFAULT 0,
-        updated_at DATETIME,
-        KEY idx_user (user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
-    
-    $stmt = $pdo->prepare("INSERT IGNORE INTO user_currency (user_id, coins, zen, vip_points, updated_at) VALUES (?, 0, 0, 0, NOW())");
-    $stmt->execute(array($userId));
-    
-    $allowedFields = array('coins', 'zen', 'vip_points');
-    if (in_array($field, $allowedFields)) {
-        $stmt = $pdo->prepare("UPDATE user_currency SET {$field} = {$field} + ?, updated_at = NOW() WHERE user_id = ?");
-        $stmt->execute(array($amount, $userId));
-        error_log("RID={$RID} CURRENCY_GRANTED user={$userId} {$field}={$amount}");
-    }
+    return $result['success'];
 }
 
 function storePendingDelivery($pdo, $orderId, $userId, $itemId, $quantity, $RID) {
@@ -592,7 +380,6 @@ function storePendingDelivery($pdo, $orderId, $userId, $itemId, $quantity, $RID)
         user_id INT NOT NULL,
         item_id INT NOT NULL,
         quantity INT NOT NULL,
-        order_type VARCHAR(20) DEFAULT 'product',
         status VARCHAR(20) DEFAULT 'pending',
         created_at DATETIME,
         delivered_at DATETIME,
@@ -600,27 +387,7 @@ function storePendingDelivery($pdo, $orderId, $userId, $itemId, $quantity, $RID)
         KEY idx_status (status)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
     
-    $stmt = $pdo->prepare("INSERT INTO pending_deliveries (order_id, user_id, item_id, quantity, order_type, status, created_at) VALUES (?, ?, ?, ?, 'product', 'pending', NOW())");
+    $stmt = $pdo->prepare("INSERT INTO pending_deliveries (order_id, user_id, item_id, quantity, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())");
     $stmt->execute(array($orderId, $userId, $itemId, $quantity));
     error_log("RID={$RID} PENDING_DELIVERY_CREATED user={$userId} item={$itemId} qty={$quantity}");
-}
-
-function storePendingBundleDelivery($pdo, $orderId, $userId, $bundleId, $RID) {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS pending_deliveries (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        order_id INT NOT NULL,
-        user_id INT NOT NULL,
-        item_id INT NOT NULL,
-        quantity INT NOT NULL,
-        order_type VARCHAR(20) DEFAULT 'product',
-        status VARCHAR(20) DEFAULT 'pending',
-        created_at DATETIME,
-        delivered_at DATETIME,
-        KEY idx_user (user_id),
-        KEY idx_status (status)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
-    
-    $stmt = $pdo->prepare("INSERT INTO pending_deliveries (order_id, user_id, item_id, quantity, order_type, status, created_at) VALUES (?, ?, ?, 1, 'bundle', 'pending', NOW())");
-    $stmt->execute(array($orderId, $userId, $bundleId));
-    error_log("RID={$RID} PENDING_BUNDLE_DELIVERY_CREATED user={$userId} bundle={$bundleId}");
 }
