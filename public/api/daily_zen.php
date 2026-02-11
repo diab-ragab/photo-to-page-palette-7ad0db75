@@ -143,35 +143,61 @@ function checkOrigin($allowedOrigins) {
 }
 
 function validateSession($pdo) {
-  $sessionToken = '';
+  // Use centralized session helper if available
+  if (function_exists('getSessionToken') && function_exists('resolveSessionRow')) {
+    $sessionToken = getSessionToken();
+    if (!$sessionToken) return null;
 
+    $sess = resolveSessionRow($sessionToken);
+    if (!$sess) return null;
+
+    if (isset($sess['expires_at']) && function_exists('isSessionExpired') && isSessionExpired($sess['expires_at'])) return null;
+
+    $userId = (int)$sess['user_id'];
+    // Look up username
+    $stmt = $pdo->prepare("SELECT name FROM users WHERE ID = ? LIMIT 1");
+    $stmt->execute(array($userId));
+    $urow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$urow) return null;
+
+    return array(
+      'account_id' => $userId,
+      'username'   => $urow['name']
+    );
+  }
+
+  // Fallback: manual lookup
+  $sessionToken = '';
   if (!empty($_SERVER['HTTP_X_SESSION_TOKEN'])) {
     $sessionToken = $_SERVER['HTTP_X_SESSION_TOKEN'];
   } elseif (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
     $auth = $_SERVER['HTTP_AUTHORIZATION'];
     if (strpos($auth, 'Bearer ') === 0) $sessionToken = substr($auth, 7);
   }
-
   if (!$sessionToken) return null;
 
-  $stmt = $pdo->prepare("
-    SELECT s.user_id, s.expires_at, u.name AS username, u.ID AS account_id
-    FROM user_sessions s
-    JOIN users u ON s.user_id = u.ID
-    WHERE s.session_token = ?
-    LIMIT 1
-  ");
-  $stmt->execute(array($sessionToken));
-  $row = $stmt->fetch();
-  if (!$row) return null;
-
-  $expiresAt = strtotime($row['expires_at']);
-  if ($expiresAt < time()) return null;
-
-  return array(
-    'account_id' => (int)$row['account_id'],
-    'username'   => $row['username']
-  );
+  // Try raw then hashed
+  $attempts = array($sessionToken, hash('sha256', $sessionToken));
+  foreach ($attempts as $tok) {
+    $stmt = $pdo->prepare("
+      SELECT s.user_id, s.expires_at, u.name AS username, u.ID AS account_id
+      FROM user_sessions s
+      JOIN users u ON s.user_id = u.ID
+      WHERE s.session_token = ?
+      LIMIT 1
+    ");
+    $stmt->execute(array($tok));
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row) {
+      $expiresAt = strtotime($row['expires_at']);
+      if ($expiresAt < time()) return null;
+      return array(
+        'account_id' => (int)$row['account_id'],
+        'username'   => $row['username']
+      );
+    }
+  }
+  return null;
 }
 
 function logSecurity($pdo, $accountId, $deviceHash, $ip, $type, $details) {
@@ -404,7 +430,11 @@ function sendZenReward($mysqli, $username, $amount) {
 
 /* ───────────────────────── Main ───────────────────────── */
 
-requireCloudflare();
+// Only enforce Cloudflare check on production domain, not preview/lovable domains
+$httpHost = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '';
+if (strpos($httpHost, 'lovable') === false && strpos($httpHost, 'localhost') === false) {
+  requireCloudflare();
+}
 
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
 

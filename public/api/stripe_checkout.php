@@ -172,10 +172,13 @@ try {
     failSC(401, 'Invalid user session');
   }
   
-  if (strtotime($sess['expires_at']) <= time()) {
-    // extend session for checkout (24h)
-    $pdo->prepare("UPDATE user_sessions SET expires_at = DATE_ADD(NOW(), INTERVAL 24 HOUR) WHERE session_token = ?")
-        ->execute(array($tokenHash));
+  if (isset($sess['expires_at']) && strtotime($sess['expires_at']) <= time()) {
+    // extend session for checkout (24h) - try both raw and hashed token
+    $tokensToTry = array($token, hash('sha256', $token));
+    foreach ($tokensToTry as $t) {
+      $pdo->prepare("UPDATE user_sessions SET expires_at = DATE_ADD(NOW(), INTERVAL 24 HOUR) WHERE session_token = ?")
+          ->execute(array($t));
+    }
     error_log("RID={$rid} SESSION_EXTENDED user={$userId}");
   }
 } catch (Exception $e) {
