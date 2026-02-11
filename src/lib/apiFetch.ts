@@ -114,7 +114,7 @@ export async function fetchJsonOrThrow<T>(
     ...init,
     headers,
     credentials: 'include',
-    redirect: "error",
+    redirect: "follow",
   };
 
   let lastError: FetchJsonError | null = null;
