@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
+import { apiGet, apiPost, type FetchJsonError } from "@/lib/apiFetch";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -310,18 +310,11 @@ export const GamePass = () => {
     const fetchRewards = async () => {
       setIsLoadingRewards(true);
       try {
-        const response = await fetch(`${API_BASE}/gamepass.php?action=rewards&rid=${Date.now()}`, {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-          },
+        const data = await apiGet<any>(`/gamepass.php?action=rewards&rid=${Date.now()}`, false, {
+          showErrorToast: false,
         });
 
-        const contentType = response.headers.get("content-type") || "";
-        const data = contentType.includes("application/json") ? await response.json() : null;
-
-        if (response.ok && data?.success && Array.isArray(data.rewards) && data.rewards.length > 0) {
+        if (data?.success && Array.isArray(data.rewards) && data.rewards.length > 0) {
           setRewards(convertApiRewards(data.rewards));
           if (data.current_day) setCurrentDay(data.current_day);
         }
@@ -339,41 +332,15 @@ export const GamePass = () => {
     const fetchUserPassStatus = async () => {
       if (!user) return;
 
-      // Check if we have a session token before making the request
       const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken");
-      if (!token) {
-        // No token means not authenticated - silent fail, don't show error
-        return;
-      }
+      if (!token) return;
 
       try {
-        // Include sessionToken as query param fallback (some proxies strip custom headers)
-        const url = `${API_BASE}/gamepass.php?action=status&rid=${Date.now()}&sessionToken=${encodeURIComponent(token)}`;
-        
-        const response = await fetch(url, {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-            ...getAuthHeaders(),
-          },
-        });
-
-        const contentType = response.headers.get("content-type") || "";
-        const data = contentType.includes("application/json") ? await response.json() : null;
-
-        if (!response.ok) {
-          // 401/403 = session expired or invalid - logout silently (no toast spam)
-          if (response.status === 401 || response.status === 403) {
-            logout();
-            return;
-          }
-
-          const rid = typeof data?.rid === "string" ? ` (RID: ${data.rid})` : "";
-          const msg = data?.error || data?.message || `Game Pass status failed (${response.status}).`;
-          toast.error(`${msg}${rid}`);
-          return;
-        }
+        const data = await apiGet<any>(
+          `/gamepass.php?action=status&rid=${Date.now()}&sessionToken=${encodeURIComponent(token)}`,
+          true,
+          { showErrorToast: false, silentStatuses: [401, 403] },
+        );
 
         if (data?.success) {
           setHasElitePass(!!data.is_premium);
@@ -383,8 +350,11 @@ export const GamePass = () => {
           if (data.zen_cost_per_day && data.zen_cost_per_day > 0) setZenCostPerDay(data.zen_cost_per_day);
           if (Array.isArray(data.rewards) && data.rewards.length > 0) setRewards(convertApiRewards(data.rewards));
         }
-      } catch {
-        // Network error - silent fail for status check
+      } catch (err) {
+        const status = (err as FetchJsonError)?.status;
+        if (status === 401 || status === 403) {
+          logout();
+        }
       }
     };
 
@@ -433,8 +403,7 @@ export const GamePass = () => {
 
     setLoading(true);
     try {
-      // Include auth + payload in BOTH URL params and JSON body.
-      // Some hosts/proxies can drop POST bodies or convert POST→GET; gamepass.php supports $_REQUEST fallbacks.
+      // Include key params in URL as fallback (some proxies drop POST bodies)
       const claimParams = new URLSearchParams({
         action: "claim",
         rid: String(Date.now()),
@@ -444,56 +413,16 @@ export const GamePass = () => {
         roleId: String(selectedRoleId),
         payWithZen: payWithZen ? "1" : "0",
       });
-      const url = `${API_BASE}/gamepass.php?${claimParams.toString()}`;
 
-      const response = await fetch(url, {
-        method: "POST",
-        credentials: "include",
-        referrerPolicy: "no-referrer",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify({
-          day,
-          tier,
-          roleId: selectedRoleId,
-          payWithZen,
-          // Fallback auth: session_helper.php can read sessionToken from JSON body
-          sessionToken,
-        }),
-      });
-
-      const contentType = response.headers.get("content-type") || "";
-      const rawText = await response.text().catch(() => "");
-      const data = contentType.includes("application/json")
-        ? (() => {
-            try {
-              return rawText ? JSON.parse(rawText) : null;
-            } catch {
-              return null;
-            }
-          })()
-        : null;
-
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          toast.error("Session expired", { description: "Please log in again." });
-          logout();
-          return;
-        }
-
-        const rid = typeof data?.rid === "string" ? ` (RID: ${data.rid})` : "";
-        const msg = data?.error || data?.message || `Server error (${response.status}).`;
-        toast.error("Failed to claim", { description: `${msg}${rid}` });
-        return;
-      }
+      const data = await apiPost<any>(
+        `/gamepass.php?${claimParams.toString()}`,
+        { day, tier, roleId: selectedRoleId, payWithZen, sessionToken },
+        true,
+        { showErrorToast: false, silentStatuses: [401, 403] },
+      );
 
       if (data?.success) {
-        // Trigger confetti animation
         setClaimAnimation({ day, tier });
-
         setClaimedDays(prev => ({ ...prev, [tier]: [...prev[tier], day] }));
         if (data.user_zen !== undefined) setUserZen(data.user_zen);
         const zenMsg = data.zen_spent ? ` (-${data.zen_spent.toLocaleString()} Zen)` : "";
@@ -501,19 +430,23 @@ export const GamePass = () => {
           description: `Sent to ${selectedCharacterName || "your character"}!${zenMsg}`,
         });
       } else {
-        const errText: string = (data?.error || data?.message || "Please try again.") as string;
-        const rid = typeof data?.rid === "string" ? ` (RID: ${data.rid})` : "";
-
+        const errText = (data?.error || data?.message || "Please try again.") as string;
         if (/not authenticated/i.test(errText)) {
-          toast.error("Not authenticated", { description: `Please log in again.${rid}` });
+          toast.error("Not authenticated", { description: "Please log in again." });
           logout();
           return;
         }
-
-        toast.error("Failed to claim", { description: `${errText}${rid}` });
+        toast.error("Failed to claim", { description: errText });
       }
-    } catch {
-      toast.error("Connection error");
+    } catch (err) {
+      const status = (err as FetchJsonError)?.status;
+      if (status === 401 || status === 403) {
+        toast.error("Session expired", { description: "Please log in again." });
+        logout();
+        return;
+      }
+      const serverMsg = (err as FetchJsonError)?.serverMessage;
+      toast.error("Failed to claim", { description: serverMsg || "Connection error – please try again." });
     } finally {
       setLoading(false);
     }
