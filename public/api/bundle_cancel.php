@@ -38,11 +38,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $pdo = getDB();
 
-// Parse request body
-$rawBody = file_get_contents('php://input');
-$body = json_decode($rawBody, true);
+// Parse request body (use cached input from bootstrap)
+$body = getJsonInput();
 
-if (!$body) {
+if (empty($body)) {
     json_fail(400, 'Invalid JSON body');
 }
 

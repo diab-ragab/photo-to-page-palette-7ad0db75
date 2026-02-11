@@ -14,6 +14,7 @@ error_reporting(E_ALL);
 define('VERSION', '2026-02-01-A');
 
 require_once __DIR__ . '/bootstrap.php';
+handleCors(array('GET', 'OPTIONS'));
 
 if (ob_get_level() === 0) { ob_start(); }
 header('Content-Type: application/json; charset=utf-8');
@@ -67,8 +68,9 @@ try {
 
 // Validate user session
 try {
+  $tokenHash = hash('sha256', $token);
   $stmt = $pdo->prepare("SELECT user_id, expires_at FROM user_sessions WHERE session_token = ? LIMIT 1");
-  $stmt->execute(array($token));
+  $stmt->execute(array($tokenHash));
   $sess = $stmt->fetch(PDO::FETCH_ASSOC);
   if (!$sess) os_fail(401, 'Invalid session');
   if (strtotime($sess['expires_at']) <= time()) os_fail(401, 'Session expired');
