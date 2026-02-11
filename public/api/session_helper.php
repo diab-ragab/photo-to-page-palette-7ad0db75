@@ -2,6 +2,12 @@
 /**
  * session_helper.php - Unified session token verification
  * PHP 5.x compatible
+ *
+ * FIXES:
+ * - Reads Authorization from multiple server vars (HTTP_AUTHORIZATION, REDIRECT_HTTP_AUTHORIZATION)
+ * - Reads headers using getallheaders() when available (some servers drop HTTP_AUTHORIZATION)
+ * - Supports X-Session-Token reliably (recommended)
+ * - Reads JSON body only once (cached)
  */
 
 if (!function_exists('getDB')) {
@@ -79,6 +85,39 @@ if (!function_exists('_readJsonBodyOnce')) {
 }
 
 /**
+ * Header getter (works across server configs)
+ */
+if (!function_exists('_getHeaderValue')) {
+    function _getHeaderValue($name) {
+        $nameLower = strtolower($name);
+
+        // 1) Direct $_SERVER style: HTTP_*
+        $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+        if (isset($_SERVER[$serverKey]) && $_SERVER[$serverKey] !== '') {
+            return (string)$_SERVER[$serverKey];
+        }
+
+        // 2) Special case for Authorization
+        if ($nameLower === 'authorization') {
+            if (!empty($_SERVER['HTTP_AUTHORIZATION'])) return (string)$_SERVER['HTTP_AUTHORIZATION'];
+            if (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) return (string)$_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        }
+
+        // 3) getallheaders() fallback (Apache/NGINX/FPM differences)
+        if (function_exists('getallheaders')) {
+            $headers = getallheaders();
+            if (is_array($headers)) {
+                foreach ($headers as $k => $v) {
+                    if (strtolower($k) === $nameLower) return (string)$v;
+                }
+            }
+        }
+
+        return '';
+    }
+}
+
+/**
  * Extract session token from various sources
  * Priority:
  * Authorization Bearer > X-Session-Token > query param > JSON body > cookie > POST form
@@ -86,7 +125,7 @@ if (!function_exists('_readJsonBodyOnce')) {
 if (!function_exists('getSessionToken')) {
     function getSessionToken() {
         // Authorization: Bearer <token>
-        $auth = isset($_SERVER['HTTP_AUTHORIZATION']) ? (string)$_SERVER['HTTP_AUTHORIZATION'] : '';
+        $auth = _getHeaderValue('Authorization');
         if ($auth !== '') {
             if (stripos($auth, 'Bearer ') === 0) {
                 $t = trim(substr($auth, 7));
@@ -97,16 +136,19 @@ if (!function_exists('getSessionToken')) {
             }
         }
 
-        // X-Session-Token header
-        $hdr = isset($_SERVER['HTTP_X_SESSION_TOKEN']) ? (string)$_SERVER['HTTP_X_SESSION_TOKEN'] : '';
+        // X-Session-Token header (recommended)
+        $hdr = _getHeaderValue('X-Session-Token');
         if ($hdr !== '') return trim($hdr);
 
         // Query parameter (fallback)
         if (!empty($_GET['sessionToken'])) return trim((string)$_GET['sessionToken']);
 
-        // JSON body (CRITICAL FIX)
+        // JSON body (fallback)
         $body = _readJsonBodyOnce();
-        if (is_array($body) && !empty($body['sessionToken'])) return trim((string)$body['sessionToken']);
+        if (is_array($body)) {
+            if (!empty($body['sessionToken'])) return trim((string)$body['sessionToken']);
+            if (!empty($body['token'])) return trim((string)$body['token']); // optional alias
+        }
 
         // Cookie (fallback)
         if (!empty($_COOKIE['sessionToken'])) return trim((string)$_COOKIE['sessionToken']);
@@ -133,13 +175,14 @@ if (!function_exists('resolveSessionRow')) {
         // Detect username column (name or login)
         $usernameCol = 'name';
         try {
-            $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+            $colsStmt = $pdo->query("SHOW COLUMNS FROM users");
+            $cols = $colsStmt ? $colsStmt->fetchAll(PDO::FETCH_COLUMN) : array();
             if (is_array($cols) && in_array('login', $cols) && !in_array('name', $cols)) {
                 $usernameCol = 'login';
             }
         } catch (Exception $e) {}
 
-        // 1) Try raw token
+        // 1) Try raw token in session_token
         try {
             $stmt = $pdo->prepare("
                 SELECT us.user_id, u.`{$usernameCol}` as name, us.expires_at

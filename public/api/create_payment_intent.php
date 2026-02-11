@@ -8,6 +8,7 @@
  */
 
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/db.php';
 handleCors(array('POST', 'OPTIONS'));
 
 $RID = bin2hex(random_bytes(6));
@@ -68,10 +69,11 @@ $stmt->execute(array($clientIP));
 // Clean old rate limit entries (older than 5 minutes)
 $pdo->exec("DELETE FROM payment_rate_limit WHERE request_time < DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
 
-// Parse request body (use cached input from bootstrap)
-$body = getJsonInput();
+// Parse request body
+$rawBody = file_get_contents('php://input');
+$body = json_decode($rawBody, true);
 
-if (empty($body)) {
+if (!$body) {
     json_fail(400, 'Invalid JSON body');
 }
 
@@ -131,7 +133,7 @@ if (empty($stripeSecretKey)) {
     json_fail(500, 'Payment system not configured');
 }
 
-// Create PaymentIntent using Stripe API (file_get_contents for compatibility)
+// Create PaymentIntent using Stripe API (cURL)
 $stripeUrl = 'https://api.stripe.com/v1/payment_intents';
 
 $postData = array(
@@ -150,31 +152,24 @@ if ($userId > 0) {
     $postData['metadata[user_id]'] = $userId;
 }
 
-$opts = array(
-    'http' => array(
-        'method' => 'POST',
-        'header' => "Authorization: Bearer {$stripeSecretKey}\r\nContent-Type: application/x-www-form-urlencoded",
-        'content' => http_build_query($postData),
-        'timeout' => 30,
-        'ignore_errors' => true,
-    ),
-    'ssl' => array(
-        'verify_peer' => false,
-        'verify_peer_name' => false,
-    ),
-);
-$context = stream_context_create($opts);
-$response = @file_get_contents($stripeUrl, false, $context);
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, $stripeUrl);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+    'Authorization: Basic ' . base64_encode($stripeSecretKey . ':'),
+    'Content-Type: application/x-www-form-urlencoded',
+));
+curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
-$httpCode = 0;
-if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
-    if (preg_match('/HTTP\/\d+\.?\d*\s+(\d+)/', $http_response_header[0], $m)) {
-        $httpCode = (int)$m[1];
-    }
-}
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curlError = curl_error($ch);
+curl_close($ch);
 
-if ($response === false) {
-    error_log("RID={$RID} STRIPE_REQUEST_FAILED");
+if ($curlError) {
+    error_log("RID={$RID} STRIPE_CURL_ERROR: {$curlError}");
     json_fail(502, 'Payment service unavailable');
 }
 

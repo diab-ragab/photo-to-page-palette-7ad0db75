@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import { SEO } from "@/components/SEO";
 import { CharacterSelector } from "@/components/shop/CharacterSelector";
-import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
+import { apiPost, FetchJsonError } from "@/lib/apiFetch";
 
 const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();
@@ -51,7 +51,6 @@ const Checkout = () => {
     try {
       const token = localStorage.getItem("woi_session_token") || "";
       
-      // Prepare cart items for Stripe Checkout
       const cartItems = items.map(item => ({
         id: item.id,
         name: item.name,
@@ -59,36 +58,30 @@ const Checkout = () => {
         quantity: item.quantity,
       }));
 
-      const response = await fetch(`${API_BASE}/stripe_checkout.php`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Session-Token": token,
-          "Authorization": `Bearer ${token}`,
-        },
-        credentials: "include",
-        body: JSON.stringify({ 
+      const data = await apiPost<any>(
+        `/stripe_checkout.php?sessionToken=${encodeURIComponent(token)}`,
+        { 
           items: cartItems,
           character_id: selectedRoleId,
-          character_name: selectedCharacterName
-        }),
-      });
-
-      const data = await response.json();
+          character_name: selectedCharacterName,
+          sessionToken: token,
+        },
+        true,
+        { showErrorToast: false, retries: 1 }
+      );
 
       if (data.success && data.url) {
-        // Clear cart before redirecting
         clearCart();
-        // Redirect to Stripe Checkout
         window.location.href = data.url;
       } else {
         setError(data.message || "Failed to initialize payment");
         toast.error(data.message || "Failed to initialize payment");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Checkout error:", err);
-      setError("Failed to connect to payment service");
-      toast.error("Failed to connect to payment service");
+      const msg = err?.serverMessage || err?.message || "Failed to connect to payment service";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
     }
