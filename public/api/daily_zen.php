@@ -16,6 +16,7 @@
  */
 
 require_once __DIR__ . '/bootstrap.php';
+handleCors(array('GET','POST','OPTIONS'));
 
 header('Content-Type: application/json; charset=utf-8');
 
