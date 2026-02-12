@@ -112,6 +112,33 @@ export function useJackpotSound() {
     }
   }, [getAudioContext]);
 
+  const playNewWinnerSound = useCallback(() => {
+    try {
+      const ctx = getAudioContext();
+      const now = ctx.currentTime;
+
+      // Short bright chime — two ascending notes
+      const playTone = (freq: number, start: number, dur: number, vol: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + start);
+        gain.gain.setValueAtTime(0, now + start);
+        gain.gain.linearRampToValueAtTime(vol, now + start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + start + dur);
+        osc.start(now + start);
+        osc.stop(now + start + dur);
+      };
+
+      playTone(880, 0, 0.12, 0.15);    // A5
+      playTone(1174.66, 0.08, 0.18, 0.18); // D6
+    } catch (e) {
+      console.warn('Could not play new winner sound:', e);
+    }
+  }, [getAudioContext]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -121,5 +148,5 @@ export function useJackpotSound() {
     };
   }, []);
 
-  return { playJackpotSound, playRegularWinSound, playSpinSound };
+  return { playJackpotSound, playRegularWinSound, playSpinSound, playNewWinnerSound };
 }

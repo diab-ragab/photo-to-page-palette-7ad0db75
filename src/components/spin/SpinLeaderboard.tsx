@@ -8,6 +8,7 @@ import { Trophy, Medal, Award, Sparkles, Coins, Crown, Zap, Gift, History, Refre
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchJsonOrThrow, API_BASE } from '@/lib/apiFetch';
 import { SpinHistoryList } from './SpinHistory';
+import { useJackpotSound } from '@/hooks/useJackpotSound';
 
 interface SpinLeaderboardEntry {
   role_id: number;
@@ -41,7 +42,9 @@ export function SpinLeaderboard() {
   const [error, setError] = useState(false);
   const [newEntryKeys, setNewEntryKeys] = useState<Set<string>>(new Set());
   const prevEntriesRef = useRef<string[]>([]);
-
+  const { playNewWinnerSound } = useJackpotSound();
+  const playNewWinnerSoundRef = useRef(playNewWinnerSound);
+  playNewWinnerSoundRef.current = playNewWinnerSound;
   const loadEntries = useCallback(async (isRefresh = false) => {
     try {
       const data = await fetchJsonOrThrow<{ success: boolean; leaderboard: SpinLeaderboardEntry[] }>(
@@ -60,6 +63,7 @@ export function SpinLeaderboard() {
         });
         if (newKeys.size > 0) {
           setNewEntryKeys(newKeys);
+          playNewWinnerSoundRef.current();
           setTimeout(() => setNewEntryKeys(new Set()), 3000);
         }
       }
