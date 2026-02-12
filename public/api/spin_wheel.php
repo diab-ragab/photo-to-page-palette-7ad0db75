@@ -202,14 +202,41 @@ function ensureSpinTables($pdo) {
     $stmt = $pdo->query("SELECT COUNT(*) FROM spin_wheel_segments");
     if ((int)$stmt->fetchColumn() === 0) {
         $defaultSegments = array(
-            array('50 Coins',  'coins',   50,  25.00, '#22c55e', 'coins', 1),
-            array('100 Coins', 'coins',  100,  20.00, '#3b82f6', 'coins', 2),
-            array('250 Coins', 'coins',  250,  15.00, '#8b5cf6', 'coins', 3),
-            array('500 Coins', 'coins',  500,   8.00, '#f59e0b', 'coins', 4),
-            array('10 VIP',    'vip',     10,  12.00, '#ec4899', 'crown', 5),
-            array('50 VIP',    'vip',     50,   5.00, '#ef4444', 'crown', 6),
-            array('1000 Zen',  'zen',   1000,  10.00, '#06b6d4', 'zap',   7),
-            array('Try Again', 'nothing',   0,   5.00, '#64748b', 'x',     8)
+            // --- COMMON: Coins (40% total) ---
+            array('10 Coins',     'coins',      10,   6.00, '#4ade80', 'coins',  1),
+            array('25 Coins',     'coins',      25,   6.00, '#22c55e', 'coins',  2),
+            array('50 Coins',     'coins',      50,   5.50, '#16a34a', 'coins',  3),
+            array('75 Coins',     'coins',      75,   4.50, '#15803d', 'coins',  4),
+            array('100 Coins',    'coins',     100,   4.00, '#3b82f6', 'coins',  5),
+            array('150 Coins',    'coins',     150,   3.50, '#2563eb', 'coins',  6),
+            array('200 Coins',    'coins',     200,   3.00, '#1d4ed8', 'coins',  7),
+            array('300 Coins',    'coins',     300,   2.50, '#6366f1', 'coins',  8),
+            array('500 Coins',    'coins',     500,   2.00, '#8b5cf6', 'coins',  9),
+            array('750 Coins',    'coins',     750,   1.50, '#7c3aed', 'coins', 10),
+            array('1000 Coins',   'coins',    1000,   1.00, '#a855f7', 'coins', 11),
+            // --- UNCOMMON: VIP Points (15% total) ---
+            array('5 VIP',        'vip',         5,   3.50, '#f472b6', 'crown', 12),
+            array('10 VIP',       'vip',        10,   3.00, '#ec4899', 'crown', 13),
+            array('25 VIP',       'vip',        25,   2.50, '#db2777', 'crown', 14),
+            array('50 VIP',       'vip',        50,   2.00, '#be185d', 'crown', 15),
+            array('100 VIP',      'vip',       100,   1.50, '#9d174d', 'crown', 16),
+            array('200 VIP',      'vip',       200,   1.00, '#831843', 'crown', 17),
+            array('500 VIP',      'vip',       500,   0.80, '#701a75', 'crown', 18),
+            array('1000 VIP',     'vip',      1000,   0.70, '#86198f', 'crown', 19),
+            // --- RARE: Zen (10% total) ---
+            array('500 Zen',      'zen',       500,   2.50, '#22d3ee', 'zap',   20),
+            array('1000 Zen',     'zen',      1000,   2.00, '#06b6d4', 'zap',   21),
+            array('2500 Zen',     'zen',      2500,   1.50, '#0891b2', 'zap',   22),
+            array('5000 Zen',     'zen',      5000,   1.20, '#0e7490', 'zap',   23),
+            array('10000 Zen',    'zen',     10000,   0.80, '#155e75', 'zap',   24),
+            // --- SUPER RARE: Zen Jackpots (2% total) ---
+            array('25000 Zen',    'zen',     25000,   0.60, '#f59e0b', 'zap',   25),
+            array('50000 Zen',    'zen',     50000,   0.40, '#d97706', 'zap',   26),
+            array('100000 Zen',   'zen',    100000,   0.25, '#b45309', 'zap',   27),
+            array('500000 Zen',   'zen',    500000,   0.15, '#ef4444', 'zap',   28),
+            // --- NOTHING (33% total) ---
+            array('Try Again',    'nothing',     0,  18.00, '#64748b', 'x',     29),
+            array('Better Luck',  'nothing',     0,  15.00, '#94a3b8', 'x',     30)
         );
         $stmt = $pdo->prepare("
             INSERT INTO spin_wheel_segments
