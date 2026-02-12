@@ -118,7 +118,7 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
               </div>
               <div>
                 <p className="font-semibold text-violet-200 text-sm">
-                  Gold Pass — {currentTier === "elite" ? "€10.00 upgrade" : "€19.99"}
+                  Gold Pass — €19.99
                 </p>
                 {currentTier === "gold" ? (
                   <ActiveBadge tier="Gold" />
@@ -317,7 +317,7 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
               className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-bold h-11 text-base shadow-lg shadow-violet-500/30"
             >
               <ArrowUp className="h-5 w-5 mr-2" />
-              {loading === "gold" ? "Processing..." : "Upgrade to Gold — €10.00"}
+              {loading === "gold" ? "Processing..." : "Upgrade to Gold — €19.99"}
             </Button>
           ) : (
             <Button
@@ -330,7 +330,7 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
             </Button>
           )}
           <p className="text-center text-xs text-violet-200/50 mt-3">
-            {currentTier === "elite" ? "Upgrade price • Pay the difference" : "One-time purchase • 30-day access"}
+            One-time purchase • 30-day access
           </p>
         </div>
       </div>

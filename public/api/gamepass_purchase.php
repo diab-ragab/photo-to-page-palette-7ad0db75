@@ -111,11 +111,10 @@ $tierNames = array(
   'gold'  => 'Gold Game Pass',
 );
 
-// If upgrading from elite to gold, charge the difference
+// If upgrading from elite to gold, charge full gold price
 $unitAmount = $tierPrices[$tierInput];
 $productName = $tierNames[$tierInput];
 if ($isUpgrade && $existingTier === 'elite' && $tierInput === 'gold') {
-  $unitAmount = $tierPrices['gold'] - $tierPrices['elite']; // 1000 cents = 10.00 EUR
   $productName = 'Gold Game Pass (Upgrade from Elite)';
 }
 
