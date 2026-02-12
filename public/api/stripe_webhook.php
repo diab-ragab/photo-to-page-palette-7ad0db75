@@ -165,25 +165,31 @@ function handleCheckoutComplete($pdo, $event, $logId, $RID) {
     $currency = isset($session['currency']) ? strtoupper($session['currency']) : 'EUR';
     $paymentStatus = isset($session['payment_status']) ? $session['payment_status'] : '';
     
-    // Get line items metadata if available
     $metadata = isset($session['metadata']) ? $session['metadata'] : array();
     $productId = isset($metadata['product_id']) ? (int)$metadata['product_id'] : 0;
     $userId = isset($metadata['user_id']) ? (int)$metadata['user_id'] : 0;
     $quantity = isset($metadata['quantity']) ? (int)$metadata['quantity'] : 1;
+    $purchaseType = isset($metadata['type']) ? $metadata['type'] : '';
+    $purchaseTier = isset($metadata['tier']) ? $metadata['tier'] : '';
     
-    error_log("RID={$RID} CHECKOUT_COMPLETE session={$sessionId} email={$customerEmail} amount={$amountTotal} status={$paymentStatus}");
+    error_log("RID={$RID} CHECKOUT_COMPLETE session={$sessionId} email={$customerEmail} amount={$amountTotal} status={$paymentStatus} type={$purchaseType}");
     
     if ($paymentStatus !== 'paid') {
         return;
     }
     
-    // Check if order already exists for this session
+    // Handle Game Pass purchases
+    if ($purchaseType === 'gamepass' && in_array($purchaseTier, array('elite', 'gold'))) {
+        handleGamePassPurchase($pdo, $userId, $purchaseTier, $sessionId, $RID);
+        return;
+    }
+    
+    // Regular webshop order handling
     $stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE stripe_session_id = ? LIMIT 1");
     $stmt->execute(array($sessionId));
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($existing) {
-        // Update existing order
         $stmt = $pdo->prepare("
             UPDATE webshop_orders 
             SET status = 'completed', 
@@ -194,8 +200,6 @@ function handleCheckoutComplete($pdo, $event, $logId, $RID) {
         $stmt->execute(array($paymentIntent, $sessionId));
         error_log("RID={$RID} ORDER_UPDATED id={$existing['id']}");
     } else {
-        // Create new order from webhook
-        // Try to find user by email if not in metadata
         if ($userId <= 0 && $customerEmail !== '') {
             $stmt = $pdo->prepare("SELECT ID FROM users WHERE email = ? LIMIT 1");
             $stmt->execute(array($customerEmail));
@@ -205,7 +209,7 @@ function handleCheckoutComplete($pdo, $event, $logId, $RID) {
             }
         }
         
-        $totalReal = $amountTotal / 100; // Convert from cents
+        $totalReal = $amountTotal / 100;
         
         $stmt = $pdo->prepare("
             INSERT INTO webshop_orders 
@@ -215,11 +219,44 @@ function handleCheckoutComplete($pdo, $event, $logId, $RID) {
         $stmt->execute(array($userId, $productId, $quantity, $totalReal, $sessionId, $paymentIntent));
         $orderId = $pdo->lastInsertId();
         error_log("RID={$RID} ORDER_CREATED id={$orderId} user={$userId} product={$productId}");
-        
-        // TODO: Deliver items to player in-game
-        // This is where you would call your game server API to deliver items
-        // deliverItemsToPlayer($userId, $productId, $quantity);
     }
+}
+
+function handleGamePassPurchase($pdo, $userId, $tier, $sessionId, $RID) {
+    if ($userId <= 0) {
+        error_log("RID={$RID} GAMEPASS_WEBHOOK_NO_USER session={$sessionId}");
+        return;
+    }
+    
+    // Ensure columns exist
+    try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free'"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN stripe_session_id VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
+    
+    // Upsert user_gamepass
+    $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ?");
+    $stmt->execute(array($userId));
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Set expiry 30 days from now
+    $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
+    
+    if ($existing) {
+        $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = ?, expires_at = ?, stripe_session_id = ? WHERE user_id = ?");
+        $stmt->execute(array($tier, $expiresAt, $sessionId, $userId));
+    } else {
+        $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, expires_at, stripe_session_id, created_at) VALUES (?, 1, ?, ?, ?, NOW())");
+        $stmt->execute(array($userId, $tier, $expiresAt, $sessionId));
+    }
+    
+    // Update purchase log
+    try {
+        $stmt = $pdo->prepare("UPDATE gamepass_purchases SET status = 'completed', completed_at = NOW() WHERE stripe_session_id = ?");
+        $stmt->execute(array($sessionId));
+    } catch (Exception $e) {
+        error_log("RID={$RID} GAMEPASS_PURCHASE_LOG_ERR: " . $e->getMessage());
+    }
+    
+    error_log("RID={$RID} GAMEPASS_ACTIVATED user={$userId} tier={$tier} expires={$expiresAt}");
 }
 
 function handlePaymentSucceeded($pdo, $event, $logId, $RID) {

@@ -135,7 +135,7 @@ switch ($action) {
 
     $day = isset($input['day']) ? (int)$input['day'] : 1;
     $tierInput = isset($input['tier']) ? $input['tier'] : '';
-    $tier = in_array($tierInput, array('free', 'elite')) ? $tierInput : 'free';
+    $tier = in_array($tierInput, array('free', 'elite', 'gold')) ? $tierInput : 'free';
 
     $item_id = isset($input['item_id']) ? (int)$input['item_id'] : 0;
     $item_name = isset($input['item_name']) ? trim($input['item_name']) : '';
@@ -177,7 +177,7 @@ switch ($action) {
 
     $day = isset($input['day']) ? (int)$input['day'] : 1;
     $tierInput = isset($input['tier']) ? $input['tier'] : '';
-    $tier = in_array($tierInput, array('free', 'elite')) ? $tierInput : 'free';
+    $tier = in_array($tierInput, array('free', 'elite', 'gold')) ? $tierInput : 'free';
 
     $item_id = isset($input['item_id']) ? (int)$input['item_id'] : 0;
     $item_name = isset($input['item_name']) ? trim($input['item_name']) : '';
