@@ -14,6 +14,12 @@ interface DailyZenStatus {
   ban_seconds_remaining?: number;
   strike_count?: number;
   error?: string;
+  // Character requirement fields
+  min_character_level?: number;
+  character_name?: string;
+  character_level?: number;
+  meets_character_requirement?: boolean;
+  character_requirement_error?: string;
 }
 
 interface ClaimResult {
@@ -27,6 +33,10 @@ interface ClaimResult {
   ban_seconds_remaining?: number;
   strike_count?: number;
   error?: string;
+  // Character requirement fields
+  min_character_level?: number;
+  character_name?: string;
+  character_level?: number;
 }
 
 // Store CSRF token from status check

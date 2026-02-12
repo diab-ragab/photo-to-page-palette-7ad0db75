@@ -17,7 +17,9 @@ import {
   Zap,
   Timer,
   ShieldAlert,
-  Ban
+  Ban,
+  Sword,
+  TrendingUp
 } from 'lucide-react';
 
 interface DailyZenRewardProps {
@@ -40,6 +42,13 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
   const [permBan, setPermBan] = useState(false);
   const [banSecondsRemaining, setBanSecondsRemaining] = useState(0);
   const [strikeCount, setStrikeCount] = useState(0);
+
+  // Character requirement state
+  const [meetsCharReq, setMeetsCharReq] = useState(true);
+  const [charReqError, setCharReqError] = useState('');
+  const [characterName, setCharacterName] = useState('');
+  const [characterLevel, setCharacterLevel] = useState(0);
+  const [minCharLevel, setMinCharLevel] = useState(50);
   
   const countdownEndTimeRef = useRef<number>(0);
   const banEndTimeRef = useRef<number>(0);
@@ -74,6 +83,13 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         countdownEndTimeRef.current = serverSeconds > 0 ? Date.now() + (serverSeconds * 1000) : 0;
 
         applyBanState(status);
+
+        // Character requirement
+        setMeetsCharReq(status.meets_character_requirement !== false);
+        setCharReqError(status.character_requirement_error || '');
+        setCharacterName(status.character_name || '');
+        setCharacterLevel(status.character_level || 0);
+        if (status.min_character_level) setMinCharLevel(status.min_character_level);
         
         if (status.csrf_token) {
           sessionStorage.setItem('csrf_token', status.csrf_token);
@@ -155,6 +171,14 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         // Check if banned from claim response
         if (result.is_banned) {
           applyBanState(result);
+        }
+        // Check character requirement failure
+        if (result.min_character_level) {
+          setMeetsCharReq(false);
+          setCharReqError(result.error || '');
+          if (result.character_name) setCharacterName(result.character_name);
+          if (result.character_level !== undefined) setCharacterLevel(result.character_level);
+          setMinCharLevel(result.min_character_level);
         }
         setError(result.error || 'Failed to claim reward');
         toast.error(result.error || 'Failed to claim reward');
@@ -260,6 +284,31 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
               <span className="text-xs text-amber-400">
                 Strikes: {strikeCount}/3 {strikeCount >= 3 ? '(max)' : ''}
               </span>
+            </div>
+          </div>
+        ) : !meetsCharReq ? (
+          /* ───── Character requirement not met ───── */
+          <div className="flex flex-col gap-3 p-4 bg-amber-950/30 border border-amber-500/30 rounded-xl">
+            <div className="flex items-center gap-2">
+              <Sword className="h-5 w-5 text-amber-400" />
+              <span className="text-sm font-bold text-amber-400">Character Required</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {charReqError || `You need a character at level ${minCharLevel} or higher to claim Free Zen.`}
+            </p>
+            {characterName && characterName !== 'Unknown' && (
+              <div className="flex items-center gap-2 mt-1">
+                <TrendingUp className="h-4 w-4 text-cyan-400" />
+                <span className="text-xs text-muted-foreground">
+                  {characterName} — Lv.{characterLevel} / {minCharLevel} required
+                </span>
+              </div>
+            )}
+            <div className="w-full bg-muted/50 rounded-full h-2 mt-1">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 to-cyan-500 rounded-full transition-all"
+                style={{ width: `${Math.min(100, (characterLevel / minCharLevel) * 100)}%` }}
+              />
             </div>
           </div>
         ) : (
