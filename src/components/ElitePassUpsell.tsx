@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Sparkles, Gift, Zap, Star, ChevronRight, Diamond, Gem, ArrowUp, ShieldCheck } from "lucide-react";
+import { Crown, Sparkles, Gift, Zap, Star, ChevronRight, Diamond, Gem, ArrowUp, ShieldCheck, Clock } from "lucide-react";
 import { apiPost } from "@/lib/apiFetch";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,11 +9,25 @@ import { useAuth } from "@/contexts/AuthContext";
 interface PassUpsellProps {
   compact?: boolean;
   currentTier?: "free" | "elite" | "gold";
+  expiresAt?: string | null;
 }
 
-export const ElitePassUpsell = ({ compact = false, currentTier = "free" }: PassUpsellProps) => {
+export const ElitePassUpsell = ({ compact = false, currentTier = "free", expiresAt }: PassUpsellProps) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
+
+  const formatExpiry = (dateStr: string | null | undefined) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return null;
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    const daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    const formatted = date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    return { formatted, daysLeft };
+  };
+
+  const expiry = formatExpiry(expiresAt);
 
   const handlePurchase = async (tier: "elite" | "gold", isUpgrade = false) => {
     if (!user) {
@@ -43,11 +57,21 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free" }: PassU
 
   // Active tier badge component
   const ActiveBadge = ({ tier }: { tier: string }) => (
-    <div className="flex items-center gap-2 py-2">
-      <ShieldCheck className="h-4 w-4 text-emerald-400" />
-      <span className="text-xs font-semibold text-emerald-400">
-        ✓ You have an active {tier} Pass
-      </span>
+    <div className="flex flex-col gap-1 py-1">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-emerald-400" />
+        <span className="text-xs font-semibold text-emerald-400">
+          ✓ Active {tier} Pass
+        </span>
+      </div>
+      {expiry && (
+        <div className="flex items-center gap-1.5 ml-6">
+          <Clock className="h-3 w-3 text-muted-foreground" />
+          <span className="text-[10px] text-muted-foreground">
+            Expires {expiry.formatted} ({expiry.daysLeft}d left)
+          </span>
+        </div>
+      )}
     </div>
   );
 
@@ -185,9 +209,17 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free" }: PassU
           </div>
 
           {currentTier === "elite" ? (
-            <div className="w-full flex items-center justify-center gap-2 h-11 rounded-md bg-emerald-500/10 border border-emerald-500/30">
-              <ShieldCheck className="h-5 w-5 text-emerald-400" />
-              <span className="font-bold text-emerald-400">Active Elite Pass</span>
+            <div className="w-full flex flex-col items-center justify-center gap-1 py-2.5 rounded-md bg-emerald-500/10 border border-emerald-500/30">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-400" />
+                <span className="font-bold text-emerald-400">Active Elite Pass</span>
+              </div>
+              {expiry && (
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[11px] text-muted-foreground">Expires {expiry.formatted} ({expiry.daysLeft}d left)</span>
+                </div>
+              )}
             </div>
           ) : currentTier === "gold" ? (
             <div className="w-full flex items-center justify-center gap-2 h-11 rounded-md bg-emerald-500/10 border border-emerald-500/30">
@@ -266,9 +298,17 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free" }: PassU
           </div>
 
           {currentTier === "gold" ? (
-            <div className="w-full flex items-center justify-center gap-2 h-11 rounded-md bg-emerald-500/10 border border-emerald-500/30">
-              <ShieldCheck className="h-5 w-5 text-emerald-400" />
-              <span className="font-bold text-emerald-400">Active Gold Pass</span>
+            <div className="w-full flex flex-col items-center justify-center gap-1 py-2.5 rounded-md bg-emerald-500/10 border border-emerald-500/30">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-400" />
+                <span className="font-bold text-emerald-400">Active Gold Pass</span>
+              </div>
+              {expiry && (
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[11px] text-muted-foreground">Expires {expiry.formatted} ({expiry.daysLeft}d left)</span>
+                </div>
+              )}
             </div>
           ) : currentTier === "elite" ? (
             <Button

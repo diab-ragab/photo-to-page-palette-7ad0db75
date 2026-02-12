@@ -19,6 +19,7 @@ const features = [
 export const GamePassSection = () => {
   const { user } = useAuth();
   const currentTier = (user as any)?.gamepassTier || "free";
+  const expiresAt = (user as any)?.gamepassExpiresAt || null;
 
   return (
     <div className="space-y-8">
@@ -193,7 +194,7 @@ export const GamePassSection = () => {
 
       {/* Purchase cards */}
       <div className="max-w-3xl mx-auto">
-        <ElitePassUpsell currentTier={currentTier} />
+        <ElitePassUpsell currentTier={currentTier} expiresAt={expiresAt} />
       </div>
     </div>
   );

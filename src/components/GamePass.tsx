@@ -287,6 +287,7 @@ export const GamePass = () => {
   const [zenSkipConfirm, setZenSkipConfirm] = useState<ZenSkipConfirm | null>(null);
   const [claimAnimation, setClaimAnimation] = useState<{ day: number; tier: "free" | "elite" | "gold" } | null>(null);
   const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
+  const [passExpiresAt, setPassExpiresAt] = useState<string | null>(null);
 
   const handleCharacterSelect = (roleId: number | null, name: string | null) => {
     setSelectedRoleId(roleId);
@@ -342,6 +343,7 @@ export const GamePass = () => {
           setHasElitePass(!!data.is_premium);
           const tier = data.user_tier || (data.is_premium ? 'elite' : 'free');
           setUserTier(tier as "free" | "elite" | "gold");
+          if (data.expires_at) setPassExpiresAt(data.expires_at);
           setClaimedDays({ free: data.claimed_days?.free || [], elite: data.claimed_days?.elite || [], gold: data.claimed_days?.gold || [] });
           if (data.current_day) setCurrentDay(data.current_day);
           if (data.user_zen !== undefined) setUserZen(data.user_zen);
@@ -629,7 +631,7 @@ export const GamePass = () => {
       {/* Pass Upsell Banner */}
       {userTier !== "gold" && (
         <div className="mb-6">
-          <ElitePassUpsell compact currentTier={userTier} />
+          <ElitePassUpsell compact currentTier={userTier} expiresAt={passExpiresAt} />
         </div>
       )}
 
