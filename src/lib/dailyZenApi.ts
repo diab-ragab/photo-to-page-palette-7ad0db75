@@ -20,6 +20,11 @@ interface DailyZenStatus {
   character_level?: number;
   meets_character_requirement?: boolean;
   character_requirement_error?: string;
+  // Last claim info
+  last_claim?: {
+    claimed_at: string;
+    reward_amount: number;
+  } | null;
 }
 
 interface ClaimResult {

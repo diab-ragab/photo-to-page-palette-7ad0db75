@@ -19,7 +19,8 @@ import {
   ShieldAlert,
   Ban,
   Sword,
-  TrendingUp
+  TrendingUp,
+  History
 } from 'lucide-react';
 
 interface DailyZenRewardProps {
@@ -49,6 +50,8 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
   const [characterName, setCharacterName] = useState('');
   const [characterLevel, setCharacterLevel] = useState(0);
   const [minCharLevel, setMinCharLevel] = useState(50);
+  const [lastClaimAt, setLastClaimAt] = useState<string | null>(null);
+  const [lastClaimAmount, setLastClaimAmount] = useState<number>(0);
   
   const countdownEndTimeRef = useRef<number>(0);
   const banEndTimeRef = useRef<number>(0);
@@ -90,7 +93,12 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCharacterName(status.character_name || '');
         setCharacterLevel(status.character_level || 0);
         if (status.min_character_level) setMinCharLevel(status.min_character_level);
-        
+
+        // Last claim info
+        if (status.last_claim) {
+          setLastClaimAt(status.last_claim.claimed_at);
+          setLastClaimAmount(status.last_claim.reward_amount);
+        }
         if (status.csrf_token) {
           sessionStorage.setItem('csrf_token', status.csrf_token);
         }
@@ -403,7 +411,18 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
               ) : null}
             </AnimatePresence>
 
-            {/* Success animation overlay */}
+            {/* Last claim info */}
+            {lastClaimAt && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 rounded-lg border border-border/30">
+                <History className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground">
+                  Last claimed <span className="font-medium text-foreground">{lastClaimAmount.toLocaleString()} Zen</span> on{' '}
+                  <span className="font-medium text-foreground">
+                    {new Date(lastClaimAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </span>
+              </div>
+            )}
             <AnimatePresence>
               {showSuccess && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

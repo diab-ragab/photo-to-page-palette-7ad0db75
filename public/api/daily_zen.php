@@ -464,6 +464,20 @@ try {
 
     $remain = secondsUntilNextClaim($pdo, $user['account_id']);
 
+    // Fetch last claim info
+    $lastClaim = null;
+    try {
+      $lcStmt = $pdo->prepare("SELECT claimed_at, reward_amount FROM daily_zen_claims WHERE account_id = ? ORDER BY claimed_at DESC LIMIT 1");
+      $lcStmt->execute(array($user['account_id']));
+      $lcRow = $lcStmt->fetch(PDO::FETCH_ASSOC);
+      if ($lcRow) {
+        $lastClaim = array(
+          'claimed_at' => $lcRow['claimed_at'],
+          'reward_amount' => (int)$lcRow['reward_amount']
+        );
+      }
+    } catch (Exception $e) {}
+
     $serverStmt = $pdo->query("SELECT UNIX_TIMESTAMP(NOW()) as server_time");
     $serverRow = $serverStmt->fetch();
     $serverTime = (int)$serverRow['server_time'];
@@ -479,7 +493,8 @@ try {
       'ban_seconds_remaining'=>$banSeconds,
       'strike_count'=>$pen['strike'],
       'server_time'=>$serverTime,
-      'csrf_token'=>getCsrfToken()
+      'csrf_token'=>getCsrfToken(),
+      'last_claim'=>$lastClaim
     ));
   }
 
