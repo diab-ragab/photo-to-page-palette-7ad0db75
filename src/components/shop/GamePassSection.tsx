@@ -1,6 +1,8 @@
-import { Shield, Crown, Diamond, Check, X, Sparkles, Zap, Gift, Star, Gem, Trophy } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Shield, Crown, Diamond, Check, X, Sparkles, Zap, Gift, Star, Gem, Trophy, Power } from "lucide-react";
 import { ElitePassUpsell } from "@/components/ElitePassUpsell";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiGet } from "@/lib/apiFetch";
 import { motion } from "framer-motion";
 
 const features = [
@@ -20,6 +22,45 @@ export const GamePassSection = () => {
   const { user } = useAuth();
   const currentTier = (user as any)?.gamepassTier || "free";
   const expiresAt = (user as any)?.gamepassExpiresAt || null;
+
+  const [elitePriceCents, setElitePriceCents] = useState(999);
+  const [goldPriceCents, setGoldPriceCents] = useState(1999);
+  const [gamepassEnabled, setGamepassEnabled] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const data = await apiGet<any>(`/gamepass.php?action=rewards&rid=${Date.now()}`, false, { showErrorToast: false });
+        if (data?.success) {
+          if (data.elite_price_cents) setElitePriceCents(data.elite_price_cents);
+          if (data.gold_price_cents) setGoldPriceCents(data.gold_price_cents);
+          if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
+        }
+      } catch {}
+      setLoaded(true);
+    };
+    fetchSettings();
+  }, []);
+
+  if (loaded && !gamepassEnabled) {
+    return (
+      <div className="space-y-8">
+        <div className="text-center space-y-3">
+          <div className="rounded-2xl border border-border bg-muted/30 p-12 text-center">
+            <Power className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h2 className="text-xl font-bold text-foreground mb-2">Game Pass is Currently Unavailable</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              The Game Pass is temporarily disabled. Check back later for updates!
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const elitePriceStr = `€${(elitePriceCents / 100).toFixed(2)}`;
+  const goldPriceStr = `€${(goldPriceCents / 100).toFixed(2)}`;
 
   return (
     <div className="space-y-8">
@@ -78,7 +119,7 @@ export const GamePassSection = () => {
             <Crown className="h-5 w-5 md:h-6 md:w-6 text-amber-400" />
           </div>
           <p className="font-bold text-amber-200 text-sm md:text-base">Elite</p>
-          <p className="text-xl md:text-2xl font-extrabold text-amber-400 mt-1">€9.99</p>
+          <p className="text-xl md:text-2xl font-extrabold text-amber-400 mt-1">{elitePriceStr}</p>
           <p className="text-[10px] text-amber-200/60 mt-1">30-day access</p>
         </motion.div>
 
@@ -119,7 +160,7 @@ export const GamePassSection = () => {
               <Diamond className="h-5 w-5 md:h-6 md:w-6 text-violet-400" />
             </div>
             <p className="font-bold text-violet-200 text-sm md:text-base">Gold</p>
-            <p className="text-xl md:text-2xl font-extrabold text-violet-400 mt-1">€19.99</p>
+            <p className="text-xl md:text-2xl font-extrabold text-violet-400 mt-1">{goldPriceStr}</p>
             <p className="text-[10px] text-violet-200/60 mt-1">30-day access</p>
           </div>
         </motion.div>
@@ -194,7 +235,13 @@ export const GamePassSection = () => {
 
       {/* Purchase cards */}
       <div className="max-w-3xl mx-auto">
-        <ElitePassUpsell currentTier={currentTier} expiresAt={expiresAt} />
+        <ElitePassUpsell
+          currentTier={currentTier}
+          expiresAt={expiresAt}
+          elitePriceCents={elitePriceCents}
+          goldPriceCents={goldPriceCents}
+          gamepassEnabled={gamepassEnabled}
+        />
       </div>
     </div>
   );

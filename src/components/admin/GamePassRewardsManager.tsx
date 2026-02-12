@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Gift, Crown, Plus, Pencil, Trash2, Save, X, Coins, Gem, Package, Diamond } from "lucide-react";
+import { Gift, Crown, Plus, Pencil, Trash2, Save, X, Coins, Gem, Package, Diamond, Power } from "lucide-react";
 import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 
 type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
@@ -312,6 +313,8 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   const [goldPrice, setGoldPrice] = useState<number>(1999);
   const [goldPriceInput, setGoldPriceInput] = useState<string>("19.99");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [gamepassEnabled, setGamepassEnabled] = useState(true);
+  const [isTogglingEnabled, setIsTogglingEnabled] = useState(false);
 
   useEffect(() => {
     fetchRewards();
@@ -334,9 +337,33 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
         setElitePriceInput((ep / 100).toFixed(2));
         setGoldPrice(gp);
         setGoldPriceInput((gp / 100).toFixed(2));
+        setGamepassEnabled(data.settings.gamepass_enabled !== false);
       }
     } catch (error) {
       console.error("Failed to fetch settings:", error);
+    }
+  };
+
+  const handleToggleEnabled = async (enabled: boolean) => {
+    setIsTogglingEnabled(true);
+    try {
+      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=update_settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ gamepass_enabled: enabled }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setGamepassEnabled(enabled);
+        toast({ title: enabled ? "Game Pass Enabled" : "Game Pass Disabled", description: enabled ? "Players can now access the Game Pass." : "Game Pass is now hidden from players." });
+      } else {
+        toast({ title: "Error", description: data.error || "Failed to toggle", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to toggle Game Pass", variant: "destructive" });
+    } finally {
+      setIsTogglingEnabled(false);
     }
   };
 
@@ -531,6 +558,29 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Enable/Disable Toggle */}
+          <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+            <div className="flex items-center gap-3">
+              <Power className={`h-5 w-5 ${gamepassEnabled ? "text-emerald-400" : "text-destructive"}`} />
+              <div>
+                <p className="font-medium text-sm">{gamepassEnabled ? "Game Pass is Active" : "Game Pass is OFF"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {gamepassEnabled ? "Players can view and purchase the Game Pass" : "Game Pass is hidden from all players"}
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={gamepassEnabled}
+              onCheckedChange={handleToggleEnabled}
+              disabled={isTogglingEnabled}
+            />
+          </div>
+          {!gamepassEnabled && (
+            <div className="flex items-center gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-sm">
+              <Power className="h-4 w-4 shrink-0" />
+              <span>Game Pass is currently disabled. Players cannot see or purchase it.</span>
+            </div>
+          )}
           {/* Tier Prices */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
