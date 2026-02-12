@@ -5,6 +5,7 @@ import { ShopCategories } from "@/components/shop/ShopCategories";
 import { ShopProducts } from "@/components/shop/ShopProducts";
 import { LimitedTimeBundles } from "@/components/shop/LimitedTimeBundles";
 import { CurrencyTopUp } from "@/components/shop/CurrencyTopUp";
+import { GamePassSection } from "@/components/shop/GamePassSection";
 import { SEO } from "@/components/SEO";
 import { useState, useCallback } from "react";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -58,6 +59,11 @@ const Shop = () => {
         {/* Currency Top-Up Section */}
         <section className="container mx-auto px-4 py-8 border-t border-border">
           <CurrencyTopUp key={`topup-${refreshKey}`} />
+        </section>
+
+        {/* Game Pass Section */}
+        <section className="container mx-auto px-4 py-8 border-t border-border">
+          <GamePassSection />
         </section>
         
         <div className="border-t border-border">
