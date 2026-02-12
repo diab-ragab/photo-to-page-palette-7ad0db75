@@ -46,17 +46,25 @@ interface RewardPopupProps {
   onClose: () => void;
 }
 
+const RARITY_MAP: Record<string, { label: string; color: string; glow: string }> = {
+  zen: { label: '✦ SUPER RARE', color: 'text-cyan-400', glow: 'shadow-cyan-500/40' },
+  vip: { label: '★ EPIC', color: 'text-purple-400', glow: 'shadow-purple-500/40' },
+  coins: { label: '◆ RARE', color: 'text-amber-400', glow: 'shadow-amber-500/40' },
+  nothing: { label: '', color: '', glow: '' },
+};
+
 function RewardPopup({ result, characterName, onClose }: RewardPopupProps) {
   const isNothing = result.winner?.reward_type === 'nothing';
   const rewardType = result.winner?.reward_type;
   const isMailReward = rewardType === 'coins' || rewardType === 'zen';
+  const rarity = RARITY_MAP[rewardType || 'nothing'] || RARITY_MAP.coins;
   
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -64,16 +72,16 @@ function RewardPopup({ result, characterName, onClose }: RewardPopupProps) {
         animate={{ scale: 1, opacity: 1, rotateY: 0 }}
         exit={{ scale: 0.5, opacity: 0 }}
         transition={{ type: 'spring', damping: 15 }}
-        className="bg-card border border-primary/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
+        className="bg-card border border-primary/30 rounded-2xl p-5 md:p-8 max-w-xs md:max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Confetti effect for wins */}
         {!isNothing && (
           <div className="absolute inset-0 pointer-events-none">
-            {[...Array(20)].map((_, i) => (
+            {[...Array(16)].map((_, i) => (
               <motion.div
                 key={i}
-                className="absolute w-2 h-2 rounded-full"
+                className="absolute w-1.5 h-1.5 md:w-2 md:h-2 rounded-full"
                 style={{
                   backgroundColor: ['#f59e0b', '#ec4899', '#8b5cf6', '#22c55e', '#3b82f6'][i % 5],
                   left: `${Math.random() * 100}%`,
@@ -94,23 +102,37 @@ function RewardPopup({ result, characterName, onClose }: RewardPopupProps) {
             ))}
           </div>
         )}
+
+        {/* Rarity badge */}
+        {!isNothing && rarity.label && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.15, type: 'spring' }}
+            className="mb-2 md:mb-3"
+          >
+            <span className={`text-[10px] md:text-xs font-bold tracking-widest uppercase ${rarity.color}`}>
+              {rarity.label}
+            </span>
+          </motion.div>
+        )}
         
         {!isNothing && result.winner && (
           <motion.div
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ delay: 0.2, type: 'spring' }}
-            className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
+            className={`w-16 h-16 md:w-20 md:h-20 mx-auto mb-3 md:mb-4 rounded-full flex items-center justify-center shadow-lg ${rarity.glow}`}
             style={{ backgroundColor: (result.winner.color || '#3b82f6') + '30' }}
           >
-            <span className="text-4xl" style={{ color: result.winner.color || '#3b82f6' }}>
-              {ICON_MAP[result.winner.icon || 'gift'] || <Gift className="h-10 w-10" />}
+            <span className="text-3xl md:text-4xl" style={{ color: result.winner.color || '#3b82f6' }}>
+              {ICON_MAP[result.winner.icon || 'gift'] || <Gift className="h-8 w-8 md:h-10 md:w-10" />}
             </span>
           </motion.div>
         )}
         
         <motion.h3 
-          className="text-2xl font-bold mb-2"
+          className="text-xl md:text-2xl font-bold mb-1.5 md:mb-2"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -119,7 +141,7 @@ function RewardPopup({ result, characterName, onClose }: RewardPopupProps) {
         </motion.h3>
         
         <motion.p 
-          className="text-lg mb-2"
+          className="text-base md:text-lg mb-1.5 md:mb-2"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
@@ -140,36 +162,36 @@ function RewardPopup({ result, characterName, onClose }: RewardPopupProps) {
         {/* Mail delivery notice for coins/zen */}
         {!isNothing && isMailReward && result.reward_given && (
           <motion.p 
-            className="text-sm text-muted-foreground mb-4 flex items-center justify-center gap-1"
+            className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4 flex items-center justify-center gap-1"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
-            <Gift className="h-4 w-4" />
-            Sent via in-game mail to <span className="font-medium text-foreground">{characterName}</span>
+            <Gift className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            Sent via mail to <span className="font-medium text-foreground">{characterName}</span>
           </motion.p>
         )}
 
         {/* VIP points notice */}
         {!isNothing && rewardType === 'vip' && result.reward_given && (
           <motion.p 
-            className="text-sm text-muted-foreground mb-4 flex items-center justify-center gap-1"
+            className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4 flex items-center justify-center gap-1"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
-            <Crown className="h-4 w-4" />
+            <Crown className="h-3.5 w-3.5 md:h-4 md:w-4" />
             VIP points added to your account
           </motion.p>
         )}
         
         {result.spins_remaining > 0 && (
-          <p className="text-sm text-muted-foreground mb-4">
-            You have {result.spins_remaining} spin{result.spins_remaining !== 1 ? 's' : ''} remaining
+          <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
+            {result.spins_remaining} spin{result.spins_remaining !== 1 ? 's' : ''} remaining
           </p>
         )}
         
-        <Button onClick={onClose} className="w-full">
+        <Button onClick={onClose} className="w-full h-9 md:h-10 text-sm">
           {result.spins_remaining > 0 ? 'Spin Again' : 'Awesome!'}
         </Button>
       </motion.div>
