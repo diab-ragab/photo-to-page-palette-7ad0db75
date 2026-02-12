@@ -26,6 +26,8 @@ export const GamePassSection = () => {
   const [elitePriceCents, setElitePriceCents] = useState(999);
   const [goldPriceCents, setGoldPriceCents] = useState(1999);
   const [gamepassEnabled, setGamepassEnabled] = useState(true);
+  const [eliteEnabled, setEliteEnabled] = useState(true);
+  const [goldEnabled, setGoldEnabled] = useState(true);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -36,6 +38,8 @@ export const GamePassSection = () => {
           if (data.elite_price_cents) setElitePriceCents(data.elite_price_cents);
           if (data.gold_price_cents) setGoldPriceCents(data.gold_price_cents);
           if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
+          if (data.elite_enabled !== undefined) setEliteEnabled(data.elite_enabled);
+          if (data.gold_enabled !== undefined) setGoldEnabled(data.gold_enabled);
         }
       } catch {}
       setLoaded(true);
@@ -241,6 +245,8 @@ export const GamePassSection = () => {
           elitePriceCents={elitePriceCents}
           goldPriceCents={goldPriceCents}
           gamepassEnabled={gamepassEnabled}
+          eliteEnabled={eliteEnabled}
+          goldEnabled={goldEnabled}
         />
       </div>
     </div>

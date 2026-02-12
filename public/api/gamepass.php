@@ -217,13 +217,17 @@ try {
       $elitePriceCents = 999;
       $goldPriceCents = 1999;
       $gamepassEnabled = true;
+      $eliteEnabled = true;
+      $goldEnabled = true;
       try {
-        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('elite_price_cents','gold_price_cents','gamepass_enabled')");
+        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('elite_price_cents','gold_price_cents','gamepass_enabled','elite_enabled','gold_enabled')");
         if ($stmtS) {
           $settings = $stmtS->fetchAll(PDO::FETCH_KEY_PAIR);
           if (isset($settings['elite_price_cents'])) $elitePriceCents = (int)$settings['elite_price_cents'];
           if (isset($settings['gold_price_cents'])) $goldPriceCents = (int)$settings['gold_price_cents'];
           if (isset($settings['gamepass_enabled'])) $gamepassEnabled = ($settings['gamepass_enabled'] === '1' || $settings['gamepass_enabled'] === 1);
+          if (isset($settings['elite_enabled'])) $eliteEnabled = ($settings['elite_enabled'] === '1' || $settings['elite_enabled'] === 1);
+          if (isset($settings['gold_enabled'])) $goldEnabled = ($settings['gold_enabled'] === '1' || $settings['gold_enabled'] === 1);
         }
       } catch (Exception $e) {}
 
@@ -236,6 +240,8 @@ try {
         'elite_price_cents' => $elitePriceCents,
         'gold_price_cents' => $goldPriceCents,
         'gamepass_enabled' => $gamepassEnabled,
+        'elite_enabled' => $eliteEnabled,
+        'gold_enabled' => $goldEnabled,
         'rewards' => formatRewards($rewards)
       ));
       break;
@@ -298,13 +304,17 @@ try {
       $elitePriceCents = 999;
       $goldPriceCents = 1999;
       $gamepassEnabled = true;
+      $eliteEnabled = true;
+      $goldEnabled = true;
       try {
-        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('elite_price_cents','gold_price_cents','gamepass_enabled')");
+        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('elite_price_cents','gold_price_cents','gamepass_enabled','elite_enabled','gold_enabled')");
         if ($stmtS) {
           $settings = $stmtS->fetchAll(PDO::FETCH_KEY_PAIR);
           if (isset($settings['elite_price_cents'])) $elitePriceCents = (int)$settings['elite_price_cents'];
           if (isset($settings['gold_price_cents'])) $goldPriceCents = (int)$settings['gold_price_cents'];
           if (isset($settings['gamepass_enabled'])) $gamepassEnabled = ($settings['gamepass_enabled'] === '1' || $settings['gamepass_enabled'] === 1);
+          if (isset($settings['elite_enabled'])) $eliteEnabled = ($settings['elite_enabled'] === '1' || $settings['elite_enabled'] === 1);
+          if (isset($settings['gold_enabled'])) $goldEnabled = ($settings['gold_enabled'] === '1' || $settings['gold_enabled'] === 1);
         }
       } catch (Exception $e) {}
 
@@ -321,6 +331,8 @@ try {
         'elite_price_cents' => $elitePriceCents,
         'gold_price_cents' => $goldPriceCents,
         'gamepass_enabled' => $gamepassEnabled,
+        'elite_enabled' => $eliteEnabled,
+        'gold_enabled' => $goldEnabled,
         'rewards' => formatRewards($rewards),
         'expires_at' => isset($expiresAt) ? $expiresAt : null
       ));

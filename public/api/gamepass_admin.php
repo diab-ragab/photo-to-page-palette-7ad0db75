@@ -109,11 +109,15 @@ switch ($action) {
     $elitePrice = (int)getGamepassSetting('elite_price_cents', '999');
     $goldPrice = (int)getGamepassSetting('gold_price_cents', '1999');
     $enabled = getGamepassSetting('gamepass_enabled', '1');
+    $eliteEnabled = getGamepassSetting('elite_enabled', '1');
+    $goldEnabled = getGamepassSetting('gold_enabled', '1');
     json_out(200, array('success' => true, 'settings' => array(
       'zen_skip_cost' => $zenSkipCost,
       'elite_price_cents' => $elitePrice,
       'gold_price_cents' => $goldPrice,
-      'gamepass_enabled' => ($enabled === '1' || $enabled === 1) ? true : false
+      'gamepass_enabled' => ($enabled === '1' || $enabled === 1) ? true : false,
+      'elite_enabled' => ($eliteEnabled === '1' || $eliteEnabled === 1) ? true : false,
+      'gold_enabled' => ($goldEnabled === '1' || $goldEnabled === 1) ? true : false
     )));
     break;
 
@@ -147,6 +151,16 @@ switch ($action) {
     $gamepassEnabled = isset($input['gamepass_enabled']) ? $input['gamepass_enabled'] : null;
     if ($gamepassEnabled !== null) {
       $upsertStmt->execute(array('gamepass_enabled', $gamepassEnabled ? '1' : '0'));
+    }
+
+    $eliteEnabled = isset($input['elite_enabled']) ? $input['elite_enabled'] : null;
+    if ($eliteEnabled !== null) {
+      $upsertStmt->execute(array('elite_enabled', $eliteEnabled ? '1' : '0'));
+    }
+
+    $goldEnabled = isset($input['gold_enabled']) ? $input['gold_enabled'] : null;
+    if ($goldEnabled !== null) {
+      $upsertStmt->execute(array('gold_enabled', $goldEnabled ? '1' : '0'));
     }
 
     json_out(200, array('success' => true));
