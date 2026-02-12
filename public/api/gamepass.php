@@ -411,18 +411,43 @@ try {
       }
       $reward = $allRewards[0];
 
-      // Deliver
-      $mailer = new GameMailer($pdo);
-      $result = $mailer->sendGamePassReward(
-        $roleId,
-        $day,
-        $tier,
-        (int)$reward['item_id'],
-        (int)$reward['quantity'],
-        (int)$reward['coins'],
-        (int)$reward['zen'],
-        (int)$reward['exp']
-      );
+      // Check if reward is a spin bonus (item_id = -4 means spins)
+      if ((int)$reward['item_id'] === -4) {
+        // Grant bonus spins instead of mail delivery
+        $spinCount = (int)$reward['quantity'];
+        if ($spinCount <= 0) $spinCount = 1;
+        
+        // Create bonus spins table entry
+        $stmt = $pdo->prepare("
+          CREATE TABLE IF NOT EXISTS user_bonus_spins (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            spins_available INT NOT NULL DEFAULT 0,
+            source VARCHAR(50) NOT NULL DEFAULT 'zen',
+            granted_at DATETIME NOT NULL,
+            INDEX idx_user_bonus (user_id)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+        ");
+        $stmt->execute();
+        
+        $stmt = $pdo->prepare("INSERT INTO user_bonus_spins (user_id, spins_available, source, granted_at) VALUES (?, ?, 'gamepass', NOW())");
+        $stmt->execute(array($userId, $spinCount));
+        
+        $result = array('success' => true, 'type' => 'spins', 'spins_granted' => $spinCount);
+      } else {
+        // Deliver via mail
+        $mailer = new GameMailer($pdo);
+        $result = $mailer->sendGamePassReward(
+          $roleId,
+          $day,
+          $tier,
+          (int)$reward['item_id'],
+          (int)$reward['quantity'],
+          (int)$reward['coins'],
+          (int)$reward['zen'],
+          (int)$reward['exp']
+        );
+      }
 
       if (!is_array($result) || empty($result['success'])) {
         error_log("GAMEPASS_CLAIM_FAILED user={$userId} day={$day} tier={$tier}");

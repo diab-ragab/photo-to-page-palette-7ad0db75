@@ -20,6 +20,7 @@ import {
   fetchWheelSegments, 
   fetchSpinStatus, 
   performSpin,
+  buyExtraSpins,
   type WheelSegment,
   type SpinStatus,
   type SpinResult
@@ -177,6 +178,7 @@ function RewardPopup({ result, characterName, onClose }: RewardPopupProps) {
 }
 
 export function LuckyWheel() {
+  const [buyingSpins, setBuyingSpins] = useState(false);
   const [segments, setSegments] = useState<WheelSegment[]>([]);
   const [status, setStatus] = useState<SpinStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -369,6 +371,26 @@ export function LuckyWheel() {
     loadData();
   };
 
+  const handleBuySpins = async (count: number = 1) => {
+    setBuyingSpins(true);
+    try {
+      const result = await buyExtraSpins(count);
+      if (result.success) {
+        toast.success(`🎰 ${result.message}`, {
+          description: `Spent ${result.zen_spent.toLocaleString()} Zen`
+        });
+        loadData(); // refresh status
+      } else {
+        toast.error(result.message || 'Failed to buy spins');
+      }
+    } catch (err: any) {
+      const msg = err?.serverMessage || err?.message || 'Failed to purchase spins';
+      toast.error(msg);
+    } finally {
+      setBuyingSpins(false);
+    }
+  };
+
   if (loading) {
     return <SkeletonCard rows={4} className="border-primary/20" />;
   }
@@ -417,10 +439,18 @@ export function LuckyWheel() {
                 <Sparkles className="h-5 w-5 text-amber-500" />
                 Lucky Spin
               </CardTitle>
-              <Badge variant="outline" className="gap-1">
-                <History className="h-3 w-3" />
-                {status.spins_remaining}/{status.spins_per_day} spins
-              </Badge>
+              <div className="flex items-center gap-2">
+                {(status.bonus_spins ?? 0) > 0 && (
+                  <Badge variant="outline" className="gap-1 border-primary/30 bg-primary/10 text-primary text-xs">
+                    <Zap className="h-3 w-3" />
+                    +{status.bonus_spins} bonus
+                  </Badge>
+                )}
+                <Badge variant="outline" className="gap-1">
+                  <History className="h-3 w-3" />
+                  {status.spins_remaining} spins
+                </Badge>
+              </div>
             </div>
           </CardHeader>
 
@@ -459,12 +489,42 @@ export function LuckyWheel() {
                 {spinning ? 'Spinning...' : !selectedRoleId ? 'Select Character' : 'Spin Now!'}
               </Button>
             ) : (
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-2">Next spin available in:</p>
-                <div className="flex items-center gap-2 justify-center text-lg font-mono font-bold text-primary">
-                  <Clock className="h-5 w-5" />
-                  {countdown || 'Loading...'}
+              <div className="text-center space-y-3">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Next free spin in:</p>
+                  <div className="flex items-center gap-2 justify-center text-lg font-mono font-bold text-primary">
+                    <Clock className="h-5 w-5" />
+                    {countdown || 'Loading...'}
+                  </div>
                 </div>
+                {/* Buy extra spins with Zen */}
+                {(status.zen_per_spin ?? 0) > 0 && (
+                  <div className="pt-2 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground mb-2">Or buy extra spins with Zen</p>
+                    <div className="flex items-center gap-2 justify-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleBuySpins(1)}
+                        disabled={buyingSpins}
+                        className="gap-1 border-primary/30 hover:bg-primary/10"
+                      >
+                        <Zap className="h-3.5 w-3.5 text-primary" />
+                        {buyingSpins ? '...' : `1 Spin · ${((status.zen_per_spin ?? 50000) / 1000).toFixed(0)}k Zen`}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleBuySpins(3)}
+                        disabled={buyingSpins}
+                        className="gap-1 border-primary/30 hover:bg-primary/10"
+                      >
+                        <Zap className="h-3.5 w-3.5 text-primary" />
+                        {buyingSpins ? '...' : `3 Spins · ${((status.zen_per_spin ?? 50000) * 3 / 1000).toFixed(0)}k`}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -115,7 +115,8 @@ export function SpinWheelManager() {
   const [settingsForm, setSettingsForm] = useState({
     spins_per_day: '1',
     cooldown_hours: '24',
-    enabled: '1'
+    enabled: '1',
+    zen_per_spin: '50000'
   });
 
   useEffect(() => {
@@ -136,7 +137,8 @@ export function SpinWheelManager() {
       setSettingsForm({
         spins_per_day: sets.spins_per_day || '1',
         cooldown_hours: sets.cooldown_hours || '24',
-        enabled: sets.enabled || '1'
+        enabled: sets.enabled || '1',
+        zen_per_spin: (sets as any).zen_per_spin || '50000'
       });
     } catch (err) {
       console.error('Failed to load wheel data:', err);
@@ -552,6 +554,19 @@ export function SpinWheelManager() {
               />
               <p className="text-xs text-muted-foreground">
                 Time before spin count resets
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Zen Per Extra Spin</Label>
+              <Input
+                type="number"
+                min="1000"
+                value={settingsForm.zen_per_spin}
+                onChange={(e) => setSettingsForm({ ...settingsForm, zen_per_spin: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Cost in Zen to buy one extra spin
               </p>
             </div>
           </div>
