@@ -302,6 +302,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [filterTier, setFilterTier] = useState<"all" | "free" | "elite" | "gold">("all");
+  const [isSeeding, setIsSeeding] = useState(false);
   
   // Settings state
   const [zenSkipCost, setZenSkipCost] = useState<number>(100000);
@@ -463,6 +464,31 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     setIsEditing(true);
   };
 
+  const handleSeedTier = async (tier: "elite" | "gold") => {
+    if (!confirm(`This will DELETE all existing ${tier.toUpperCase()} rewards and replace them with 30 seeded rewards. Continue?`)) return;
+    setIsSeeding(true);
+    try {
+      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=seed_rewards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ tier }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: "Success", description: `${data.inserted} ${tier} rewards seeded!` });
+        fetchRewards();
+      } else {
+        toast({ title: "Error", description: data.error || "Seed failed", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Seed error:", error);
+      toast({ title: "Error", description: "Failed to seed rewards", variant: "destructive" });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const handleCloseModal = () => {
     setSelectedReward(null);
     setIsEditing(false);
@@ -540,6 +566,14 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
               <Button onClick={handleAddNew}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Reward
+              </Button>
+              <Button variant="outline" disabled={isSeeding} onClick={() => handleSeedTier("elite")} className="text-amber-500 border-amber-500/30 hover:bg-amber-500/10">
+                <Crown className="h-4 w-4 mr-2" />
+                {isSeeding ? "Seeding..." : "Seed Elite 30"}
+              </Button>
+              <Button variant="outline" disabled={isSeeding} onClick={() => handleSeedTier("gold")} className="text-violet-500 border-violet-500/30 hover:bg-violet-500/10">
+                <Diamond className="h-4 w-4 mr-2" />
+                {isSeeding ? "Seeding..." : "Seed Gold 30"}
               </Button>
             </div>
           </div>
