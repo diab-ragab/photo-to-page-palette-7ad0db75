@@ -187,3 +187,13 @@ export async function fetchSpinStats(): Promise<SpinStats> {
   );
   return data.stats;
 }
+
+export async function seedRewards(): Promise<{ inserted: number; message: string }> {
+  return fetchJsonOrThrow<{ success: boolean; inserted: number; message: string }>(
+    `${API_BASE}/spin_wheel.php?action=admin_segments`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ operation: 'seed_rewards' })
+    }
+  );
+}

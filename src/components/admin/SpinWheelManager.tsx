@@ -52,6 +52,7 @@ import {
   fetchSpinSettings,
   updateSpinSettings,
   fetchSpinStats,
+  seedRewards,
   type WheelSegment,
   type SpinSettings,
   type SpinStats
@@ -106,6 +107,7 @@ export function SpinWheelManager() {
   const [stats, setStats] = useState<SpinStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   
   const [editingSegment, setEditingSegment] = useState<WheelSegment | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -316,6 +318,27 @@ export function SpinWheelManager() {
             Wheel Segments ({segments.length})
           </CardTitle>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={seeding}
+              onClick={async () => {
+                if (!confirm('This will replace ALL existing segments with 30 balanced rewards. Continue?')) return;
+                setSeeding(true);
+                try {
+                  const res = await seedRewards();
+                  toast.success(`${res.inserted} rewards seeded successfully`);
+                  loadData();
+                } catch {
+                  toast.error('Failed to seed rewards');
+                } finally {
+                  setSeeding(false);
+                }
+              }}
+            >
+              <Gift className="h-4 w-4 mr-2" />
+              {seeding ? 'Seeding...' : 'Seed 30 Rewards'}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowSettings(true)}>
               <Settings className="h-4 w-4 mr-2" />
               Settings
