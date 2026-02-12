@@ -47,6 +47,24 @@ if (!in_array($tierInput, array('elite', 'gold'))) {
   json_fail_gp(400, 'Invalid tier. Must be elite or gold.');
 }
 
+// One tier per user - check if user already has an active pass
+$pdo = getDB();
+try {
+  $stmt = $pdo->prepare("SELECT tier, expires_at FROM user_gamepass WHERE user_id = ? AND (is_premium = 1 OR tier IN ('elite','gold'))");
+  $stmt->execute(array($userId));
+  $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+  if ($existing) {
+    $expiresAt = isset($existing['expires_at']) ? $existing['expires_at'] : null;
+    $isActive = ($expiresAt === null || strtotime($expiresAt) > time());
+    $existingTier = isset($existing['tier']) ? $existing['tier'] : 'elite';
+    if ($isActive && in_array($existingTier, array('elite', 'gold'))) {
+      json_fail_gp(400, 'You already have an active ' . ucfirst($existingTier) . ' Game Pass. Only one pass per user is allowed.');
+    }
+  }
+} catch (Exception $e) {
+  error_log("RID={$RID} GAMEPASS_TIER_CHECK_ERR: " . $e->getMessage());
+}
+
 // Stripe config
 $cfg = getConfig();
 $stripeCfg = isset($cfg['stripe']) ? $cfg['stripe'] : array();
