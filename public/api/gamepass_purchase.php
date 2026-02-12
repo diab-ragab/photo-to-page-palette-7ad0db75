@@ -47,22 +47,37 @@ if (!in_array($tierInput, array('elite', 'gold'))) {
   json_fail_gp(400, 'Invalid tier. Must be elite or gold.');
 }
 
+$isUpgrade = isset($input['upgrade']) && ($input['upgrade'] === true || $input['upgrade'] === 'true' || $input['upgrade'] === '1');
+
 // One tier per user - check if user already has an active pass
 $pdo = getDB();
+$existingTier = 'free';
 try {
-  $stmt = $pdo->prepare("SELECT tier, expires_at FROM user_gamepass WHERE user_id = ? AND (is_premium = 1 OR tier IN ('elite','gold'))");
+  $stmt = $pdo->prepare("SELECT tier, expires_at, is_premium FROM user_gamepass WHERE user_id = ?");
   $stmt->execute(array($userId));
   $existing = $stmt->fetch(PDO::FETCH_ASSOC);
   if ($existing) {
     $expiresAt = isset($existing['expires_at']) ? $existing['expires_at'] : null;
     $isActive = ($expiresAt === null || strtotime($expiresAt) > time());
-    $existingTier = isset($existing['tier']) ? $existing['tier'] : 'elite';
-    if ($isActive && in_array($existingTier, array('elite', 'gold'))) {
-      json_fail_gp(400, 'You already have an active ' . ucfirst($existingTier) . ' Game Pass. Only one pass per user is allowed.');
+    $et = isset($existing['tier']) ? $existing['tier'] : ((int)$existing['is_premium'] === 1 ? 'elite' : 'free');
+    if ($isActive && in_array($et, array('elite', 'gold'))) {
+      $existingTier = $et;
     }
   }
 } catch (Exception $e) {
   error_log("RID={$RID} GAMEPASS_TIER_CHECK_ERR: " . $e->getMessage());
+}
+
+// Block duplicate or downgrade purchase
+if ($existingTier === 'gold') {
+  json_fail_gp(400, 'You already have an active Gold Game Pass.');
+}
+if ($existingTier === 'elite' && $tierInput === 'elite') {
+  json_fail_gp(400, 'You already have an active Elite Game Pass.');
+}
+// Allow elite -> gold upgrade
+if ($existingTier === 'elite' && $tierInput === 'gold') {
+  $isUpgrade = true;
 }
 
 // Stripe config
@@ -74,16 +89,21 @@ $currency = isset($stripeCfg['currency']) ? $stripeCfg['currency'] : 'eur';
 
 // Prices in cents
 $tierPrices = array(
-  'elite' => 999,   // 9.99 EUR
-  'gold'  => 1999,  // 19.99 EUR
+  'elite' => 999,    // 9.99 EUR
+  'gold'  => 1999,   // 19.99 EUR
 );
 $tierNames = array(
   'elite' => 'Elite Game Pass',
   'gold'  => 'Gold Game Pass',
 );
 
+// If upgrading from elite to gold, charge the difference
 $unitAmount = $tierPrices[$tierInput];
 $productName = $tierNames[$tierInput];
+if ($isUpgrade && $existingTier === 'elite' && $tierInput === 'gold') {
+  $unitAmount = $tierPrices['gold'] - $tierPrices['elite']; // 1000 cents = 10.00 EUR
+  $productName = 'Gold Game Pass (Upgrade from Elite)';
+}
 
 // Success/cancel URLs
 $baseUrl = 'https://woiendgame.online';
@@ -100,6 +120,7 @@ $fields = array(
   'metadata[type]' => 'gamepass',
   'metadata[tier]' => $tierInput,
   'metadata[rid]' => $RID,
+  'metadata[upgrade]' => $isUpgrade ? '1' : '0',
   'line_items[0][price_data][currency]' => $currency,
   'line_items[0][price_data][unit_amount]' => $unitAmount,
   'line_items[0][price_data][product_data][name]' => $productName,
