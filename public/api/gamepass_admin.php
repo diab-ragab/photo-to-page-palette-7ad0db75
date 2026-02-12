@@ -237,45 +237,83 @@ switch ($action) {
     $stmt->execute(array($tierInput));
 
     // Define 30 days of rewards
-    // Zen totals: Elite = 5,000,000 | Gold = 9,000,000 (ratio 9/5)
-    $isGold = ($tierInput === 'gold');
-    $coinMult = $isGold ? 3 : 1;
-    // Zen: base values sum to 5M for elite; gold = base * 9/5
-    $zM = $isGold ? 9 : 5; // divide by 5 below
-
-    $seedRewards = array(
-      // day, item_name, item_id, qty, coins, zen, exp, rarity, icon
-      array(1,  'Daily Coins',       -2, 1, 1000000  * $coinMult, 0, 0, 'common', 'COIN'),
-      array(2,  'Zen Boost',         -1, 1, 0, (int)(100000 * $zM / 5), 0, 'common', 'BOLT'),
-      array(3,  'EXP Boost',         -3, 1, 0, 0, 50000, 'common', 'FIRE'),
-      array(4,  'Coin Chest',        -2, 1, 2000000  * $coinMult, 0, 0, 'uncommon', 'COIN'),
-      array(5,  'Lucky Spin',        -4, 1, 0, 0, 0, 'uncommon', 'DICE'),
-      array(6,  'Zen Reward',        -1, 1, 0, (int)(200000 * $zM / 5), 0, 'common', 'BOLT'),
-      array(7,  'Weekly Bonus',      -2, 1, 3000000  * $coinMult, 0, 0, 'rare', 'TROPHY'),
-      array(8,  'EXP Surge',         -3, 1, 0, 0, 100000, 'uncommon', 'FIRE'),
-      array(9,  'Coin Rain',         -2, 1, 2500000  * $coinMult, 0, 0, 'uncommon', 'COIN'),
-      array(10, 'Zen Chest',         -1, 1, 0, (int)(300000 * $zM / 5), 0, 'rare', 'GEM'),
-      array(11, 'Lucky Spins x2',    -4, 2, 0, 0, 0, 'rare', 'DICE'),
-      array(12, 'Gold Coins',        -2, 1, 5000000  * $coinMult, 0, 0, 'rare', 'GOLD'),
-      array(13, 'Zen Surge',         -1, 1, 0, (int)(350000 * $zM / 5), 0, 'uncommon', 'BOLT'),
-      array(14, 'Bi-Weekly Bonus',   -2, 1, 7000000  * $coinMult, 0, 0, 'epic', 'TROPHY'),
-      array(15, 'EXP Mega',          -3, 1, 0, 0, 200000, 'rare', 'FIRE'),
-      array(16, 'Coin Vault',        -2, 1, 6000000  * $coinMult, 0, 0, 'rare', 'COIN'),
-      array(17, 'Zen Vault',         -1, 1, 0, (int)(450000 * $zM / 5), 0, 'rare', 'GEM'),
-      array(18, 'Lucky Spins x3',    -4, 3, 0, 0, 0, 'epic', 'DICE'),
-      array(19, 'Mega Coins',        -2, 1, 8000000  * $coinMult, 0, 0, 'epic', 'GOLD'),
-      array(20, 'Zen Mega',          -1, 1, 0, (int)(500000 * $zM / 5), 0, 'epic', 'SPARKLE'),
-      array(21, 'Triple Reward',     -2, 1, 10000000 * $coinMult, (int)(100000 * $zM / 5), 150000, 'epic', 'STAR'),
-      array(22, 'EXP Legendary',     -3, 1, 0, 0, 500000, 'epic', 'FIRE'),
-      array(23, 'Coin Jackpot',      -2, 1, 12000000 * $coinMult, 0, 0, 'epic', 'TROPHY'),
-      array(24, 'Zen Jackpot',       -1, 1, 0, (int)(650000 * $zM / 5), 0, 'epic', 'ORB'),
-      array(25, 'Lucky Spins x5',    -4, 5, 0, 0, 0, 'legendary', 'DICE'),
-      array(26, 'Mega Vault',        -2, 1, 15000000 * $coinMult, 0, 0, 'legendary', 'GOLD'),
-      array(27, 'Zen Fortune',       -1, 1, 0, (int)(850000 * $zM / 5), 0, 'legendary', 'GEM'),
-      array(28, 'Grand Reward',      -2, 1, 20000000 * $coinMult, (int)(500000 * $zM / 5), 300000, 'legendary', 'CROWN'),
-      array(29, 'Lucky Spins x10',   -4, 10, 0, 0, 0, 'legendary', 'DICE'),
-      array(30, 'Ultimate Reward',   -2, 1, 30000000 * $coinMult, (int)(1000000 * $zM / 5), 500000, 'legendary', 'CROWN'),
-    );
+    // Gold: 9,000,000 Zen total | Elite: 5,000,000 Zen total
+    if ($tierInput === 'gold') {
+      // GOLD TIER - 9M Zen total, 3x coins vs elite, better spins & EXP
+      // Zen distribution (9,000,000 total):
+      // D2:100k D6:200k D7:150k D10:350k D13:450k D15:400k
+      // D17:600k D20:750k D21:300k D24:1M D27:1.2M D28:900k D30:2.6M
+      $seedRewards = array(
+        // day, name, item_id, qty, coins, zen, exp, rarity, icon
+        array(1,  'Gold Coins',         -2, 1, 3000000,  0,       0,      'common',    'COIN'),
+        array(2,  'Zen Spark',          -1, 1, 0,        100000,  0,      'common',    'BOLT'),
+        array(3,  'EXP Burst',          -3, 1, 0,        0,       80000,  'common',    'FIRE'),
+        array(4,  'Coin Chest',         -2, 1, 5000000,  0,       0,      'uncommon',  'COIN'),
+        array(5,  'Lucky Spin',         -4, 2, 0,        0,       0,      'uncommon',  'DICE'),
+        array(6,  'Zen Flow',           -1, 1, 0,        200000,  0,      'uncommon',  'BOLT'),
+        array(7,  'Weekly Jackpot',     -2, 1, 8000000,  150000,  100000, 'rare',      'TROPHY'),
+        array(8,  'EXP Storm',          -3, 1, 0,        0,       150000, 'uncommon',  'FIRE'),
+        array(9,  'Coin Rain',          -2, 1, 7000000,  0,       0,      'uncommon',  'COIN'),
+        array(10, 'Zen Chest',          -1, 1, 0,        350000,  0,      'rare',      'GEM'),
+        array(11, 'Lucky Spins x3',     -4, 3, 0,        0,       0,      'rare',      'DICE'),
+        array(12, 'Mythic Coins',       -2, 1, 12000000, 0,       0,      'rare',      'GOLD'),
+        array(13, 'Zen Surge',          -1, 1, 0,        450000,  0,      'rare',      'BOLT'),
+        array(14, 'Bi-Weekly Bonus',    -2, 1, 15000000, 0,       200000, 'epic',      'TROPHY'),
+        array(15, 'Zen Blessing',       -1, 1, 0,        400000,  0,      'rare',      'GEM'),
+        array(16, 'Coin Vault',         -2, 1, 18000000, 0,       0,      'rare',      'COIN'),
+        array(17, 'Zen Vault',          -1, 1, 0,        600000,  0,      'epic',      'GEM'),
+        array(18, 'Lucky Spins x5',     -4, 5, 0,        0,       0,      'epic',      'DICE'),
+        array(19, 'Mega Coins',         -2, 1, 25000000, 0,       0,      'epic',      'GOLD'),
+        array(20, 'Zen Torrent',        -1, 1, 0,        750000,  0,      'epic',      'SPARKLE'),
+        array(21, 'Triple Reward',      -2, 1, 20000000, 300000,  250000, 'epic',      'STAR'),
+        array(22, 'EXP Legendary',      -3, 1, 0,        0,       500000, 'epic',      'FIRE'),
+        array(23, 'Coin Jackpot',       -2, 1, 30000000, 0,       0,      'epic',      'TROPHY'),
+        array(24, 'Zen Jackpot',        -1, 1, 0,        1000000, 0,      'legendary', 'ORB'),
+        array(25, 'Lucky Spins x8',     -4, 8, 0,        0,       0,      'legendary', 'DICE'),
+        array(26, 'Mythic Vault',       -2, 1, 40000000, 0,       0,      'legendary', 'GOLD'),
+        array(27, 'Zen Fortune',        -1, 1, 0,        1200000, 0,      'legendary', 'GEM'),
+        array(28, 'Grand Reward',       -2, 1, 50000000, 900000,  400000, 'legendary', 'CROWN'),
+        array(29, 'Lucky Spins x10',    -4, 10, 0,       0,       0,      'legendary', 'DICE'),
+        array(30, 'Ultimate Reward',    -2, 1, 75000000, 2600000, 600000, 'legendary', 'CROWN'),
+      );
+    } else {
+      // ELITE TIER - 5M Zen total, base coins, standard spins & EXP
+      // Zen distribution (5,000,000 total):
+      // D2:50k D6:100k D7:80k D10:200k D13:250k D15:220k
+      // D17:330k D20:420k D21:170k D24:550k D27:680k D28:500k D30:1.45M
+      $seedRewards = array(
+        array(1,  'Daily Coins',        -2, 1, 1000000,  0,       0,      'common',    'COIN'),
+        array(2,  'Zen Spark',          -1, 1, 0,        50000,   0,      'common',    'BOLT'),
+        array(3,  'EXP Boost',          -3, 1, 0,        0,       50000,  'common',    'FIRE'),
+        array(4,  'Coin Chest',         -2, 1, 2000000,  0,       0,      'uncommon',  'COIN'),
+        array(5,  'Lucky Spin',         -4, 1, 0,        0,       0,      'uncommon',  'DICE'),
+        array(6,  'Zen Flow',           -1, 1, 0,        100000,  0,      'common',    'BOLT'),
+        array(7,  'Weekly Bonus',       -2, 1, 3000000,  80000,   50000,  'rare',      'TROPHY'),
+        array(8,  'EXP Surge',          -3, 1, 0,        0,       100000, 'uncommon',  'FIRE'),
+        array(9,  'Coin Rain',          -2, 1, 2500000,  0,       0,      'uncommon',  'COIN'),
+        array(10, 'Zen Chest',          -1, 1, 0,        200000,  0,      'rare',      'GEM'),
+        array(11, 'Lucky Spins x2',     -4, 2, 0,        0,       0,      'rare',      'DICE'),
+        array(12, 'Gold Coins',         -2, 1, 5000000,  0,       0,      'rare',      'GOLD'),
+        array(13, 'Zen Surge',          -1, 1, 0,        250000,  0,      'uncommon',  'BOLT'),
+        array(14, 'Bi-Weekly Bonus',    -2, 1, 7000000,  0,       100000, 'epic',      'TROPHY'),
+        array(15, 'Zen Blessing',       -1, 1, 0,        220000,  0,      'rare',      'GEM'),
+        array(16, 'Coin Vault',         -2, 1, 6000000,  0,       0,      'rare',      'COIN'),
+        array(17, 'Zen Vault',          -1, 1, 0,        330000,  0,      'rare',      'GEM'),
+        array(18, 'Lucky Spins x3',     -4, 3, 0,        0,       0,      'epic',      'DICE'),
+        array(19, 'Mega Coins',         -2, 1, 8000000,  0,       0,      'epic',      'GOLD'),
+        array(20, 'Zen Mega',           -1, 1, 0,        420000,  0,      'epic',      'SPARKLE'),
+        array(21, 'Triple Reward',      -2, 1, 10000000, 170000,  150000, 'epic',      'STAR'),
+        array(22, 'EXP Legendary',      -3, 1, 0,        0,       300000, 'epic',      'FIRE'),
+        array(23, 'Coin Jackpot',       -2, 1, 12000000, 0,       0,      'epic',      'TROPHY'),
+        array(24, 'Zen Jackpot',        -1, 1, 0,        550000,  0,      'epic',      'ORB'),
+        array(25, 'Lucky Spins x5',     -4, 5, 0,        0,       0,      'legendary', 'DICE'),
+        array(26, 'Mega Vault',         -2, 1, 15000000, 0,       0,      'legendary', 'GOLD'),
+        array(27, 'Zen Fortune',        -1, 1, 0,        680000,  0,      'legendary', 'GEM'),
+        array(28, 'Grand Reward',       -2, 1, 20000000, 500000,  200000, 'legendary', 'CROWN'),
+        array(29, 'Lucky Spins x7',     -4, 7, 0,        0,       0,      'legendary', 'DICE'),
+        array(30, 'Ultimate Reward',    -2, 1, 25000000, 1450000, 400000, 'legendary', 'CROWN'),
+      );
+    }
 
     $stmt = $pdo->prepare("
       INSERT INTO gamepass_rewards (day, tier, item_id, item_name, quantity, coins, zen, exp, rarity, icon, created_at)
