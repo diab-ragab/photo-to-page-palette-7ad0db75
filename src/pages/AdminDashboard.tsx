@@ -156,8 +156,12 @@ export default function AdminDashboard() {
     const fetchStats = async () => {
       setStatsLoading(true);
       try {
+        const sessionToken = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken") || "";
+        const url = sessionToken
+          ? `${API_BASE}/admin_stats.php?sessionToken=${encodeURIComponent(sessionToken)}`
+          : `${API_BASE}/admin_stats.php`;
         
-        const response = await fetch(`${API_BASE}/admin_stats.php`, {
+        const response = await fetch(url, {
           credentials: "include",
           headers: {
             "Accept": "application/json",
