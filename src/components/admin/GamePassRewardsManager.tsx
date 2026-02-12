@@ -140,18 +140,56 @@ const RewardFormContent = memo(function RewardFormContent({
         </div>
       </div>
 
+      {/* Quick reward type selector */}
+      <div>
+        <label className="text-sm font-medium mb-2 block">Reward Type</label>
+        <Select
+          value={
+            editData.item_id === -1 ? "zen" :
+            editData.item_id === -2 ? "coins" :
+            editData.item_id === -3 ? "exp" :
+            editData.item_id === -4 ? "spins" :
+            "item"
+          }
+          onValueChange={(v) => {
+            const presets: Record<string, Partial<Omit<GamePassReward, "id">>> = {
+              zen:   { item_id: -1, item_name: editData.item_name || "Zen Reward", icon: "BOLT" },
+              coins: { item_id: -2, item_name: editData.item_name || "Coins Reward", icon: "COIN" },
+              exp:   { item_id: -3, item_name: editData.item_name || "EXP Reward", icon: "FIRE" },
+              spins: { item_id: -4, item_name: editData.item_name || "Extra Spins", icon: "DICE", quantity: editData.quantity || 1 },
+              item:  { item_id: 0, item_name: editData.item_name || "" },
+            };
+            setEditData({ ...editData, ...presets[v] });
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="item">🎁 Game Item</SelectItem>
+            <SelectItem value="coins">💰 Coins</SelectItem>
+            <SelectItem value="zen">⚡ Zen</SelectItem>
+            <SelectItem value="exp">🔥 EXP</SelectItem>
+            <SelectItem value="spins">🎰 Extra Spins</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-sm font-medium mb-2 block">Item ID (0 = currency only)</label>
+          <label className="text-sm font-medium mb-2 block">
+            {editData.item_id === -4 ? "Item ID (Spins = -4)" : "Item ID (0 = currency only)"}
+          </label>
           <Input
             type="number"
-            min={0}
             value={editData.item_id}
             onChange={(e) => setEditData({ ...editData, item_id: parseInt(e.target.value) || 0 })}
           />
         </div>
         <div>
-          <label className="text-sm font-medium mb-2 block">Quantity</label>
+          <label className="text-sm font-medium mb-2 block">
+            {editData.item_id === -4 ? "Number of Spins" : "Quantity"}
+          </label>
           <Input
             type="number"
             min={1}

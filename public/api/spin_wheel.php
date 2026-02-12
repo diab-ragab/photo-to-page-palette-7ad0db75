@@ -160,16 +160,14 @@ function ensureSpinTables($pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
 
-    // Migration: add role_id column if missing (for tables created before this column existed)
+    // Migration: add role_id column if missing
     try {
         $stmt = $pdo->query("SHOW COLUMNS FROM user_spins LIKE 'role_id'");
         if (!$stmt->fetch()) {
             $pdo->exec("ALTER TABLE user_spins ADD COLUMN role_id INT NOT NULL DEFAULT 0 AFTER user_id");
             $pdo->exec("ALTER TABLE user_spins ADD INDEX idx_role_spun (role_id, spun_at)");
         }
-    } catch (Exception $e) {
-        // ignore if already exists or permissions issue
-    }
+    } catch (Exception $e) {}
 
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS spin_settings (
@@ -178,10 +176,23 @@ function ensureSpinTables($pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
 
+    // Bonus spins table (from Zen purchase or Game Pass rewards)
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS user_bonus_spins (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            spins_available INT NOT NULL DEFAULT 0,
+            source VARCHAR(50) NOT NULL DEFAULT 'zen',
+            granted_at DATETIME NOT NULL,
+            INDEX idx_user_bonus (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+    ");
+
     $defaults = array(
         'spins_per_day'  => '1',
         'cooldown_hours' => '24',
-        'enabled'        => '1'
+        'enabled'        => '1',
+        'zen_per_spin'   => '50000'
     );
     foreach ($defaults as $key => $value) {
         $stmt = $pdo->prepare("INSERT IGNORE INTO spin_settings (setting_key, setting_value) VALUES (?, ?)");
@@ -211,6 +222,48 @@ function ensureSpinTables($pdo) {
     }
 }
 
+/**
+ * Get user's total available bonus spins
+ */
+function getUserBonusSpins($pdo, $userId) {
+    $userId = (int)$userId;
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(spins_available), 0) FROM user_bonus_spins WHERE user_id = ? AND spins_available > 0");
+    $stmt->execute(array($userId));
+    return (int)$stmt->fetchColumn();
+}
+
+/**
+ * Consume one bonus spin (FIFO)
+ */
+function consumeBonusSpin($pdo, $userId) {
+    $userId = (int)$userId;
+    $stmt = $pdo->prepare("SELECT id, spins_available FROM user_bonus_spins WHERE user_id = ? AND spins_available > 0 ORDER BY granted_at ASC LIMIT 1");
+    $stmt->execute(array($userId));
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) return false;
+    
+    $newVal = (int)$row['spins_available'] - 1;
+    if ($newVal <= 0) {
+        $stmt = $pdo->prepare("DELETE FROM user_bonus_spins WHERE id = ?");
+        $stmt->execute(array((int)$row['id']));
+    } else {
+        $stmt = $pdo->prepare("UPDATE user_bonus_spins SET spins_available = ? WHERE id = ?");
+        $stmt->execute(array($newVal, (int)$row['id']));
+    }
+    return true;
+}
+
+/**
+ * Grant bonus spins to a user
+ */
+function grantBonusSpins($pdo, $userId, $count, $source) {
+    $userId = (int)$userId;
+    $count = (int)$count;
+    if ($count <= 0) return;
+    $stmt = $pdo->prepare("INSERT INTO user_bonus_spins (user_id, spins_available, source, granted_at) VALUES (?, ?, ?, NOW())");
+    $stmt->execute(array($userId, $count, (string)$source));
+}
+
 ensureSpinTables($pdo);
 
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
@@ -229,7 +282,7 @@ if ($method === 'GET' && $action === 'segments') {
 }
 
 // Auth required actions
-if ($action === 'spin' || $action === 'status' || $action === 'history' || $action === 'characters') {
+if ($action === 'spin' || $action === 'status' || $action === 'history' || $action === 'characters' || $action === 'buy_spin') {
     $user = requireAuth();
     // session_helper returns 'user_id', not 'id'
     $userId = isset($user['user_id']) ? (int)$user['user_id'] : (int)$user['id'];
@@ -252,6 +305,7 @@ if ($method === 'GET' && $action === 'status') {
     $enabled       = safeBoolSetting(isset($settings['enabled']) ? $settings['enabled'] : '1', true);
     $spinsPerDay   = isset($settings['spins_per_day']) ? (int)$settings['spins_per_day'] : 1;
     $cooldownHours = isset($settings['cooldown_hours']) ? (int)$settings['cooldown_hours'] : 24;
+    $zenPerSpin    = isset($settings['zen_per_spin']) ? (int)$settings['zen_per_spin'] : 50000;
 
     $stmt = $pdo->prepare("
         SELECT COUNT(*)
@@ -261,11 +315,15 @@ if ($method === 'GET' && $action === 'status') {
     $stmt->execute(array($userId, $cooldownHours));
     $spinsUsed = (int)$stmt->fetchColumn();
 
+    $bonusSpins = getUserBonusSpins($pdo, $userId);
+
     $stmt = $pdo->prepare("SELECT spun_at FROM user_spins WHERE user_id = ? ORDER BY spun_at DESC LIMIT 1");
     $stmt->execute(array($userId));
     $lastSpin = $stmt->fetchColumn();
 
-    $canSpin = $enabled && ($spinsUsed < $spinsPerDay);
+    $dailyRemaining = max(0, $spinsPerDay - $spinsUsed);
+    $totalRemaining = $dailyRemaining + $bonusSpins;
+    $canSpin = $enabled && ($totalRemaining > 0);
     $nextSpinAt = null;
     if (!$canSpin && $lastSpin) {
         $nextSpinAt = date('Y-m-d H:i:s', strtotime($lastSpin) + ($cooldownHours * 3600));
@@ -276,7 +334,10 @@ if ($method === 'GET' && $action === 'status') {
         'can_spin'        => $canSpin,
         'spins_used'      => $spinsUsed,
         'spins_per_day'   => $spinsPerDay,
-        'spins_remaining' => max(0, $spinsPerDay - $spinsUsed),
+        'spins_remaining' => $totalRemaining,
+        'daily_remaining' => $dailyRemaining,
+        'bonus_spins'     => $bonusSpins,
+        'zen_per_spin'    => $zenPerSpin,
         'cooldown_hours'  => $cooldownHours,
         'last_spin'       => $lastSpin,
         'next_spin_at'    => $nextSpinAt,
@@ -336,7 +397,7 @@ if ($method === 'POST' && $action === 'spin') {
             jsonResponse(array('success' => false, 'message' => 'Spin wheel is currently disabled', 'rid' => $RID), 403);
         }
 
-        // cooldown check
+        // cooldown check - daily spins
         $stmt = $pdo->prepare("
             SELECT COUNT(*)
             FROM user_spins
@@ -345,8 +406,22 @@ if ($method === 'POST' && $action === 'spin') {
         $stmt->execute(array($userId, $cooldownHours));
         $spinsUsed = (int)$stmt->fetchColumn();
 
-        if ($spinsUsed >= $spinsPerDay) {
-            jsonResponse(array('success' => false, 'message' => 'No spins remaining today', 'rid' => $RID), 429);
+        $usedBonus = false;
+        $dailyRemaining = max(0, $spinsPerDay - $spinsUsed);
+        $bonusSpins = getUserBonusSpins($pdo, $userId);
+
+        if ($dailyRemaining <= 0) {
+            // Try to use a bonus spin
+            if ($bonusSpins > 0) {
+                $consumed = consumeBonusSpin($pdo, $userId);
+                if (!$consumed) {
+                    jsonResponse(array('success' => false, 'message' => 'No spins remaining', 'rid' => $RID), 429);
+                }
+                $usedBonus = true;
+                $bonusSpins--;
+            } else {
+                jsonResponse(array('success' => false, 'message' => 'No spins remaining today. Buy extra spins with Zen!', 'rid' => $RID), 429);
+            }
         }
 
         // segments
@@ -431,6 +506,9 @@ if ($method === 'POST' && $action === 'spin') {
 
         if (method_exists($pdo, 'commit')) $pdo->commit();
 
+        $newDailyRemaining = $usedBonus ? 0 : max(0, $spinsPerDay - $spinsUsed - 1);
+        $totalRemaining = $newDailyRemaining + $bonusSpins;
+
         jsonResponse(array(
             'success'         => true,
             'winner'          => $winner,
@@ -438,7 +516,10 @@ if ($method === 'POST' && $action === 'spin') {
             'segment_count'   => count($segments),
             'reward_given'    => $rewardGiven,
             'reward_mail'     => $rewardMail,
-            'spins_remaining' => max(0, $spinsPerDay - $spinsUsed - 1),
+            'spins_remaining' => $totalRemaining,
+            'daily_remaining' => $newDailyRemaining,
+            'bonus_spins'     => $bonusSpins,
+            'used_bonus'      => $usedBonus,
             'rid'             => $RID
         ));
 
@@ -461,6 +542,87 @@ if ($method === 'POST' && $action === 'spin') {
             '_debug'  => $exMsg,
             'rid'     => $RID
         ), 500);
+    }
+}
+
+// Buy extra spins with Zen
+if ($method === 'POST' && $action === 'buy_spin') {
+    try {
+        $raw = file_get_contents('php://input');
+        $input = json_decode($raw, true);
+        $count = isset($input['count']) ? (int)$input['count'] : 1;
+        if ($count < 1 || $count > 10) {
+            jsonResponse(array('success' => false, 'message' => 'You can buy 1-10 spins at a time', 'rid' => $RID), 400);
+        }
+
+        $stmt = $pdo->query("SELECT setting_key, setting_value FROM spin_settings");
+        $settings = array();
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $settings[$row['setting_key']] = $row['setting_value'];
+        }
+        $zenPerSpin = isset($settings['zen_per_spin']) ? (int)$settings['zen_per_spin'] : 50000;
+        $totalCost = $zenPerSpin * $count;
+
+        // Check user has getUserZenBalance (from session_helper or gamepass)
+        // Import zen helpers
+        if (!function_exists('getUserZenBalance')) {
+            // Fallback: read from user_currency
+            function getUserZenBalance_local($pdo, $uid) {
+                try {
+                    $stmt = $pdo->prepare("SELECT zen FROM user_currency WHERE user_id = ?");
+                    $stmt->execute(array((int)$uid));
+                    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                    return $row ? (int)$row['zen'] : 0;
+                } catch (Exception $e) { return 0; }
+            }
+            $userZen = getUserZenBalance_local($pdo, $userId);
+        } else {
+            $userZen = getUserZenBalance($userId);
+        }
+
+        if ($userZen < $totalCost) {
+            jsonResponse(array(
+                'success' => false,
+                'message' => "Not enough Zen. Need " . number_format($totalCost) . " Zen, you have " . number_format($userZen),
+                'zen_cost' => $totalCost,
+                'user_zen' => $userZen,
+                'rid' => $RID
+            ), 400);
+        }
+
+        // Deduct Zen
+        if (function_exists('deductUserZen')) {
+            $result = deductUserZen($userId, $totalCost);
+            if (!$result['success']) {
+                jsonResponse(array('success' => false, 'message' => $result['message'], 'rid' => $RID), 400);
+            }
+        } else {
+            // Fallback deduction
+            $stmt = $pdo->prepare("UPDATE user_currency SET zen = zen - ?, updated_at = NOW() WHERE user_id = ? AND zen >= ?");
+            $stmt->execute(array($totalCost, $userId, $totalCost));
+            if ($stmt->rowCount() === 0) {
+                jsonResponse(array('success' => false, 'message' => 'Insufficient Zen', 'rid' => $RID), 400);
+            }
+        }
+
+        // Grant bonus spins
+        grantBonusSpins($pdo, $userId, $count, 'zen');
+
+        $newZen = function_exists('getUserZenBalance') ? getUserZenBalance($userId) : 0;
+
+        jsonResponse(array(
+            'success' => true,
+            'message' => "Purchased $count extra spin" . ($count > 1 ? 's' : '') . "!",
+            'spins_purchased' => $count,
+            'zen_spent' => $totalCost,
+            'user_zen' => $newZen,
+            'bonus_spins' => getUserBonusSpins($pdo, $userId),
+            'rid' => $RID
+        ));
+
+    } catch (Exception $e) {
+        error_log("BUY_SPIN_ERROR rid=$RID msg=" . $e->getMessage());
+        jsonResponse(array('success' => false, 'message' => 'Failed to purchase spins', 'rid' => $RID), 500);
     }
 }
 

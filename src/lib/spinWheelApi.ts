@@ -24,6 +24,9 @@ export interface SpinStatus {
   spins_used: number;
   spins_per_day: number;
   spins_remaining: number;
+  daily_remaining?: number;
+  bonus_spins?: number;
+  zen_per_spin?: number;
   cooldown_hours: number;
   last_spin: string | null;
   next_spin_at: string | null;
@@ -108,6 +111,27 @@ export async function fetchSpinHistory(limit = 10): Promise<SpinHistory[]> {
     `${API_BASE}/spin_wheel.php?action=history&limit=${limit}`
   );
   return data.history;
+}
+
+export interface BuySpinResult {
+  success: boolean;
+  message: string;
+  spins_purchased: number;
+  zen_spent: number;
+  user_zen: number;
+  bonus_spins: number;
+}
+
+export async function buyExtraSpins(count: number = 1): Promise<BuySpinResult> {
+  return fetchJsonOrThrow<BuySpinResult>(
+    `${API_BASE}/spin_wheel.php?action=buy_spin`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ count })
+    },
+    true,
+    { showErrorToast: false }
+  );
 }
 
 // Admin endpoints
