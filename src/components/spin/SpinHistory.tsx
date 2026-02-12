@@ -120,10 +120,10 @@ export function SpinHistoryList() {
 
   return (
     <Card className="bg-card border-primary/20 overflow-hidden">
-      <CardHeader className="pb-2 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <div className="p-1.5 rounded-lg bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-            <History className="h-4 w-4" />
+      <CardHeader className="pb-2 px-3 py-2.5 md:px-6 md:py-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+        <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+          <div className="p-1 md:p-1.5 rounded-lg bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
+            <History className="h-3.5 w-3.5 md:h-4 md:w-4" />
           </div>
           My Spin History
         </CardTitle>

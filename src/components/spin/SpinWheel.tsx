@@ -45,7 +45,7 @@ export function SpinWheel({ segments, spinning, winnerIndex, onSpinComplete }: S
   const segmentAngle = 360 / segments.length;
 
   return (
-    <div className="relative w-72 h-72 md:w-80 md:h-80 mx-auto">
+    <div className="relative w-60 h-60 sm:w-72 sm:h-72 md:w-80 md:h-80 mx-auto">
       {/* Multi-layer outer glow */}
       <div 
         className={`absolute inset-[-12px] rounded-full transition-all duration-700 ${

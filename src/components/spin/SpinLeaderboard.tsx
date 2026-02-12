@@ -180,11 +180,11 @@ export function SpinLeaderboard() {
       
       <TabsContent value="winners" className="mt-0">
         <Card className="bg-card border-primary/20 overflow-hidden">
-          <CardHeader className="pb-2 bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent">
+          <CardHeader className="pb-2 px-3 py-2.5 md:px-6 md:py-4 bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white">
-                  <Trophy className="h-4 w-4" />
+              <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+                <div className="p-1 md:p-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white">
+                  <Trophy className="h-3.5 w-3.5 md:h-4 md:w-4" />
                 </div>
                 Recent Winners
               </CardTitle>
@@ -195,7 +195,7 @@ export function SpinLeaderboard() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[300px] md:h-[400px]">
               <div className="p-3 space-y-1.5">
                 <AnimatePresence mode="popLayout">
                   {entries.map((entry, index) => {
@@ -212,7 +212,7 @@ export function SpinLeaderboard() {
                         animate={{ opacity: 1, x: 0, scale: 1 }}
                         exit={{ opacity: 0, x: 20, scale: 0.95 }}
                         transition={{ delay: index * 0.04, type: 'spring', stiffness: 300, damping: 25 }}
-                        className={`relative flex items-center gap-2.5 p-2.5 rounded-xl transition-all duration-200 group ${
+                        className={`relative flex items-center gap-2 p-2 md:p-2.5 rounded-xl transition-all duration-200 group ${
                           isTop3
                             ? `${rankConfig!.bg} ${rankConfig!.border} border`
                             : 'hover:bg-muted/50'

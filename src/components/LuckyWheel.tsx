@@ -430,23 +430,23 @@ export function LuckyWheel() {
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
         {/* Main Wheel Card */}
         <Card className="bg-card border-primary/20 overflow-hidden lg:col-span-2">
-          <CardHeader className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10">
+          <CardHeader className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 px-3 py-3 md:p-6">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Sparkles className="h-5 w-5 text-amber-500" />
+              <CardTitle className="flex items-center gap-2 text-base md:text-xl">
+                <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-amber-500" />
                 Lucky Spin
               </CardTitle>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 md:gap-2">
                 {(status.bonus_spins ?? 0) > 0 && (
-                  <Badge variant="outline" className="gap-1 border-primary/30 bg-primary/10 text-primary text-xs">
+                  <Badge variant="outline" className="gap-1 border-primary/30 bg-primary/10 text-primary text-[10px] md:text-xs px-1.5 py-0.5">
                     <Zap className="h-3 w-3" />
-                    +{status.bonus_spins} bonus
+                    +{status.bonus_spins}
                   </Badge>
                 )}
-                <Badge variant="outline" className="gap-1">
+                <Badge variant="outline" className="gap-1 text-[10px] md:text-xs px-1.5 py-0.5">
                   <History className="h-3 w-3" />
                   {status.spins_remaining} spins
                 </Badge>
@@ -454,7 +454,7 @@ export function LuckyWheel() {
             </div>
           </CardHeader>
 
-          <CardContent className="p-6 flex flex-col items-center gap-6">
+          <CardContent className="p-3 md:p-6 flex flex-col items-center gap-4 md:gap-6">
             {/* Character Selector */}
             <div className="w-full max-w-xs">
               <SpinCharacterSelector
@@ -472,22 +472,22 @@ export function LuckyWheel() {
 
             {/* Reward receiver label */}
             {selectedCharacterName && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <User className="h-4 w-4" />
-                <span>Reward receiver: <span className="font-medium text-foreground">{selectedCharacterName}</span></span>
+              <div className="flex items-center gap-1.5 text-xs md:text-sm text-muted-foreground">
+                <User className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span>Receiver: <span className="font-medium text-foreground">{selectedCharacterName}</span></span>
               </div>
             )}
 
             {/* Spins indicator */}
-            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-muted/50 border border-border">
-              <div className="flex items-center gap-1.5 text-sm">
-                <Sparkles className="h-4 w-4 text-amber-500" />
+            <div className="flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2 rounded-xl bg-muted/50 border border-border">
+              <div className="flex items-center gap-1 md:gap-1.5 text-xs md:text-sm">
+                <Sparkles className="h-3.5 w-3.5 md:h-4 md:w-4 text-amber-500" />
                 <span className="text-muted-foreground">Free:</span>
                 <span className="font-bold text-foreground">{status.spins_remaining}</span>
               </div>
-              <div className="w-px h-5 bg-border" />
-              <div className="flex items-center gap-1.5 text-sm">
-                <Zap className="h-4 w-4 text-primary" />
+              <div className="w-px h-4 md:h-5 bg-border" />
+              <div className="flex items-center gap-1 md:gap-1.5 text-xs md:text-sm">
+                <Zap className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
                 <span className="text-muted-foreground">Bonus:</span>
                 <span className="font-bold text-primary">{status.bonus_spins ?? 0}</span>
               </div>
@@ -515,46 +515,46 @@ export function LuckyWheel() {
 
             {/* Always-visible Buy More spins */}
             {(status.zen_per_spin ?? 0) > 0 && (
-              <div className={`w-full max-w-sm border rounded-xl p-3 text-center space-y-2 transition-all duration-300 ${
+              <div className={`w-full max-w-sm border rounded-xl p-2.5 md:p-3 text-center space-y-1.5 md:space-y-2 transition-all duration-300 ${
                 status.spins_remaining === 0 && (status.bonus_spins ?? 0) === 0
                   ? 'border-primary/50 bg-primary/10 shadow-[0_0_15px_hsl(var(--primary)/0.3)] animate-pulse'
                   : 'border-primary/20 bg-primary/5'
               }`}>
-                <p className="text-xs font-medium text-muted-foreground">Buy Extra Spins with Zen</p>
-                <div className="flex items-center gap-2 justify-center">
+                <p className="text-[10px] md:text-xs font-medium text-muted-foreground">Buy Extra Spins with Zen</p>
+                <div className="flex items-center gap-1.5 md:gap-2 justify-center">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => handleBuySpins(1)}
                     disabled={buyingSpins}
-                    className="gap-1 border-primary/30 hover:bg-primary/10"
+                    className="gap-1 border-primary/30 hover:bg-primary/10 text-[10px] md:text-xs h-7 md:h-8 px-2 md:px-3"
                   >
-                    <Zap className="h-3.5 w-3.5 text-primary" />
-                    {buyingSpins ? '...' : `1 Spin · ${((status.zen_per_spin ?? 50000) / 1000).toFixed(0)}k Zen`}
+                    <Zap className="h-3 w-3 text-primary" />
+                    {buyingSpins ? '...' : `1 · ${((status.zen_per_spin ?? 50000) / 1000).toFixed(0)}k`}
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => handleBuySpins(3)}
                     disabled={buyingSpins}
-                    className="gap-1 border-primary/30 hover:bg-primary/10"
+                    className="gap-1 border-primary/30 hover:bg-primary/10 text-[10px] md:text-xs h-7 md:h-8 px-2 md:px-3"
                   >
-                    <Zap className="h-3.5 w-3.5 text-primary" />
-                    {buyingSpins ? '...' : `3 Spins · ${((status.zen_per_spin ?? 50000) * 3 / 1000).toFixed(0)}k`}
+                    <Zap className="h-3 w-3 text-primary" />
+                    {buyingSpins ? '...' : `3 · ${((status.zen_per_spin ?? 50000) * 3 / 1000).toFixed(0)}k`}
                   </Button>
                 </div>
               </div>
             )}
 
             {/* Legend */}
-            <div className="w-full pt-4 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center mb-3">Possible Rewards</p>
-              <div className="flex flex-wrap justify-center gap-2">
+            <div className="w-full pt-3 md:pt-4 border-t border-border">
+              <p className="text-[10px] md:text-xs text-muted-foreground text-center mb-2 md:mb-3">Possible Rewards</p>
+              <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
                 {segments.slice(0, 6).map((seg) => (
                   <Badge
                     key={seg.id}
                     variant="outline"
-                    className="gap-1 text-xs"
+                    className="gap-1 text-[10px] md:text-xs px-1.5 py-0.5"
                     style={{ borderColor: seg.color, color: seg.color }}
                   >
                     {ICON_MAP[seg.icon] || <Gift className="h-3 w-3" />}
@@ -562,7 +562,7 @@ export function LuckyWheel() {
                   </Badge>
                 ))}
                 {segments.length > 6 && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-[10px] md:text-xs px-1.5 py-0.5">
                     +{segments.length - 6} more
                   </Badge>
                 )}
