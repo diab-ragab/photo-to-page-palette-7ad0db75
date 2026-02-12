@@ -13,9 +13,11 @@ interface PassUpsellProps {
   elitePriceCents?: number;
   goldPriceCents?: number;
   gamepassEnabled?: boolean;
+  eliteEnabled?: boolean;
+  goldEnabled?: boolean;
 }
 
-export const ElitePassUpsell = ({ compact = false, currentTier = "free", expiresAt, elitePriceCents = 999, goldPriceCents = 1999, gamepassEnabled = true }: PassUpsellProps) => {
+export const ElitePassUpsell = ({ compact = false, currentTier = "free", expiresAt, elitePriceCents = 999, goldPriceCents = 1999, gamepassEnabled = true, eliteEnabled = true, goldEnabled = true }: PassUpsellProps) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
 
@@ -112,7 +114,7 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
                 )}
               </div>
             </div>
-            {currentTier === "free" && (
+            {currentTier === "free" && eliteEnabled && (
               <Button
                 onClick={() => handlePurchase("elite")}
                 size="sm"
@@ -122,6 +124,9 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
                 {loading === "elite" ? "..." : "Buy"}
                 <ChevronRight className="h-4 w-4" />
               </Button>
+            )}
+            {currentTier === "free" && !eliteEnabled && (
+              <Badge variant="outline" className="text-destructive border-destructive/30 text-[10px]">Unavailable</Badge>
             )}
           </div>
         </div>
@@ -145,7 +150,7 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
                 )}
               </div>
             </div>
-            {currentTier !== "gold" && (
+            {currentTier !== "gold" && goldEnabled && (
               <Button
                 onClick={() => handlePurchase("gold", currentTier === "elite")}
                 size="sm"
@@ -155,6 +160,9 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
                 {loading === "gold" ? "..." : currentTier === "elite" ? "Upgrade" : "Buy"}
                 {currentTier === "elite" ? <ArrowUp className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </Button>
+            )}
+            {currentTier !== "gold" && !goldEnabled && (
+              <Badge variant="outline" className="text-destructive border-destructive/30 text-[10px]">Unavailable</Badge>
             )}
           </div>
         </div>
@@ -242,6 +250,11 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
               <ShieldCheck className="h-5 w-5 text-emerald-400" />
               <span className="font-bold text-emerald-400">Included in Gold</span>
             </div>
+          ) : !eliteEnabled ? (
+            <div className="w-full flex items-center justify-center gap-2 h-11 rounded-md bg-destructive/10 border border-destructive/30">
+              <Power className="h-5 w-5 text-destructive" />
+              <span className="font-bold text-destructive text-sm">Elite Pass Unavailable</span>
+            </div>
           ) : (
             <Button
               onClick={() => handlePurchase("elite")}
@@ -325,6 +338,11 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
                   <span className="text-[11px] text-muted-foreground">Expires {expiry.formatted} ({expiry.daysLeft}d left)</span>
                 </div>
               )}
+            </div>
+          ) : !goldEnabled ? (
+            <div className="w-full flex items-center justify-center gap-2 h-11 rounded-md bg-destructive/10 border border-destructive/30">
+              <Power className="h-5 w-5 text-destructive" />
+              <span className="font-bold text-destructive text-sm">Gold Pass Unavailable</span>
             </div>
           ) : currentTier === "elite" ? (
             <Button

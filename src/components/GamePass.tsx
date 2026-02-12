@@ -291,6 +291,8 @@ export const GamePass = () => {
   const [elitePriceCents, setElitePriceCents] = useState(999);
   const [goldPriceCents, setGoldPriceCents] = useState(1999);
   const [gamepassEnabled, setGamepassEnabled] = useState(true);
+  const [eliteEnabled, setEliteEnabled] = useState(true);
+  const [goldEnabled, setGoldEnabled] = useState(true);
 
   const handleCharacterSelect = (roleId: number | null, name: string | null) => {
     setSelectedRoleId(roleId);
@@ -320,6 +322,8 @@ export const GamePass = () => {
           if (data.elite_price_cents) setElitePriceCents(data.elite_price_cents);
           if (data.gold_price_cents) setGoldPriceCents(data.gold_price_cents);
           if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
+          if (data.elite_enabled !== undefined) setEliteEnabled(data.elite_enabled);
+          if (data.gold_enabled !== undefined) setGoldEnabled(data.gold_enabled);
         }
       } catch {
         // silent (landing page should still render)
@@ -358,6 +362,8 @@ export const GamePass = () => {
           if (data.elite_price_cents) setElitePriceCents(data.elite_price_cents);
           if (data.gold_price_cents) setGoldPriceCents(data.gold_price_cents);
           if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
+          if (data.elite_enabled !== undefined) setEliteEnabled(data.elite_enabled);
+          if (data.gold_enabled !== undefined) setGoldEnabled(data.gold_enabled);
         }
       } catch (err) {
         const status = (err as FetchJsonError)?.status;
@@ -654,7 +660,7 @@ export const GamePass = () => {
       {/* Pass Upsell Banner */}
       {userTier !== "gold" && (
         <div className="mb-6">
-          <ElitePassUpsell compact currentTier={userTier} expiresAt={passExpiresAt} elitePriceCents={elitePriceCents} goldPriceCents={goldPriceCents} gamepassEnabled={gamepassEnabled} />
+          <ElitePassUpsell compact currentTier={userTier} expiresAt={passExpiresAt} elitePriceCents={elitePriceCents} goldPriceCents={goldPriceCents} gamepassEnabled={gamepassEnabled} eliteEnabled={eliteEnabled} goldEnabled={goldEnabled} />
         </div>
       )}
 

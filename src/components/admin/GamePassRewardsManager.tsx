@@ -313,7 +313,9 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   const [goldPrice, setGoldPrice] = useState<number>(1999);
   const [goldPriceInput, setGoldPriceInput] = useState<string>("19.99");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [gamepassEnabled, setGamepassEnabled] = useState(true);
+   const [gamepassEnabled, setGamepassEnabled] = useState(true);
+  const [eliteEnabled, setEliteEnabled] = useState(true);
+  const [goldEnabled, setGoldEnabled] = useState(true);
   const [isTogglingEnabled, setIsTogglingEnabled] = useState(false);
 
   useEffect(() => {
@@ -338,30 +340,35 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
         setGoldPrice(gp);
         setGoldPriceInput((gp / 100).toFixed(2));
         setGamepassEnabled(data.settings.gamepass_enabled !== false);
+        setEliteEnabled(data.settings.elite_enabled !== false);
+        setGoldEnabled(data.settings.gold_enabled !== false);
       }
     } catch (error) {
       console.error("Failed to fetch settings:", error);
     }
   };
 
-  const handleToggleEnabled = async (enabled: boolean) => {
+  const handleToggleEnabled = async (key: string, enabled: boolean) => {
     setIsTogglingEnabled(true);
     try {
       const response = await fetch(`${API_BASE}/gamepass_admin.php?action=update_settings`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: JSON.stringify({ gamepass_enabled: enabled }),
+        body: JSON.stringify({ [key]: enabled }),
       });
       const data = await response.json();
       if (data.success) {
-        setGamepassEnabled(enabled);
-        toast({ title: enabled ? "Game Pass Enabled" : "Game Pass Disabled", description: enabled ? "Players can now access the Game Pass." : "Game Pass is now hidden from players." });
+        if (key === 'gamepass_enabled') setGamepassEnabled(enabled);
+        if (key === 'elite_enabled') setEliteEnabled(enabled);
+        if (key === 'gold_enabled') setGoldEnabled(enabled);
+        const label = key === 'gamepass_enabled' ? 'Game Pass' : key === 'elite_enabled' ? 'Elite Tier' : 'Gold Tier';
+        toast({ title: enabled ? `${label} Enabled` : `${label} Disabled`, description: enabled ? `${label} is now available to players.` : `${label} is now hidden from players.` });
       } else {
         toast({ title: "Error", description: data.error || "Failed to toggle", variant: "destructive" });
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to toggle Game Pass", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to toggle setting", variant: "destructive" });
     } finally {
       setIsTogglingEnabled(false);
     }
@@ -558,7 +565,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Enable/Disable Toggle */}
+          {/* Master Enable/Disable Toggle */}
           <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
             <div className="flex items-center gap-3">
               <Power className={`h-5 w-5 ${gamepassEnabled ? "text-emerald-400" : "text-destructive"}`} />
@@ -571,7 +578,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
             </div>
             <Switch
               checked={gamepassEnabled}
-              onCheckedChange={handleToggleEnabled}
+              onCheckedChange={(v) => handleToggleEnabled('gamepass_enabled', v)}
               disabled={isTogglingEnabled}
             />
           </div>
@@ -579,6 +586,53 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
             <div className="flex items-center gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-sm">
               <Power className="h-4 w-4 shrink-0" />
               <span>Game Pass is currently disabled. Players cannot see or purchase it.</span>
+            </div>
+          )}
+
+          {/* Per-Tier Toggles */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Elite Toggle */}
+            <div className={`flex items-center justify-between p-3 rounded-lg border ${eliteEnabled ? "border-amber-500/30 bg-amber-500/5" : "border-destructive/30 bg-destructive/5"}`}>
+              <div className="flex items-center gap-2">
+                <Crown className={`h-4 w-4 ${eliteEnabled ? "text-amber-400" : "text-destructive"}`} />
+                <div>
+                  <p className="font-medium text-sm">{eliteEnabled ? "Elite Active" : "Elite OFF"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {eliteEnabled ? "Players can buy Elite" : "Elite purchases disabled"}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={eliteEnabled}
+                onCheckedChange={(v) => handleToggleEnabled('elite_enabled', v)}
+                disabled={isTogglingEnabled}
+              />
+            </div>
+            {/* Gold Toggle */}
+            <div className={`flex items-center justify-between p-3 rounded-lg border ${goldEnabled ? "border-violet-500/30 bg-violet-500/5" : "border-destructive/30 bg-destructive/5"}`}>
+              <div className="flex items-center gap-2">
+                <Diamond className={`h-4 w-4 ${goldEnabled ? "text-violet-400" : "text-destructive"}`} />
+                <div>
+                  <p className="font-medium text-sm">{goldEnabled ? "Gold Active" : "Gold OFF"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {goldEnabled ? "Players can buy Gold" : "Gold purchases disabled"}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={goldEnabled}
+                onCheckedChange={(v) => handleToggleEnabled('gold_enabled', v)}
+                disabled={isTogglingEnabled}
+              />
+            </div>
+          </div>
+          {(!eliteEnabled || !goldEnabled) && (
+            <div className="flex items-center gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-sm">
+              <Power className="h-4 w-4 shrink-0" />
+              <span>
+                {!eliteEnabled && !goldEnabled ? "Elite & Gold tiers are disabled." : !eliteEnabled ? "Elite tier is disabled." : "Gold tier is disabled."}
+                {" "}Players cannot purchase disabled tiers.
+              </span>
             </div>
           )}
           {/* Tier Prices */}
