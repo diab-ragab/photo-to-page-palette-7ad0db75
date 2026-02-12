@@ -287,7 +287,8 @@ try {
         'claimed_days' => $claimedDays,
         'user_zen' => $userZen,
         'zen_cost_per_day' => getZenSkipCost(),
-        'rewards' => formatRewards($rewards)
+        'rewards' => formatRewards($rewards),
+        'expires_at' => isset($expiresAt) ? $expiresAt : null
       ));
       break;
 
