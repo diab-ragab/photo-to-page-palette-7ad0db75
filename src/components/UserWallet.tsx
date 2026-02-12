@@ -7,7 +7,6 @@ interface WalletCurrency {
   icon: React.ReactNode;
   color: string;
   bgColor: string;
-  description?: string;
 }
 
 interface UserWalletProps {
@@ -22,81 +21,67 @@ export const UserWallet = ({ coins, vipPoints, zen = 0, premiumCoins = 0 }: User
     {
       name: "Vote Coins",
       amount: coins,
-      icon: <Coins className="h-5 w-5" />,
+      icon: <Coins className="h-4 w-4" />,
       color: "text-yellow-500",
       bgColor: "bg-yellow-500/10",
-      description: "Earned from voting"
     },
     {
       name: "VIP Points",
       amount: vipPoints,
-      icon: <Crown className="h-5 w-5" />,
+      icon: <Crown className="h-4 w-4" />,
       color: "text-purple-400",
       bgColor: "bg-purple-500/10",
-      description: "Unlock VIP benefits"
     },
     {
       name: "Zen",
       amount: zen,
-      icon: <Gem className="h-5 w-5" />,
+      icon: <Gem className="h-4 w-4" />,
       color: "text-cyan-400",
       bgColor: "bg-cyan-500/10",
-      description: "Premium currency"
     },
     {
-      name: "Premium Coins",
+      name: "Premium",
       amount: premiumCoins,
-      icon: <Sparkles className="h-5 w-5" />,
+      icon: <Sparkles className="h-4 w-4" />,
       color: "text-amber-400",
       bgColor: "bg-amber-500/10",
-      description: "Shop purchases"
     }
   ];
 
-  // Filter out currencies with 0 balance (except Coins and VIP which are always shown)
   const visibleCurrencies = currencies.filter((c, i) => i < 2 || c.amount > 0);
 
   return (
     <Card className="bg-card border-primary/20 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 pointer-events-none" />
-      <CardHeader className="relative">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Wallet className="h-5 w-5 text-primary" />
+      <CardHeader className="relative py-3 px-4">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <div className="p-1.5 rounded-md bg-primary/10">
+            <Wallet className="h-4 w-4 text-primary" />
           </div>
           My Wallet
         </CardTitle>
       </CardHeader>
-      <CardContent className="relative space-y-3">
-        {visibleCurrencies.map((currency, index) => (
+      <CardContent className="relative px-4 pb-3 pt-0 space-y-1.5">
+        {visibleCurrencies.map((currency) => (
           <div
             key={currency.name}
-            className="group flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all duration-300"
+            className="flex items-center justify-between p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
           >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${currency.bgColor} ${currency.color} transition-transform duration-300 group-hover:scale-110`}>
+            <div className="flex items-center gap-2">
+              <div className={`p-1.5 rounded-md ${currency.bgColor} ${currency.color}`}>
                 {currency.icon}
               </div>
-              <div>
-                <div className="font-medium text-sm">{currency.name}</div>
-                {currency.description && (
-                  <div className="text-xs text-muted-foreground">{currency.description}</div>
-                )}
-              </div>
+              <span className="font-medium text-xs">{currency.name}</span>
             </div>
-            <div className={`text-lg font-bold ${currency.color}`}>
-              {currency.amount.toLocaleString()}
-            </div>
+            <span className={`text-sm font-bold ${currency.color}`}>
+              {currency.amount >= 1000000
+                ? `${(currency.amount / 1000000).toFixed(1)}M`
+                : currency.amount >= 1000
+                  ? `${(currency.amount / 1000).toFixed(0)}k`
+                  : currency.amount.toLocaleString()}
+            </span>
           </div>
         ))}
-
-        {/* Total Value Indicator */}
-        <div className="pt-3 mt-3 border-t border-border">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Total Currencies</span>
-            <span className="font-medium text-foreground">{visibleCurrencies.length} active</span>
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
