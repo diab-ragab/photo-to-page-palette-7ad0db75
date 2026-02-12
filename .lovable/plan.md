@@ -1,79 +1,104 @@
 
-# Update API Files to Use New Session Helper
 
-## Problem
-Several API files still use **old manual session lookups** (raw `SELECT ... FROM user_sessions WHERE session_token = ?` without SHA-256 hashing), which causes "Invalid session" errors. The new `session_helper.php` uses `resolveSessionRow()` which tries raw token, SHA-256 hash, and optional hash columns -- but these files bypass it entirely.
+# Game Pass: 3-Tier System (Free, Elite, Gold) with Stripe Purchase
 
-## Files That Need Updating
+## Summary
+Expand the current 2-tier Game Pass (Free + Elite) to a 3-tier system (Free, Elite, Gold) where Elite and Gold tiers can be purchased via Stripe Checkout. Admin can manage rewards for all 3 tiers.
 
-### 1. `order_status.php` (HIGH priority - checkout flow)
-- Still requires legacy `db.php` (should be removed)
-- Does NOT include `session_helper.php`
-- Manual session lookup without SHA-256 hash
-- **Fix**: Include `session_helper.php`, replace manual lookup with `resolveSessionRow()`, add CORS via `handleCors()`
+## Current State
+- Game Pass has **Free** and **Elite** tiers
+- `gamepass_rewards` table stores rewards with `tier` column (`free` / `elite`)
+- `user_gamepass` table tracks premium status (`is_premium` flag)
+- Admin manager (`GamePassRewardsManager`) manages Free/Elite rewards
+- Stripe checkout already works via `stripe_checkout.php` (raw Stripe API, no SDK)
+- `ElitePassUpsell` component has hardcoded "9.99/month" text
 
-### 2. `create_payment_intent.php` (HIGH priority - payment flow)
-- Still requires legacy `db.php`
-- Does NOT include `session_helper.php`
-- Manual session lookup without hash
-- **Fix**: Include `session_helper.php`, use `resolveSessionRow()`, remove `db.php`
+## What Changes
 
-### 3. `user_characters.php` (HIGH priority - checkout character selector)
-- Does NOT include `session_helper.php`
-- Manual token extraction from headers only (misses query params, cookies, JSON body)
-- Manual session lookup without hash
-- No `handleCors()` call
-- **Fix**: Include `session_helper.php`, use `getSessionToken()` + `resolveSessionRow()`, add `handleCors()`
+### 1. Database Changes (PHP backend)
 
-### 4. `bundles.php` - purchase case (MEDIUM priority)
-- Already includes `session_helper.php` but the `purchase` case uses its own `getBearerToken()` and manual `SELECT` without hash
-- **Fix**: Replace `getBearerToken()` call with `getSessionToken()`, replace manual lookup with `resolveSessionRow()`
+**`gamepass_rewards` table** - The `tier` column currently allows `free` / `elite`. Add `gold` as a valid tier value. Since MySQL 5.1 ENUM altering can be tricky, use VARCHAR instead or ALTER ENUM.
 
-### 5. `payment_confirm.php` (MEDIUM priority)
-- Does NOT include `session_helper.php`
-- Has its own session verification logic
-- **Fix**: Include `session_helper.php`, use centralized functions
-
-## Technical Details
-
-For each file, the changes follow the same pattern:
+**`user_gamepass` table** - Replace the boolean `is_premium` with a `tier` column storing `free`, `elite`, or `gold`. Add `stripe_session_id` for tracking purchases.
 
 ```text
-BEFORE (broken):
-  $stmt = $pdo->prepare("SELECT user_id FROM user_sessions WHERE session_token = ? LIMIT 1");
-  $stmt->execute(array($token));
-
-AFTER (works with hashed tokens):
-  $sess = resolveSessionRow($token);
-  if (!$sess) { fail(401, 'Invalid session'); }
-  $userId = (int)$sess['user_id'];
+ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free';
+UPDATE user_gamepass SET tier = 'elite' WHERE is_premium = 1;
 ```
 
-### Changes per file:
+### 2. Backend: `gamepass_admin.php` Updates
+- Allow `gold` as a valid tier in `add_reward` and `update_reward` actions
+- Update validation: `in_array($tierInput, array('free', 'elite', 'gold'))`
 
-**order_status.php**
-- Remove `require_once db.php`
-- Add `require_once session_helper.php`
-- Add `handleCors(array('GET', 'OPTIONS'))`
-- Replace manual token extraction with `getSessionToken()`
-- Replace manual DB query with `resolveSessionRow()`
+### 3. Backend: `gamepass.php` Updates
+- **`status` action**: Return the user's current tier (`free`, `elite`, `gold`) instead of just `is_premium`
+- **`claim` action**: Check if user's purchased tier matches the reward tier (elite users can claim elite, gold users can claim elite + gold)
+- **`rewards` action**: Include gold-tier rewards in the response
 
-**create_payment_intent.php**
-- Remove `require_once db.php`
-- Add `require_once session_helper.php`
-- Replace manual session lookup with `resolveSessionRow()`
+### 4. Backend: New `gamepass_purchase.php` Endpoint
+- Creates a Stripe Checkout session for purchasing Elite or Gold Game Pass
+- Uses the existing `stripeRequest()` pattern from `stripe_checkout.php` (raw HTTP, no SDK)
+- On success URL, a confirmation endpoint updates `user_gamepass` tier
+- Flow:
+  1. POST `{ tier: "elite" }` or `{ tier: "gold" }`
+  2. Creates Stripe session with the correct price
+  3. Returns checkout URL
+  4. After payment, webhook or success-page verification upgrades the user's tier
 
-**user_characters.php**
-- Add `require_once session_helper.php`
-- Add `handleCors(array('GET', 'OPTIONS'))`
-- Replace manual header reading + DB query with `getSessionToken()` + `resolveSessionRow()`
+### 5. Backend: Update `stripe_webhook.php`
+- Handle Game Pass purchase completions
+- Set `user_gamepass.tier` based on the purchased product metadata
 
-**bundles.php (purchase case only)**
-- Replace `getBearerToken()` with `getSessionToken()`
-- Replace manual `SELECT user_id FROM user_sessions` with `resolveSessionRow()`
+### 6. Frontend: `GamePass.tsx` Updates
+- Add a **3-row layout**: Free (bottom), Elite (middle), Gold (top)
+- Each tier row shows its rewards horizontally
+- Gold rewards get a distinct visual style (diamond/platinum gradient)
+- Show which tier the user owns (Free / Elite / Gold badge)
+- Gold users can claim all tiers; Elite users can claim Free + Elite; Free users only Free
+- Add purchase buttons for Elite and Gold tiers
 
-**payment_confirm.php**
-- Add `require_once session_helper.php`
-- Use centralized session functions where applicable
+### 7. Frontend: `GamePassRewardsManager.tsx` (Admin)
+- Add `gold` to the tier dropdown selector
+- Add `gold` to the filter options (All / Free / Elite / Gold)
+- Gold tier gets a diamond icon in the UI
 
-All changes maintain PHP 5.1 compatibility (no closures, no `??`, `array()` syntax).
+### 8. Frontend: `ElitePassUpsell.tsx` Update
+- Rename/expand to show both Elite and Gold purchase options
+- Show pricing for each tier
+- Link to Stripe Checkout via the new `gamepass_purchase.php` endpoint
+
+### 9. Frontend: New Type Definitions
+- Update `ApiReward` interface: `tier: "free" | "elite" | "gold"`
+- Update `PassReward` to include `goldReward`
+- Add tier hierarchy logic: `gold > elite > free`
+
+## Tier Hierarchy
+```text
+Gold  (highest) - Can claim: Free + Elite + Gold rewards
+Elite (middle)  - Can claim: Free + Elite rewards
+Free  (base)    - Can claim: Free rewards only
+```
+
+## Stripe Integration
+- Uses the existing raw Stripe API pattern (no SDK, PHP 5.x compatible)
+- Two products/prices configured in Stripe Dashboard (or created via the config)
+- Prices stored in `gamepass_settings` table or `config.php`
+- Monthly subscription model using `mode: 'subscription'` or one-time `mode: 'payment'` (user preference needed -- defaulting to one-time monthly payment for simplicity)
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `public/api/gamepass_admin.php` | Modify -- add `gold` tier support |
+| `public/api/gamepass.php` | Modify -- tier-based access, return user tier |
+| `public/api/gamepass_purchase.php` | **Create** -- Stripe checkout for pass purchase |
+| `src/components/GamePass.tsx` | Modify -- 3-tier UI, purchase buttons |
+| `src/components/admin/GamePassRewardsManager.tsx` | Modify -- add gold tier option |
+| `src/components/ElitePassUpsell.tsx` | Modify -- show Elite + Gold options |
+
+## Technical Notes
+- All PHP must be PHP 5.x compatible (no closures in handlers, use `array()` syntax)
+- MySQL 5.1 compatible (no `DEFAULT CURRENT_TIMESTAMP` on DATETIME)
+- Stripe API called via `file_get_contents` with stream context (existing pattern)
+- Session token passed redundantly in URL + body + headers (existing pattern for proxy safety)
+
