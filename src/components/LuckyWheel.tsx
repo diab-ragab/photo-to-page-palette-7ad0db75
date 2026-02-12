@@ -515,7 +515,11 @@ export function LuckyWheel() {
 
             {/* Always-visible Buy More spins */}
             {(status.zen_per_spin ?? 0) > 0 && (
-              <div className="w-full max-w-sm border border-primary/20 rounded-xl p-3 bg-primary/5 text-center space-y-2">
+              <div className={`w-full max-w-sm border rounded-xl p-3 text-center space-y-2 transition-all duration-300 ${
+                status.spins_remaining === 0 && (status.bonus_spins ?? 0) === 0
+                  ? 'border-primary/50 bg-primary/10 shadow-[0_0_15px_hsl(var(--primary)/0.3)] animate-pulse'
+                  : 'border-primary/20 bg-primary/5'
+              }`}>
                 <p className="text-xs font-medium text-muted-foreground">Buy Extra Spins with Zen</p>
                 <div className="flex items-center gap-2 justify-center">
                   <Button
