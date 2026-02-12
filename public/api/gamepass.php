@@ -232,16 +232,24 @@ try {
       $userId = (int)$user['user_id'];
       $cycle = getCycleInfo();
 
-      // Premium status
+      // Premium status & tier
       $isPremium = false;
+      $userTier = 'free';
       try {
-        $stmt = $pdo->prepare("SELECT is_premium, expires_at FROM user_gamepass WHERE user_id = ?");
+        $stmt = $pdo->prepare("SELECT is_premium, expires_at, tier FROM user_gamepass WHERE user_id = ?");
         $stmt->execute(array($userId));
         $gp = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($gp) {
           $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
           $isPremium = ((int)$gp['is_premium'] === 1) && ($expiresAt === null || strtotime($expiresAt) > time());
+          // Use tier column if it exists, otherwise derive from is_premium
+          if (isset($gp['tier']) && in_array($gp['tier'], array('elite', 'gold'))) {
+            $userTier = $gp['tier'];
+            $isPremium = true; // elite or gold = premium
+          } elseif ($isPremium) {
+            $userTier = 'elite';
+          }
         }
       } catch (Exception $e) {
         error_log("GAMEPASS_PREMIUM_CHECK: " . $e->getMessage());
@@ -250,7 +258,7 @@ try {
       $userZen = getUserZenBalance($userId);
 
       // Claims
-      $claimedDays = array('free' => array(), 'elite' => array());
+      $claimedDays = array('free' => array(), 'elite' => array(), 'gold' => array());
       try {
         $stmt = $pdo->prepare("SELECT day, tier FROM user_gamepass_claims WHERE user_id = ? AND cycle_start = ?");
         $stmt->execute(array($userId, $cycle['cycle_start']));
@@ -272,6 +280,7 @@ try {
       json_out(200, array(
         'success' => true,
         'is_premium' => $isPremium,
+        'user_tier' => $userTier,
         'current_day' => $cycle['current_day'],
         'cycle_start' => $cycle['cycle_start'],
         'days_remaining' => $cycle['days_remaining'],
@@ -306,7 +315,7 @@ try {
       $userId = (int)$user['user_id'];
 
       $day = isset($input['day']) ? (int)$input['day'] : 0;
-      $tier = (isset($input['tier']) && in_array($input['tier'], array('free', 'elite'))) ? $input['tier'] : 'free';
+      $tier = (isset($input['tier']) && in_array($input['tier'], array('free', 'elite', 'gold'))) ? $input['tier'] : 'free';
       $roleId = isset($input['roleId']) ? (int)$input['roleId'] : 0;
       $payWithZen = (isset($input['payWithZen']) && ($input['payWithZen'] === true || $input['payWithZen'] === 'true' || $input['payWithZen'] === '1'));
 
@@ -360,20 +369,31 @@ try {
         }
       }
 
-      // Elite eligibility
-      if ($tier === 'elite') {
-        $stmt = $pdo->prepare("SELECT is_premium, expires_at FROM user_gamepass WHERE user_id = ?");
+      // Tier eligibility check
+      if ($tier === 'elite' || $tier === 'gold') {
+        $stmt = $pdo->prepare("SELECT is_premium, expires_at, tier FROM user_gamepass WHERE user_id = ?");
         $stmt->execute(array($userId));
         $gp = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $isPremium = false;
+        $userTier = 'free';
         if ($gp) {
           $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
-          $isPremium = ((int)$gp['is_premium'] === 1) && ($expiresAt === null || strtotime($expiresAt) > time());
+          $isActive = ($expiresAt === null || strtotime($expiresAt) > time());
+          if (isset($gp['tier']) && in_array($gp['tier'], array('elite', 'gold')) && $isActive) {
+            $userTier = $gp['tier'];
+          } elseif ((int)$gp['is_premium'] === 1 && $isActive) {
+            $userTier = 'elite';
+          }
         }
 
-        if (!$isPremium) {
-          json_out(403, array('success' => false, 'error' => 'Elite tier requires premium Game Pass'));
+        // Tier hierarchy: gold > elite > free
+        $tierRank = array('free' => 0, 'elite' => 1, 'gold' => 2);
+        $requiredRank = isset($tierRank[$tier]) ? $tierRank[$tier] : 0;
+        $userRank = isset($tierRank[$userTier]) ? $tierRank[$userTier] : 0;
+
+        if ($userRank < $requiredRank) {
+          $tierLabel = ucfirst($tier);
+          json_out(403, array('success' => false, 'error' => "{$tierLabel} tier requires {$tierLabel} Game Pass"));
         }
       }
 

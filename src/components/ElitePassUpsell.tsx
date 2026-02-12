@@ -1,118 +1,229 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Crown, Sparkles, Gift, Zap, Star, ChevronRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Crown, Sparkles, Gift, Zap, Star, ChevronRight, Diamond, Gem } from "lucide-react";
+import { apiPost } from "@/lib/apiFetch";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
-interface ElitePassUpsellProps {
+interface PassUpsellProps {
   compact?: boolean;
-  onUpgrade?: () => void;
+  currentTier?: "free" | "elite" | "gold";
 }
 
-export const ElitePassUpsell = ({ compact = false, onUpgrade }: ElitePassUpsellProps) => {
-  const navigate = useNavigate();
+export const ElitePassUpsell = ({ compact = false, currentTier = "free" }: PassUpsellProps) => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState<string | null>(null);
 
-  const handleUpgrade = () => {
-    if (onUpgrade) {
-      onUpgrade();
-    } else {
-      navigate("/shop?category=elite-pass");
+  const handlePurchase = async (tier: "elite" | "gold") => {
+    if (!user) {
+      toast.error("Please log in first to purchase a Game Pass.");
+      return;
+    }
+    setLoading(tier);
+    try {
+      const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken") || "";
+      const data = await apiPost<any>(
+        `/gamepass_purchase.php?sessionToken=${encodeURIComponent(token)}`,
+        { tier, sessionToken: token },
+        true,
+        { showErrorToast: false }
+      );
+      if (data?.success && data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error(data?.error || "Failed to start purchase");
+      }
+    } catch (err: any) {
+      toast.error(err?.serverMessage || "Failed to start purchase. Please try again.");
+    } finally {
+      setLoading(null);
     }
   };
 
   if (compact) {
     return (
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-amber-500/20 border border-amber-500/30 p-4">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxjaXJjbGUgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iMC4wNSIgY3g9IjIwIiBjeT0iMjAiIHI9IjEiLz48L2c+PC9zdmc+')] opacity-50" />
-        
-        <div className="relative flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-500/20 rounded-lg">
-              <Crown className="h-5 w-5 text-amber-400" />
-            </div>
-            <div>
-              <p className="font-semibold text-amber-200 text-sm">Upgrade to Elite Pass</p>
-              <p className="text-xs text-amber-200/70">Unlock exclusive rewards!</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Elite compact */}
+        {currentTier === "free" && (
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-amber-500/20 border border-amber-500/30 p-4">
+            <div className="relative flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-500/20 rounded-lg">
+                  <Crown className="h-5 w-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-amber-200 text-sm">Elite Pass — €9.99</p>
+                  <p className="text-xs text-amber-200/70">Unlock elite rewards!</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => handlePurchase("elite")}
+                size="sm"
+                disabled={loading === "elite"}
+                className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-semibold gap-1"
+              >
+                {loading === "elite" ? "..." : "Buy"}
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          
-          <Button 
-            onClick={handleUpgrade}
-            size="sm"
-            className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-semibold gap-1"
-          >
-            Upgrade
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+        )}
+        {/* Gold compact */}
+        {currentTier !== "gold" && (
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-violet-500/20 via-fuchsia-500/10 to-violet-500/20 border border-violet-500/30 p-4">
+            <div className="relative flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-violet-500/20 rounded-lg">
+                  <Diamond className="h-5 w-5 text-violet-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-violet-200 text-sm">Gold Pass — €19.99</p>
+                  <p className="text-xs text-violet-200/70">Unlock ALL rewards!</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => handlePurchase("gold")}
+                size="sm"
+                disabled={loading === "gold"}
+                className="bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-semibold gap-1"
+              >
+                {loading === "gold" ? "..." : "Buy"}
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-900/40 via-yellow-900/20 to-amber-900/40 border border-amber-500/30">
-      {/* Animated particles */}
-      <div className="absolute inset-0 overflow-hidden">
-        {[...Array(6)].map((_, i) => (
-          <Sparkles
-            key={i}
-            className="absolute text-amber-400/30 animate-pulse"
-            style={{
-              top: `${20 + i * 15}%`,
-              left: `${10 + i * 15}%`,
-              animationDelay: `${i * 0.3}s`,
-              width: 12 + (i % 3) * 4,
-              height: 12 + (i % 3) * 4,
-            }}
-          />
-        ))}
-      </div>
-      
-      <div className="relative p-6">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-xl shadow-lg shadow-amber-500/30">
-            <Crown className="h-7 w-7 text-black" />
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Elite Pass Card */}
+      {currentTier === "free" && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-900/40 via-yellow-900/20 to-amber-900/40 border border-amber-500/30">
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(4)].map((_, i) => (
+              <Sparkles
+                key={i}
+                className="absolute text-amber-400/30 animate-pulse"
+                style={{
+                  top: `${20 + i * 20}%`,
+                  left: `${10 + i * 20}%`,
+                  animationDelay: `${i * 0.3}s`,
+                  width: 12 + (i % 3) * 4,
+                  height: 12 + (i % 3) * 4,
+                }}
+              />
+            ))}
           </div>
-          <div>
-            <h3 className="text-xl font-bold bg-gradient-to-r from-amber-200 to-yellow-100 bg-clip-text text-transparent">
-              Elite Pass
-            </h3>
-            <p className="text-sm text-amber-200/70">Unlock premium rewards</p>
+          <div className="relative p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-xl shadow-lg shadow-amber-500/30">
+                <Crown className="h-7 w-7 text-black" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold bg-gradient-to-r from-amber-200 to-yellow-100 bg-clip-text text-transparent">
+                  Elite Pass
+                </h3>
+                <p className="text-sm text-amber-200/70">Premium tier</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-lg">
+                <Gift className="h-4 w-4 text-amber-400" />
+                <span className="text-xs text-amber-100">2x Daily Rewards</span>
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-lg">
+                <Zap className="h-4 w-4 text-amber-400" />
+                <span className="text-xs text-amber-100">Exclusive Items</span>
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-lg">
+                <Star className="h-4 w-4 text-amber-400" />
+                <span className="text-xs text-amber-100">Legendary Gear</span>
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-lg">
+                <Sparkles className="h-4 w-4 text-amber-400" />
+                <span className="text-xs text-amber-100">Bonus Zen</span>
+              </div>
+            </div>
+            <Button
+              onClick={() => handlePurchase("elite")}
+              disabled={loading === "elite"}
+              className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-bold h-11 text-base shadow-lg shadow-amber-500/30"
+            >
+              <Crown className="h-5 w-5 mr-2" />
+              {loading === "elite" ? "Processing..." : "Buy Elite — €9.99"}
+            </Button>
+            <p className="text-center text-xs text-amber-200/50 mt-3">
+              One-time purchase • 30-day access
+            </p>
           </div>
         </div>
+      )}
 
-        {/* Benefits */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-lg">
-            <Gift className="h-4 w-4 text-amber-400" />
-            <span className="text-xs text-amber-100">2x Daily Rewards</span>
+      {/* Gold Pass Card */}
+      {currentTier !== "gold" && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-900/40 via-fuchsia-900/20 to-violet-900/40 border border-violet-500/30">
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(4)].map((_, i) => (
+              <Sparkles
+                key={i}
+                className="absolute text-violet-400/30 animate-pulse"
+                style={{
+                  top: `${20 + i * 20}%`,
+                  left: `${10 + i * 20}%`,
+                  animationDelay: `${i * 0.3}s`,
+                  width: 12 + (i % 3) * 4,
+                  height: 12 + (i % 3) * 4,
+                }}
+              />
+            ))}
           </div>
-          <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-lg">
-            <Zap className="h-4 w-4 text-amber-400" />
-            <span className="text-xs text-amber-100">Exclusive Items</span>
-          </div>
-          <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-lg">
-            <Star className="h-4 w-4 text-amber-400" />
-            <span className="text-xs text-amber-100">Legendary Gear</span>
-          </div>
-          <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-lg">
-            <Sparkles className="h-4 w-4 text-amber-400" />
-            <span className="text-xs text-amber-100">Bonus Zen</span>
+          <div className="relative p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl shadow-lg shadow-violet-500/30">
+                <Diamond className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold bg-gradient-to-r from-violet-200 to-fuchsia-100 bg-clip-text text-transparent">
+                  Gold Pass
+                </h3>
+                <p className="text-sm text-violet-200/70">Ultimate tier</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div className="flex items-center gap-2 p-2 bg-violet-500/10 rounded-lg">
+                <Gift className="h-4 w-4 text-violet-400" />
+                <span className="text-xs text-violet-100">All Elite Rewards</span>
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-violet-500/10 rounded-lg">
+                <Gem className="h-4 w-4 text-violet-400" />
+                <span className="text-xs text-violet-100">Gold-Only Items</span>
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-violet-500/10 rounded-lg">
+                <Diamond className="h-4 w-4 text-violet-400" />
+                <span className="text-xs text-violet-100">Mythic Gear</span>
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-violet-500/10 rounded-lg">
+                <Sparkles className="h-4 w-4 text-violet-400" />
+                <span className="text-xs text-violet-100">Max Zen Bonus</span>
+              </div>
+            </div>
+            <Button
+              onClick={() => handlePurchase("gold")}
+              disabled={loading === "gold"}
+              className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-bold h-11 text-base shadow-lg shadow-violet-500/30"
+            >
+              <Diamond className="h-5 w-5 mr-2" />
+              {loading === "gold" ? "Processing..." : "Buy Gold — €19.99"}
+            </Button>
+            <p className="text-center text-xs text-violet-200/50 mt-3">
+              One-time purchase • 30-day access
+            </p>
           </div>
         </div>
-
-        {/* CTA */}
-        <Button 
-          onClick={handleUpgrade}
-          className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-bold h-11 text-base shadow-lg shadow-amber-500/30"
-        >
-          <Crown className="h-5 w-5 mr-2" />
-          Upgrade Now - €9.99/month
-        </Button>
-        
-        <p className="text-center text-xs text-amber-200/50 mt-3">
-          Cancel anytime • Instant activation
-        </p>
-      </div>
+      )}
     </div>
   );
 };

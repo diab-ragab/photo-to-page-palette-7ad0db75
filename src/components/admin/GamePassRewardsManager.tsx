@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Gift, Crown, Plus, Pencil, Trash2, Save, X, Coins, Gem, Package } from "lucide-react";
+import { Gift, Crown, Plus, Pencil, Trash2, Save, X, Coins, Gem, Package, Diamond } from "lucide-react";
 import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 
 type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
@@ -17,7 +17,7 @@ type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
 export interface GamePassReward {
   id?: number;
   day: number;
-  tier: "free" | "elite";
+  tier: "free" | "elite" | "gold";
   item_id: number;
   item_name: string;
   quantity: number;
@@ -121,7 +121,7 @@ const RewardFormContent = memo(function RewardFormContent({
         </div>
         <div>
           <label className="text-sm font-medium mb-2 block">Tier</label>
-          <Select value={editData.tier} onValueChange={(v: "free" | "elite") => setEditData({ ...editData, tier: v })}>
+          <Select value={editData.tier} onValueChange={(v: "free" | "elite" | "gold") => setEditData({ ...editData, tier: v })}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -131,6 +131,9 @@ const RewardFormContent = memo(function RewardFormContent({
               </SelectItem>
               <SelectItem value="elite">
                 <span className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Elite</span>
+              </SelectItem>
+              <SelectItem value="gold">
+                <span className="flex items-center gap-2"><Diamond className="h-4 w-4 text-violet-500" /> Gold</span>
               </SelectItem>
             </SelectContent>
           </Select>
@@ -260,7 +263,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   const [editData, setEditData] = useState<Omit<GamePassReward, "id">>(defaultReward);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [filterTier, setFilterTier] = useState<"all" | "free" | "elite">("all");
+  const [filterTier, setFilterTier] = useState<"all" | "free" | "elite" | "gold">("all");
   
   // Settings state
   const [zenSkipCost, setZenSkipCost] = useState<number>(100000);
@@ -481,11 +484,11 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                 Game Pass Rewards
               </CardTitle>
               <CardDescription>
-                Configure daily rewards for Free and Elite pass tiers
+                Configure daily rewards for Free, Elite, and Gold pass tiers
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Select value={filterTier} onValueChange={(v: "all" | "free" | "elite") => setFilterTier(v)}>
+              <Select value={filterTier} onValueChange={(v: "all" | "free" | "elite" | "gold") => setFilterTier(v)}>
                 <SelectTrigger className="w-[120px]">
                   <SelectValue />
                 </SelectTrigger>
@@ -493,6 +496,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                   <SelectItem value="all">All Tiers</SelectItem>
                   <SelectItem value="free">Free Only</SelectItem>
                   <SelectItem value="elite">Elite Only</SelectItem>
+                  <SelectItem value="gold">Gold Only</SelectItem>
                 </SelectContent>
               </Select>
               <Button onClick={handleAddNew}>
@@ -528,8 +532,9 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                         <p className="font-medium text-sm">{reward.item_name}</p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>Day {reward.day}</span>
-                          <Badge variant={reward.tier === "elite" ? "default" : "secondary"} className="text-xs">
-                            {reward.tier === "elite" ? <Crown className="h-3 w-3 mr-1" /> : <Gift className="h-3 w-3 mr-1" />}
+                          <Badge variant={reward.tier === "gold" ? "default" : reward.tier === "elite" ? "default" : "secondary"} 
+                            className={`text-xs ${reward.tier === "gold" ? "bg-violet-500/80" : ""}`}>
+                            {reward.tier === "gold" ? <Diamond className="h-3 w-3 mr-1" /> : reward.tier === "elite" ? <Crown className="h-3 w-3 mr-1" /> : <Gift className="h-3 w-3 mr-1" />}
                             {reward.tier}
                           </Badge>
                         </div>
@@ -573,8 +578,9 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                   <TableRow key={reward.id}>
                     <TableCell className="font-medium">{reward.day}</TableCell>
                     <TableCell>
-                      <Badge variant={reward.tier === "elite" ? "default" : "secondary"}>
-                        {reward.tier === "elite" ? <Crown className="h-3 w-3 mr-1" /> : <Gift className="h-3 w-3 mr-1" />}
+                      <Badge variant={reward.tier === "gold" ? "default" : reward.tier === "elite" ? "default" : "secondary"}
+                        className={reward.tier === "gold" ? "bg-violet-500/80" : ""}>
+                        {reward.tier === "gold" ? <Diamond className="h-3 w-3 mr-1" /> : reward.tier === "elite" ? <Crown className="h-3 w-3 mr-1" /> : <Gift className="h-3 w-3 mr-1" />}
                         {reward.tier}
                       </Badge>
                     </TableCell>

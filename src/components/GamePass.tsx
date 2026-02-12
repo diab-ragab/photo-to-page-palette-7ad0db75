@@ -142,7 +142,7 @@ type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
 interface ApiReward {
   id: number;
   day: number;
-  tier: "free" | "elite";
+  tier: "free" | "elite" | "gold";
   item_id: number;
   item_name: string;
   quantity: number;
@@ -169,6 +169,13 @@ interface PassReward {
     icon: string;
     rarity?: Rarity;
   };
+  goldReward: {
+    type: "coins" | "vip_points" | "item";
+    name: string;
+    amount?: number;
+    icon: string;
+    rarity?: Rarity;
+  };
 }
 
 interface ZenSkipConfirm {
@@ -180,7 +187,7 @@ interface ZenSkipConfirm {
 // Convert API rewards to PassReward format
 const convertApiRewards = (apiRewards: ApiReward[]): PassReward[] => {
   const rewards: PassReward[] = [];
-  const rewardsByDay: Record<number, { free?: ApiReward; elite?: ApiReward }> = {};
+  const rewardsByDay: Record<number, { free?: ApiReward; elite?: ApiReward; gold?: ApiReward }> = {};
   
   apiRewards.forEach(reward => {
     if (!rewardsByDay[reward.day]) {
@@ -188,45 +195,33 @@ const convertApiRewards = (apiRewards: ApiReward[]): PassReward[] => {
     }
     if (reward.tier === "free") {
       rewardsByDay[reward.day].free = reward;
-    } else {
+    } else if (reward.tier === "elite") {
       rewardsByDay[reward.day].elite = reward;
+    } else if (reward.tier === "gold") {
+      rewardsByDay[reward.day].gold = reward;
     }
   });
   
+  const makeRewardDisplay = (r: ApiReward | undefined, defaultIcon: string): PassReward["freeReward"] => {
+    if (!r) return { name: "Coming Soon", icon: defaultIcon, type: "item", rarity: "common" };
+    const rewardType: "coins" | "vip_points" | "item" = r.coins > 0 ? "coins" : r.zen > 0 ? "vip_points" : "item";
+    return {
+      name: r.item_name,
+      icon: r.icon,
+      type: rewardType,
+      amount: r.coins > 0 ? r.coins : r.zen > 0 ? r.zen : undefined,
+      rarity: r.rarity,
+    };
+  };
+
   for (let day = 1; day <= 30; day++) {
     const dayRewards = rewardsByDay[day];
-    
-    const defaultFree: PassReward["freeReward"] = { name: "Coming Soon", icon: "🎁", type: "item", rarity: "common" };
-    const defaultElite: PassReward["eliteReward"] = { name: "Coming Soon", icon: "👑", type: "item", rarity: "rare" };
-    
-    let freeReward: PassReward["freeReward"] = defaultFree;
-    let eliteReward: PassReward["eliteReward"] = defaultElite;
-    
-    if (dayRewards?.free) {
-      const r = dayRewards.free;
-      const rewardType: "coins" | "vip_points" | "item" = r.coins > 0 ? "coins" : r.zen > 0 ? "vip_points" : "item";
-      freeReward = {
-        name: r.item_name,
-        icon: r.icon,
-        type: rewardType,
-        amount: r.coins > 0 ? r.coins : r.zen > 0 ? r.zen : undefined,
-        rarity: r.rarity,
-      };
-    }
-    
-    if (dayRewards?.elite) {
-      const r = dayRewards.elite;
-      const rewardType: "coins" | "vip_points" | "item" = r.coins > 0 ? "coins" : r.zen > 0 ? "vip_points" : "item";
-      eliteReward = {
-        name: r.item_name,
-        icon: r.icon,
-        type: rewardType,
-        amount: r.coins > 0 ? r.coins : r.zen > 0 ? r.zen : undefined,
-        rarity: r.rarity,
-      };
-    }
-    
-    rewards.push({ day, freeReward, eliteReward });
+    rewards.push({
+      day,
+      freeReward: makeRewardDisplay(dayRewards?.free, "🎁"),
+      eliteReward: makeRewardDisplay(dayRewards?.elite, "👑"),
+      goldReward: makeRewardDisplay(dayRewards?.gold, "💎"),
+    });
   }
   
   return rewards;
@@ -279,7 +274,7 @@ export const GamePass = () => {
   const { user, logout } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [hasElitePass, setHasElitePass] = useState(false);
-  const [claimedDays, setClaimedDays] = useState<{ free: number[]; elite: number[] }>({ free: [], elite: [] });
+  const [claimedDays, setClaimedDays] = useState<{ free: number[]; elite: number[]; gold: number[] }>({ free: [], elite: [], gold: [] });
   const [currentDay, setCurrentDay] = useState(1);
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(getSeasonResetTime());
@@ -290,7 +285,8 @@ export const GamePass = () => {
   const [userZen, setUserZen] = useState(0);
   const [zenCostPerDay, setZenCostPerDay] = useState(100000);
   const [zenSkipConfirm, setZenSkipConfirm] = useState<ZenSkipConfirm | null>(null);
-  const [claimAnimation, setClaimAnimation] = useState<{ day: number; tier: "free" | "elite" } | null>(null);
+  const [claimAnimation, setClaimAnimation] = useState<{ day: number; tier: "free" | "elite" | "gold" } | null>(null);
+  const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
 
   const handleCharacterSelect = (roleId: number | null, name: string | null) => {
     setSelectedRoleId(roleId);
@@ -344,7 +340,9 @@ export const GamePass = () => {
 
         if (data?.success) {
           setHasElitePass(!!data.is_premium);
-          setClaimedDays({ free: data.claimed_days?.free || [], elite: data.claimed_days?.elite || [] });
+          const tier = data.user_tier || (data.is_premium ? 'elite' : 'free');
+          setUserTier(tier as "free" | "elite" | "gold");
+          setClaimedDays({ free: data.claimed_days?.free || [], elite: data.claimed_days?.elite || [], gold: data.claimed_days?.gold || [] });
           if (data.current_day) setCurrentDay(data.current_day);
           if (data.user_zen !== undefined) setUserZen(data.user_zen);
           if (data.zen_cost_per_day && data.zen_cost_per_day > 0) setZenCostPerDay(data.zen_cost_per_day);
@@ -370,12 +368,12 @@ export const GamePass = () => {
     }
   }, [currentDay, rewards.length]);
 
-  const claimReward = async (day: number, isElite: boolean, payWithZen: boolean = false) => {
-    const tier = isElite ? "elite" : "free";
+  const claimReward = async (day: number, tier: "free" | "elite" | "gold", payWithZen: boolean = false) => {
     if (claimedDays[tier].includes(day)) return;
-    if (isElite && !hasElitePass) return;
+    if (tier === "elite" && userTier === "free") return;
+    if (tier === "gold" && userTier !== "gold") return;
 
-    if (!isElite && day > currentDay && !payWithZen) {
+    if (tier === "free" && day > currentDay && !payWithZen) {
       const daysAhead = day - currentDay;
       const zenCost = daysAhead * zenCostPerDay;
       const reward = rewards.find(r => r.day === day);
@@ -454,7 +452,7 @@ export const GamePass = () => {
 
   const handleConfirmZenSkip = () => {
     if (zenSkipConfirm) {
-      claimReward(zenSkipConfirm.day, false, true);
+      claimReward(zenSkipConfirm.day, "free", true);
       setZenSkipConfirm(null);
     }
   };
@@ -501,10 +499,16 @@ export const GamePass = () => {
                     <Calendar className="h-3 w-3 mr-1" />
                     {getSeasonName()}
                   </Badge>
-                  {hasElitePass && (
+                  {userTier === "elite" && (
                     <Badge className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-bold text-xs animate-pulse">
                       <Crown className="h-3 w-3 mr-1" />
                       Elite Active
+                    </Badge>
+                  )}
+                  {userTier === "gold" && (
+                    <Badge className="bg-gradient-to-r from-violet-500 via-fuchsia-400 to-violet-500 text-white font-bold text-xs animate-pulse">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Gold Active
                     </Badge>
                   )}
                 </div>
@@ -518,11 +522,18 @@ export const GamePass = () => {
                 <span className="text-muted-foreground">Free:</span>
                 <span className="font-bold text-foreground">{totalFreeClaimed}/30</span>
               </div>
-              {hasElitePass && (
+              {userTier !== "free" && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
                   <Crown className="h-4 w-4 text-amber-400" />
                   <span className="text-amber-300/70">Elite:</span>
                   <span className="font-bold text-amber-300">{totalEliteClaimed}/30</span>
+                </div>
+              )}
+              {userTier === "gold" && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30">
+                  <Sparkles className="h-4 w-4 text-violet-400" />
+                  <span className="text-violet-300/70">Gold:</span>
+                  <span className="font-bold text-violet-300">{claimedDays.gold.length}/30</span>
                 </div>
               )}
               {user && userZen > 0 && (
@@ -560,14 +571,14 @@ export const GamePass = () => {
                   Past Seasons
                 </Link>
               </Button>
-              {!hasElitePass && (
+              {userTier === "free" && (
                 <Button
                   size="sm"
                   className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-600 hover:to-amber-600 text-black font-bold shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all hover:scale-105"
-                  onClick={() => toast.info("Visit the Shop to purchase Elite Pass", { action: { label: "Go to Shop", onClick: () => window.location.href = "/shop" } })}
+                  onClick={() => toast.info("Visit the Shop to purchase Elite or Gold Pass", { action: { label: "Go to Shop", onClick: () => window.location.href = "/shop" } })}
                 >
                   <Crown className="h-4 w-4 mr-1" />
-                  Upgrade to Elite
+                  Upgrade Pass
                   <Sparkles className="h-4 w-4 ml-1" />
                 </Button>
               )}
@@ -615,10 +626,10 @@ export const GamePass = () => {
         )}
       </div>
 
-      {/* Elite Pass Upsell Banner */}
-      {!hasElitePass && (
+      {/* Pass Upsell Banner */}
+      {userTier !== "gold" && (
         <div className="mb-6">
-          <ElitePassUpsell compact />
+          <ElitePassUpsell compact currentTier={userTier} />
         </div>
       )}
 
@@ -660,10 +671,15 @@ export const GamePass = () => {
             
             const freeRarity = reward.freeReward.rarity || "common";
             const eliteRarity = reward.eliteReward.rarity || "rare";
+            const goldRarity = reward.goldReward.rarity || "legendary";
             const freeClaimed = claimedDays.free.includes(day);
             const eliteClaimed = claimedDays.elite.includes(day);
+            const goldClaimed = claimedDays.gold.includes(day);
             const freeAvailable = (isPast || isCurrentDay) && !freeClaimed;
-            const eliteAvailable = (isPast || isCurrentDay) && !eliteClaimed && hasElitePass;
+            const canClaimElite = userTier === "elite" || userTier === "gold";
+            const canClaimGold = userTier === "gold";
+            const eliteAvailable = (isPast || isCurrentDay) && !eliteClaimed && canClaimElite;
+            const goldAvailable = (isPast || isCurrentDay) && !goldClaimed && canClaimGold;
             
             // Calculate Zen cost only for future days
             const daysAhead = isFuture ? (day - currentDay) : 0;
@@ -672,6 +688,7 @@ export const GamePass = () => {
 
             const isAnimatingFree = claimAnimation?.day === day && claimAnimation?.tier === "free";
             const isAnimatingElite = claimAnimation?.day === day && claimAnimation?.tier === "elite";
+            const isAnimatingGold = claimAnimation?.day === day && claimAnimation?.tier === "gold";
 
             return (
               <motion.div
@@ -689,19 +706,74 @@ export const GamePass = () => {
 
                 {/* Reward Stack */}
                 <div className="relative space-y-2">
+                  {/* Gold Reward */}
+                  <motion.button
+                    whileHover={goldAvailable ? { scale: 1.05, y: -2 } : {}}
+                    whileTap={goldAvailable ? { scale: 0.98 } : {}}
+                    onClick={() => goldAvailable && claimReward(day, "gold")}
+                    disabled={!goldAvailable || loading}
+                    className={`
+                      relative w-full aspect-[4/5] rounded-xl border-2 overflow-hidden transition-all duration-300
+                      bg-gradient-to-br from-violet-500/30 to-fuchsia-900/10 border-violet-500/60
+                      ${goldAvailable ? "cursor-pointer hover:shadow-[0_0_25px_rgba(139,92,246,0.35)]" : ""}
+                      ${!canClaimGold ? "grayscale opacity-40" : ""}
+                      ${goldClaimed ? "opacity-60" : ""}
+                      ${isCurrentDay && canClaimGold && !goldClaimed ? "shadow-[0_0_25px_rgba(139,92,246,0.35)]" : ""}
+                    `}
+                  >
+                    <ConfettiBurst show={isAnimatingGold} onComplete={clearClaimAnimation} />
+                    <SparkleEffect show={isAnimatingGold} />
+                    <div className="absolute top-1 left-1 z-10">
+                      <div className="p-1 rounded-md bg-violet-500/90 shadow-lg">
+                        <Sparkles className="h-3 w-3 text-white" />
+                      </div>
+                    </div>
+                    {!canClaimGold && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                        <Lock className="h-6 w-6 text-muted-foreground/50" />
+                      </div>
+                    )}
+                    {goldClaimed && (
+                      <motion.div
+                        initial={isAnimatingGold ? { scale: 0 } : { scale: 1 }}
+                        animate={{ scale: 1 }}
+                        className="absolute inset-0 flex items-center justify-center bg-emerald-500/30 backdrop-blur-sm"
+                      >
+                        <motion.div
+                          initial={isAnimatingGold ? { scale: 0, rotate: -180 } : { scale: 1, rotate: 0 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: "spring", stiffness: 200 }}
+                          className="p-2 rounded-full bg-emerald-500/60 border-2 border-emerald-400"
+                        >
+                          <Check className="h-5 w-5 text-white" />
+                        </motion.div>
+                      </motion.div>
+                    )}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                      <span className="text-3xl drop-shadow-lg">{getIconDisplay(reward.goldReward.icon)}</span>
+                      <span className={`text-[10px] mt-1 text-center line-clamp-2 font-medium ${rarityStyles[goldRarity].text}`}>
+                        {reward.goldReward.name}
+                      </span>
+                    </div>
+                    {goldAvailable && !goldClaimed && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-violet-500/30 via-transparent to-transparent animate-pulse" />
+                    )}
+                  </motion.button>
+
+                  <div className="absolute left-1/2 -translate-x-1/2 w-0.5 h-2 bg-gradient-to-b from-border to-transparent" />
                   {/* Elite Reward */}
                   <motion.button
                     whileHover={eliteAvailable ? { scale: 1.05, y: -2 } : {}}
                     whileTap={eliteAvailable ? { scale: 0.98 } : {}}
-                    onClick={() => eliteAvailable && claimReward(day, true)}
+                    onClick={() => eliteAvailable && claimReward(day, "elite")}
                     disabled={!eliteAvailable || loading}
                     className={`
                       relative w-full aspect-[4/5] rounded-xl border-2 overflow-hidden transition-all duration-300
                       bg-gradient-to-br ${rarityStyles[eliteRarity].bg} ${rarityStyles[eliteRarity].border}
                       ${eliteAvailable ? `cursor-pointer hover:${rarityStyles[eliteRarity].glow}` : ""}
-                      ${!hasElitePass ? "grayscale opacity-40" : ""}
+                      ${!canClaimElite ? "grayscale opacity-40" : ""}
                       ${eliteClaimed ? "opacity-60" : ""}
-                      ${isCurrentDay && hasElitePass && !eliteClaimed ? rarityStyles[eliteRarity].glow : ""}
+                      ${isCurrentDay && canClaimElite && !eliteClaimed ? rarityStyles[eliteRarity].glow : ""}
                     `}
                   >
                     {/* Confetti Effect */}
@@ -716,7 +788,7 @@ export const GamePass = () => {
                     </div>
 
                     {/* Lock Overlay */}
-                    {!hasElitePass && (
+                    {!canClaimElite && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
                         <Lock className="h-6 w-6 text-muted-foreground/50" />
                       </div>
@@ -761,7 +833,7 @@ export const GamePass = () => {
                   <motion.button
                     whileHover={(freeAvailable || showZenSkip) ? { scale: 1.05, y: -2 } : {}}
                     whileTap={(freeAvailable || showZenSkip) ? { scale: 0.98 } : {}}
-                    onClick={() => !freeClaimed && (freeAvailable || isFuture) && claimReward(day, false)}
+                    onClick={() => !freeClaimed && (freeAvailable || isFuture) && claimReward(day, "free")}
                     disabled={loading || freeClaimed || (!freeAvailable && !isFuture)}
                     className={`
                       relative w-full aspect-[4/5] rounded-xl border-2 overflow-hidden transition-all duration-300
