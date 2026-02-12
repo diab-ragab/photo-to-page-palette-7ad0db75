@@ -87,10 +87,24 @@ $secretKey = isset($stripeCfg['secret_key']) ? $stripeCfg['secret_key'] : '';
 if ($secretKey === '') json_fail_gp(500, 'Stripe not configured');
 $currency = isset($stripeCfg['currency']) ? $stripeCfg['currency'] : 'eur';
 
-// Prices in cents
+// Prices in cents - read from DB settings, fallback to defaults
+$elitePriceCents = 999;
+$goldPriceCents = 1999;
+try {
+  $priceStmt = $pdo->prepare("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('elite_price_cents', 'gold_price_cents')");
+  $priceStmt->execute();
+  $priceRows = $priceStmt->fetchAll(PDO::FETCH_ASSOC);
+  foreach ($priceRows as $pr) {
+    if ($pr['setting_key'] === 'elite_price_cents') $elitePriceCents = (int)$pr['setting_value'];
+    if ($pr['setting_key'] === 'gold_price_cents') $goldPriceCents = (int)$pr['setting_value'];
+  }
+} catch (Exception $e) {
+  error_log("RID={$RID} GAMEPASS_PRICE_READ_ERR: " . $e->getMessage());
+}
+
 $tierPrices = array(
-  'elite' => 999,    // 9.99 EUR
-  'gold'  => 1999,   // 19.99 EUR
+  'elite' => $elitePriceCents,
+  'gold'  => $goldPriceCents,
 );
 $tierNames = array(
   'elite' => 'Elite Game Pass',

@@ -307,6 +307,10 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   // Settings state
   const [zenSkipCost, setZenSkipCost] = useState<number>(100000);
   const [zenSkipCostInput, setZenSkipCostInput] = useState<string>("100000");
+  const [elitePrice, setElitePrice] = useState<number>(999);
+  const [elitePriceInput, setElitePriceInput] = useState<string>("9.99");
+  const [goldPrice, setGoldPrice] = useState<number>(1999);
+  const [goldPriceInput, setGoldPriceInput] = useState<string>("19.99");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
@@ -324,6 +328,12 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       if (data.success && data.settings) {
         setZenSkipCost(data.settings.zen_skip_cost || 100000);
         setZenSkipCostInput(String(data.settings.zen_skip_cost || 100000));
+        const ep = data.settings.elite_price_cents || 999;
+        const gp = data.settings.gold_price_cents || 1999;
+        setElitePrice(ep);
+        setElitePriceInput((ep / 100).toFixed(2));
+        setGoldPrice(gp);
+        setGoldPriceInput((gp / 100).toFixed(2));
       }
     } catch (error) {
       console.error("Failed to fetch settings:", error);
@@ -336,6 +346,12 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       toast({ title: "Error", description: "Zen cost cannot be negative", variant: "destructive" });
       return;
     }
+    const epCents = Math.round(parseFloat(elitePriceInput) * 100) || 0;
+    const gpCents = Math.round(parseFloat(goldPriceInput) * 100) || 0;
+    if (epCents < 100 || gpCents < 100) {
+      toast({ title: "Error", description: "Prices must be at least €1.00", variant: "destructive" });
+      return;
+    }
     
     setIsSavingSettings(true);
     try {
@@ -343,11 +359,13 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: JSON.stringify({ zen_skip_cost: cost }),
+        body: JSON.stringify({ zen_skip_cost: cost, elite_price_cents: epCents, gold_price_cents: gpCents }),
       });
       const data = await response.json();
       if (data.success) {
         setZenSkipCost(cost);
+        setElitePrice(epCents);
+        setGoldPrice(gpCents);
         toast({ title: "Success", description: "Settings saved!" });
       } else {
         toast({ title: "Error", description: data.error || "Failed to save settings", variant: "destructive" });
@@ -506,13 +524,45 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Gem className="h-5 w-5 text-primary" />
-            Skip Settings
+            Game Pass Settings
           </CardTitle>
           <CardDescription>
-            Set the Zen cost for players to unlock future rewards early
+            Configure tier prices and Zen skip cost
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Tier Prices */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Elite Pass Price (€)</label>
+              <Input
+                type="number"
+                min={1}
+                step={0.01}
+                value={elitePriceInput}
+                onChange={(e) => setElitePriceInput(e.target.value)}
+                placeholder="9.99"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Current: €{(elitePrice / 100).toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Gold Pass Price (€)</label>
+              <Input
+                type="number"
+                min={1}
+                step={0.01}
+                value={goldPriceInput}
+                onChange={(e) => setGoldPriceInput(e.target.value)}
+                placeholder="19.99"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Current: €{(goldPrice / 100).toFixed(2)} · Upgrade price: €{((goldPrice - elitePrice) / 100).toFixed(2)}
+              </p>
+            </div>
+          </div>
+          {/* Zen Skip Cost */}
           <div className="flex flex-col sm:flex-row gap-3 items-end">
             <div className="flex-1">
               <label className="text-sm font-medium mb-2 block">Zen Cost Per Day (to skip)</label>
@@ -529,10 +579,10 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
             </div>
             <Button 
               onClick={handleSaveSettings} 
-              disabled={isSavingSettings || parseInt(zenSkipCostInput) === zenSkipCost}
+              disabled={isSavingSettings}
             >
               <Save className="h-4 w-4 mr-2" />
-              {isSavingSettings ? "Saving..." : "Save"}
+              {isSavingSettings ? "Saving..." : "Save All Settings"}
             </Button>
           </div>
         </CardContent>
