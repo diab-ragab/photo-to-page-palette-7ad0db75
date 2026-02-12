@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Sparkles, Gift, Zap, Star, ChevronRight, Diamond, Gem, ArrowUp, ShieldCheck, Clock } from "lucide-react";
+import { Crown, Sparkles, Gift, Zap, Star, ChevronRight, Diamond, Gem, ArrowUp, ShieldCheck, Clock, Power } from "lucide-react";
 import { apiPost } from "@/lib/apiFetch";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,11 +10,27 @@ interface PassUpsellProps {
   compact?: boolean;
   currentTier?: "free" | "elite" | "gold";
   expiresAt?: string | null;
+  elitePriceCents?: number;
+  goldPriceCents?: number;
+  gamepassEnabled?: boolean;
 }
 
-export const ElitePassUpsell = ({ compact = false, currentTier = "free", expiresAt }: PassUpsellProps) => {
+export const ElitePassUpsell = ({ compact = false, currentTier = "free", expiresAt, elitePriceCents = 999, goldPriceCents = 1999, gamepassEnabled = true }: PassUpsellProps) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
+
+  const elitePriceStr = `€${(elitePriceCents / 100).toFixed(2)}`;
+  const goldPriceStr = `€${(goldPriceCents / 100).toFixed(2)}`;
+
+  if (!gamepassEnabled) {
+    return (
+      <div className="rounded-2xl border border-border bg-muted/30 p-8 text-center">
+        <Power className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+        <h3 className="text-lg font-bold text-foreground mb-1">Game Pass is Currently Unavailable</h3>
+        <p className="text-sm text-muted-foreground">The Game Pass is temporarily disabled. Check back later!</p>
+      </div>
+    );
+  }
 
   const formatExpiry = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
@@ -86,7 +102,7 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
                 <Crown className="h-5 w-5 text-amber-400" />
               </div>
               <div>
-                <p className="font-semibold text-amber-200 text-sm">Elite Pass — €9.99</p>
+                <p className="font-semibold text-amber-200 text-sm">Elite Pass — {elitePriceStr}</p>
                 {currentTier === "elite" ? (
                   <ActiveBadge tier="Elite" />
                 ) : currentTier === "gold" ? (
@@ -118,7 +134,7 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
               </div>
               <div>
                 <p className="font-semibold text-violet-200 text-sm">
-                  Gold Pass — €19.99
+                  Gold Pass — {goldPriceStr}
                 </p>
                 {currentTier === "gold" ? (
                   <ActiveBadge tier="Gold" />
@@ -233,7 +249,7 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
               className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-bold h-11 text-base shadow-lg shadow-amber-500/30"
             >
               <Crown className="h-5 w-5 mr-2" />
-              {loading === "elite" ? "Processing..." : "Buy Elite — €9.99"}
+              {loading === "elite" ? "Processing..." : `Buy Elite — ${elitePriceStr}`}
             </Button>
           )}
           <p className="text-center text-xs text-amber-200/50 mt-3">
@@ -317,7 +333,7 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
               className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-bold h-11 text-base shadow-lg shadow-violet-500/30"
             >
               <ArrowUp className="h-5 w-5 mr-2" />
-              {loading === "gold" ? "Processing..." : "Upgrade to Gold — €19.99"}
+              {loading === "gold" ? "Processing..." : `Upgrade to Gold — ${goldPriceStr}`}
             </Button>
           ) : (
             <Button
@@ -326,7 +342,7 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
               className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-bold h-11 text-base shadow-lg shadow-violet-500/30"
             >
               <Diamond className="h-5 w-5 mr-2" />
-              {loading === "gold" ? "Processing..." : "Buy Gold — €19.99"}
+              {loading === "gold" ? "Processing..." : `Buy Gold — ${goldPriceStr}`}
             </Button>
           )}
           <p className="text-center text-xs text-violet-200/50 mt-3">

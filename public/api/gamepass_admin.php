@@ -108,10 +108,12 @@ switch ($action) {
     $zenSkipCost = (int)getGamepassSetting('zen_skip_cost', '100000');
     $elitePrice = (int)getGamepassSetting('elite_price_cents', '999');
     $goldPrice = (int)getGamepassSetting('gold_price_cents', '1999');
+    $enabled = getGamepassSetting('gamepass_enabled', '1');
     json_out(200, array('success' => true, 'settings' => array(
       'zen_skip_cost' => $zenSkipCost,
       'elite_price_cents' => $elitePrice,
-      'gold_price_cents' => $goldPrice
+      'gold_price_cents' => $goldPrice,
+      'gamepass_enabled' => ($enabled === '1' || $enabled === 1) ? true : false
     )));
     break;
 
@@ -140,6 +142,11 @@ switch ($action) {
     if ($goldPrice !== null) {
       if ($goldPrice < 100) json_fail(400, 'Gold price must be at least 100 cents');
       $upsertStmt->execute(array('gold_price_cents', (string)$goldPrice));
+    }
+
+    $gamepassEnabled = isset($input['gamepass_enabled']) ? $input['gamepass_enabled'] : null;
+    if ($gamepassEnabled !== null) {
+      $upsertStmt->execute(array('gamepass_enabled', $gamepassEnabled ? '1' : '0'));
     }
 
     json_out(200, array('success' => true));

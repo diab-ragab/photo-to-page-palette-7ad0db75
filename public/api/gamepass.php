@@ -213,12 +213,29 @@ try {
       $cycle = getCycleInfo();
       $rewards = fetchRewards();
 
+      // Fetch prices and enabled status
+      $elitePriceCents = 999;
+      $goldPriceCents = 1999;
+      $gamepassEnabled = true;
+      try {
+        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('elite_price_cents','gold_price_cents','gamepass_enabled')");
+        if ($stmtS) {
+          $settings = $stmtS->fetchAll(PDO::FETCH_KEY_PAIR);
+          if (isset($settings['elite_price_cents'])) $elitePriceCents = (int)$settings['elite_price_cents'];
+          if (isset($settings['gold_price_cents'])) $goldPriceCents = (int)$settings['gold_price_cents'];
+          if (isset($settings['gamepass_enabled'])) $gamepassEnabled = ($settings['gamepass_enabled'] === '1' || $settings['gamepass_enabled'] === 1);
+        }
+      } catch (Exception $e) {}
+
       json_out(200, array(
         'success' => true,
         'current_day' => $cycle['current_day'],
         'cycle_start' => $cycle['cycle_start'],
         'days_remaining' => $cycle['days_remaining'],
         'zen_cost_per_day' => getZenSkipCost(),
+        'elite_price_cents' => $elitePriceCents,
+        'gold_price_cents' => $goldPriceCents,
+        'gamepass_enabled' => $gamepassEnabled,
         'rewards' => formatRewards($rewards)
       ));
       break;
@@ -277,6 +294,20 @@ try {
       // Rewards
       $rewards = fetchRewards();
 
+      // Fetch prices and enabled status
+      $elitePriceCents = 999;
+      $goldPriceCents = 1999;
+      $gamepassEnabled = true;
+      try {
+        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('elite_price_cents','gold_price_cents','gamepass_enabled')");
+        if ($stmtS) {
+          $settings = $stmtS->fetchAll(PDO::FETCH_KEY_PAIR);
+          if (isset($settings['elite_price_cents'])) $elitePriceCents = (int)$settings['elite_price_cents'];
+          if (isset($settings['gold_price_cents'])) $goldPriceCents = (int)$settings['gold_price_cents'];
+          if (isset($settings['gamepass_enabled'])) $gamepassEnabled = ($settings['gamepass_enabled'] === '1' || $settings['gamepass_enabled'] === 1);
+        }
+      } catch (Exception $e) {}
+
       json_out(200, array(
         'success' => true,
         'is_premium' => $isPremium,
@@ -287,6 +318,9 @@ try {
         'claimed_days' => $claimedDays,
         'user_zen' => $userZen,
         'zen_cost_per_day' => getZenSkipCost(),
+        'elite_price_cents' => $elitePriceCents,
+        'gold_price_cents' => $goldPriceCents,
+        'gamepass_enabled' => $gamepassEnabled,
         'rewards' => formatRewards($rewards),
         'expires_at' => isset($expiresAt) ? $expiresAt : null
       ));

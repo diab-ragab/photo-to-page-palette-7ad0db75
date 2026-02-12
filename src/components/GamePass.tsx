@@ -288,6 +288,9 @@ export const GamePass = () => {
   const [claimAnimation, setClaimAnimation] = useState<{ day: number; tier: "free" | "elite" | "gold" } | null>(null);
   const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
   const [passExpiresAt, setPassExpiresAt] = useState<string | null>(null);
+  const [elitePriceCents, setElitePriceCents] = useState(999);
+  const [goldPriceCents, setGoldPriceCents] = useState(1999);
+  const [gamepassEnabled, setGamepassEnabled] = useState(true);
 
   const handleCharacterSelect = (roleId: number | null, name: string | null) => {
     setSelectedRoleId(roleId);
@@ -314,6 +317,9 @@ export const GamePass = () => {
         if (data?.success && Array.isArray(data.rewards) && data.rewards.length > 0) {
           setRewards(convertApiRewards(data.rewards));
           if (data.current_day) setCurrentDay(data.current_day);
+          if (data.elite_price_cents) setElitePriceCents(data.elite_price_cents);
+          if (data.gold_price_cents) setGoldPriceCents(data.gold_price_cents);
+          if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
         }
       } catch {
         // silent (landing page should still render)
@@ -349,6 +355,9 @@ export const GamePass = () => {
           if (data.user_zen !== undefined) setUserZen(data.user_zen);
           if (data.zen_cost_per_day && data.zen_cost_per_day > 0) setZenCostPerDay(data.zen_cost_per_day);
           if (Array.isArray(data.rewards) && data.rewards.length > 0) setRewards(convertApiRewards(data.rewards));
+          if (data.elite_price_cents) setElitePriceCents(data.elite_price_cents);
+          if (data.gold_price_cents) setGoldPriceCents(data.gold_price_cents);
+          if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
         }
       } catch (err) {
         const status = (err as FetchJsonError)?.status;
@@ -472,6 +481,20 @@ export const GamePass = () => {
   const progressPercent = (currentDay / 30) * 100;
   const totalFreeClaimed = claimedDays.free.length;
   const totalEliteClaimed = claimedDays.elite.length;
+
+  if (!gamepassEnabled && !isLoadingRewards) {
+    return (
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-muted/30 p-12 text-center">
+        <div className="flex flex-col items-center gap-3">
+          <Trophy className="h-12 w-12 text-muted-foreground" />
+          <h2 className="text-xl font-bold text-foreground">Game Pass is Currently Unavailable</h2>
+          <p className="text-sm text-muted-foreground max-w-md">
+            The Game Pass is temporarily disabled. Check back later for updates!
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-background via-card to-background">
@@ -631,7 +654,7 @@ export const GamePass = () => {
       {/* Pass Upsell Banner */}
       {userTier !== "gold" && (
         <div className="mb-6">
-          <ElitePassUpsell compact currentTier={userTier} expiresAt={passExpiresAt} />
+          <ElitePassUpsell compact currentTier={userTier} expiresAt={passExpiresAt} elitePriceCents={elitePriceCents} goldPriceCents={goldPriceCents} gamepassEnabled={gamepassEnabled} />
         </div>
       )}
 
