@@ -727,17 +727,17 @@ if ($method === 'POST' && $action === 'admin_segments') {
 
         $rewards = array(
             // COMMON: Coins (~40%)
-            array('10 Coins',     'coins',      10,   6.00, '#4ade80', 'coins',  1),
-            array('25 Coins',     'coins',      25,   6.00, '#22c55e', 'coins',  2),
-            array('50 Coins',     'coins',      50,   5.50, '#16a34a', 'coins',  3),
-            array('75 Coins',     'coins',      75,   4.50, '#15803d', 'coins',  4),
-            array('100 Coins',    'coins',     100,   4.00, '#3b82f6', 'coins',  5),
-            array('150 Coins',    'coins',     150,   3.50, '#2563eb', 'coins',  6),
-            array('200 Coins',    'coins',     200,   3.00, '#1d4ed8', 'coins',  7),
-            array('300 Coins',    'coins',     300,   2.50, '#6366f1', 'coins',  8),
-            array('500 Coins',    'coins',     500,   2.00, '#8b5cf6', 'coins',  9),
-            array('750 Coins',    'coins',     750,   1.50, '#7c3aed', 'coins', 10),
-            array('1000 Coins',   'coins',    1000,   1.00, '#a855f7', 'coins', 11),
+            array('1M Coins',      'coins',    1000000,   6.00, '#4ade80', 'coins',  1),
+            array('2M Coins',      'coins',    2000000,   6.00, '#22c55e', 'coins',  2),
+            array('3M Coins',      'coins',    3000000,   5.50, '#16a34a', 'coins',  3),
+            array('5M Coins',      'coins',    5000000,   4.50, '#15803d', 'coins',  4),
+            array('7M Coins',      'coins',    7000000,   4.00, '#3b82f6', 'coins',  5),
+            array('10M Coins',     'coins',   10000000,   3.50, '#2563eb', 'coins',  6),
+            array('15M Coins',     'coins',   15000000,   3.00, '#1d4ed8', 'coins',  7),
+            array('20M Coins',     'coins',   20000000,   2.50, '#6366f1', 'coins',  8),
+            array('30M Coins',     'coins',   30000000,   2.00, '#8b5cf6', 'coins',  9),
+            array('50M Coins',     'coins',   50000000,   1.50, '#7c3aed', 'coins', 10),
+            array('100M Coins',    'coins',  100000000,   1.00, '#a855f7', 'coins', 11),
             // UNCOMMON: VIP (~15%)
             array('5 VIP',        'vip',         5,   3.50, '#f472b6', 'crown', 12),
             array('10 VIP',       'vip',        10,   3.00, '#ec4899', 'crown', 13),

@@ -11,17 +11,17 @@ ALTER TABLE spin_wheel_segments AUTO_INCREMENT = 1;
 
 -- ===== COMMON: Coins (11 segments, ~40% probability) =====
 INSERT INTO spin_wheel_segments (label, reward_type, reward_value, probability, color, icon, sort_order, is_active, created_at) VALUES
-('10 Coins',    'coins',      10,   6.00, '#4ade80', 'coins',  1, 1, NOW()),
-('25 Coins',    'coins',      25,   6.00, '#22c55e', 'coins',  2, 1, NOW()),
-('50 Coins',    'coins',      50,   5.50, '#16a34a', 'coins',  3, 1, NOW()),
-('75 Coins',    'coins',      75,   4.50, '#15803d', 'coins',  4, 1, NOW()),
-('100 Coins',   'coins',     100,   4.00, '#3b82f6', 'coins',  5, 1, NOW()),
-('150 Coins',   'coins',     150,   3.50, '#2563eb', 'coins',  6, 1, NOW()),
-('200 Coins',   'coins',     200,   3.00, '#1d4ed8', 'coins',  7, 1, NOW()),
-('300 Coins',   'coins',     300,   2.50, '#6366f1', 'coins',  8, 1, NOW()),
-('500 Coins',   'coins',     500,   2.00, '#8b5cf6', 'coins',  9, 1, NOW()),
-('750 Coins',   'coins',     750,   1.50, '#7c3aed', 'coins', 10, 1, NOW()),
-('1000 Coins',  'coins',    1000,   1.00, '#a855f7', 'coins', 11, 1, NOW());
+('1M Coins',     'coins',    1000000,   6.00, '#4ade80', 'coins',  1, 1, NOW()),
+('2M Coins',     'coins',    2000000,   6.00, '#22c55e', 'coins',  2, 1, NOW()),
+('3M Coins',     'coins',    3000000,   5.50, '#16a34a', 'coins',  3, 1, NOW()),
+('5M Coins',     'coins',    5000000,   4.50, '#15803d', 'coins',  4, 1, NOW()),
+('7M Coins',     'coins',    7000000,   4.00, '#3b82f6', 'coins',  5, 1, NOW()),
+('10M Coins',    'coins',   10000000,   3.50, '#2563eb', 'coins',  6, 1, NOW()),
+('15M Coins',    'coins',   15000000,   3.00, '#1d4ed8', 'coins',  7, 1, NOW()),
+('20M Coins',    'coins',   20000000,   2.50, '#6366f1', 'coins',  8, 1, NOW()),
+('30M Coins',    'coins',   30000000,   2.00, '#8b5cf6', 'coins',  9, 1, NOW()),
+('50M Coins',    'coins',   50000000,   1.50, '#7c3aed', 'coins', 10, 1, NOW()),
+('100M Coins',   'coins',  100000000,   1.00, '#a855f7', 'coins', 11, 1, NOW());
 
 -- ===== UNCOMMON: VIP Points (8 segments, ~15% probability) =====
 INSERT INTO spin_wheel_segments (label, reward_type, reward_value, probability, color, icon, sort_order, is_active, created_at) VALUES
