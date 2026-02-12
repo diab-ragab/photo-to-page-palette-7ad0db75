@@ -30,15 +30,17 @@ function json_fail($code, $msg) {
   json_out($code, array('success' => false, 'error' => $msg, 'rid' => $RID));
 }
 
-set_exception_handler(function($e) {
+function _gpa_exception_handler($e) {
   error_log("GAMEPASS_ADMIN EX: " . $e->getMessage());
   json_fail(500, "Server error");
-});
+}
+set_exception_handler('_gpa_exception_handler');
 
-set_error_handler(function($severity, $message, $file, $line) {
+function _gpa_error_handler($severity, $message, $file, $line) {
   error_log("GAMEPASS_ADMIN ERR: $message in $file:$line");
   throw new ErrorException($message, 0, $severity, $file, $line);
-});
+}
+set_error_handler('_gpa_error_handler');
 
 $pdo = getDB();
 $action = isset($_GET['action']) ? $_GET['action'] : (isset($_POST['action']) ? $_POST['action'] : '');
@@ -101,28 +103,43 @@ switch ($action) {
     break;
 
   case 'get_settings':
-    // Use unified helper
     requireAdmin();
     
     $zenSkipCost = (int)getGamepassSetting('zen_skip_cost', '100000');
-    json_out(200, array('success' => true, 'settings' => array('zen_skip_cost' => $zenSkipCost)));
+    $elitePrice = (int)getGamepassSetting('elite_price_cents', '999');
+    $goldPrice = (int)getGamepassSetting('gold_price_cents', '1999');
+    json_out(200, array('success' => true, 'settings' => array(
+      'zen_skip_cost' => $zenSkipCost,
+      'elite_price_cents' => $elitePrice,
+      'gold_price_cents' => $goldPrice
+    )));
     break;
 
   case 'update_settings':
     requireAdmin();
     
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = getJsonInput();
     $zenSkipCost = isset($input['zen_skip_cost']) ? (int)$input['zen_skip_cost'] : null;
+    $elitePrice = isset($input['elite_price_cents']) ? (int)$input['elite_price_cents'] : null;
+    $goldPrice = isset($input['gold_price_cents']) ? (int)$input['gold_price_cents'] : null;
+
+    $upsertStmt = $pdo->prepare("
+      INSERT INTO gamepass_settings (setting_key, setting_value, updated_at)
+      VALUES (?, ?, NOW())
+      ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()
+    ");
 
     if ($zenSkipCost !== null) {
       if ($zenSkipCost < 0) json_fail(400, 'Zen cost cannot be negative');
-
-      $stmt = $pdo->prepare("
-        INSERT INTO gamepass_settings (setting_key, setting_value, updated_at)
-        VALUES ('zen_skip_cost', ?, NOW())
-        ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()
-      ");
-      $stmt->execute(array((string)$zenSkipCost));
+      $upsertStmt->execute(array('zen_skip_cost', (string)$zenSkipCost));
+    }
+    if ($elitePrice !== null) {
+      if ($elitePrice < 100) json_fail(400, 'Elite price must be at least 100 cents');
+      $upsertStmt->execute(array('elite_price_cents', (string)$elitePrice));
+    }
+    if ($goldPrice !== null) {
+      if ($goldPrice < 100) json_fail(400, 'Gold price must be at least 100 cents');
+      $upsertStmt->execute(array('gold_price_cents', (string)$goldPrice));
     }
 
     json_out(200, array('success' => true));
@@ -131,7 +148,7 @@ switch ($action) {
   case 'add_reward':
     requireAdmin();
     
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = getJsonInput();
 
     $day = isset($input['day']) ? (int)$input['day'] : 1;
     $tierInput = isset($input['tier']) ? $input['tier'] : '';
@@ -171,7 +188,7 @@ switch ($action) {
   case 'update_reward':
     requireAdmin();
     
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = getJsonInput();
     $id = isset($input['id']) ? (int)$input['id'] : 0;
     if (!$id) json_fail(400, 'ID is required');
 
@@ -213,7 +230,7 @@ switch ($action) {
   case 'delete_reward':
     requireAdmin();
     
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = getJsonInput();
     $id = isset($input['id']) ? (int)$input['id'] : 0;
     if (!$id) json_fail(400, 'ID is required');
 
@@ -226,7 +243,7 @@ switch ($action) {
   case 'seed_rewards':
     requireAdmin();
 
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = getJsonInput();
     $tierInput = isset($input['tier']) ? $input['tier'] : '';
     if (!in_array($tierInput, array('elite', 'gold'))) {
       json_fail(400, 'Tier must be elite or gold');
