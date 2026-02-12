@@ -478,6 +478,21 @@ export function LuckyWheel() {
               </div>
             )}
 
+            {/* Spins indicator */}
+            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-muted/50 border border-border">
+              <div className="flex items-center gap-1.5 text-sm">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                <span className="text-muted-foreground">Free:</span>
+                <span className="font-bold text-foreground">{status.spins_remaining}</span>
+              </div>
+              <div className="w-px h-5 bg-border" />
+              <div className="flex items-center gap-1.5 text-sm">
+                <Zap className="h-4 w-4 text-primary" />
+                <span className="text-muted-foreground">Bonus:</span>
+                <span className="font-bold text-primary">{status.bonus_spins ?? 0}</span>
+              </div>
+            </div>
+
             {status.can_spin ? (
               <Button
                 size="lg"
@@ -489,42 +504,41 @@ export function LuckyWheel() {
                 {spinning ? 'Spinning...' : !selectedRoleId ? 'Select Character' : 'Spin Now!'}
               </Button>
             ) : (
-              <div className="text-center space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">Next free spin in:</p>
-                  <div className="flex items-center gap-2 justify-center text-lg font-mono font-bold text-primary">
-                    <Clock className="h-5 w-5" />
-                    {countdown || 'Loading...'}
-                  </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-2">Next free spin in:</p>
+                <div className="flex items-center gap-2 justify-center text-lg font-mono font-bold text-primary">
+                  <Clock className="h-5 w-5" />
+                  {countdown || 'Loading...'}
                 </div>
-                {/* Buy extra spins with Zen */}
-                {(status.zen_per_spin ?? 0) > 0 && (
-                  <div className="pt-2 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground mb-2">Or buy extra spins with Zen</p>
-                    <div className="flex items-center gap-2 justify-center">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleBuySpins(1)}
-                        disabled={buyingSpins}
-                        className="gap-1 border-primary/30 hover:bg-primary/10"
-                      >
-                        <Zap className="h-3.5 w-3.5 text-primary" />
-                        {buyingSpins ? '...' : `1 Spin · ${((status.zen_per_spin ?? 50000) / 1000).toFixed(0)}k Zen`}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleBuySpins(3)}
-                        disabled={buyingSpins}
-                        className="gap-1 border-primary/30 hover:bg-primary/10"
-                      >
-                        <Zap className="h-3.5 w-3.5 text-primary" />
-                        {buyingSpins ? '...' : `3 Spins · ${((status.zen_per_spin ?? 50000) * 3 / 1000).toFixed(0)}k`}
-                      </Button>
-                    </div>
-                  </div>
-                )}
+              </div>
+            )}
+
+            {/* Always-visible Buy More spins */}
+            {(status.zen_per_spin ?? 0) > 0 && (
+              <div className="w-full max-w-sm border border-primary/20 rounded-xl p-3 bg-primary/5 text-center space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Buy Extra Spins with Zen</p>
+                <div className="flex items-center gap-2 justify-center">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleBuySpins(1)}
+                    disabled={buyingSpins}
+                    className="gap-1 border-primary/30 hover:bg-primary/10"
+                  >
+                    <Zap className="h-3.5 w-3.5 text-primary" />
+                    {buyingSpins ? '...' : `1 Spin · ${((status.zen_per_spin ?? 50000) / 1000).toFixed(0)}k Zen`}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleBuySpins(3)}
+                    disabled={buyingSpins}
+                    className="gap-1 border-primary/30 hover:bg-primary/10"
+                  >
+                    <Zap className="h-3.5 w-3.5 text-primary" />
+                    {buyingSpins ? '...' : `3 Spins · ${((status.zen_per_spin ?? 50000) * 3 / 1000).toFixed(0)}k`}
+                  </Button>
+                </div>
               </div>
             )}
 
