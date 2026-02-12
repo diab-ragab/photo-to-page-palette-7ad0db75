@@ -371,7 +371,16 @@ function applyViolation($pdo, $user, $deviceHash, $ip, $reason, $evidence) {
 
   logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'punishment', $reason);
 
-  discordPostTo(DISCORD_SECURITY_WEBHOOK_URL, '[DAILY ZEN] BAN / WARNING', array(
+  // Public ban channel (simple info)
+  discordPostTo(DISCORD_PUBLIC_BANS_WEBHOOK_URL, '🚫 [DAILY ZEN] BAN', array(
+    "User: **" . $user['username'] . "**",
+    "Strike: **" . $strike . "**",
+    $perm ? "Action: **PERMANENT Free-Zen BAN**" : "Action: **" . $banDays . " days Free-Zen BAN**",
+    "Reason: `" . $reason . "`"
+  ));
+
+  // Admin ban channel (full details + evidence)
+  discordPostTo(DISCORD_ADMIN_BANS_WEBHOOK_URL, '🚫 [DAILY ZEN] BAN / WARNING', array(
     "User: **" . $user['username'] . "** (account_id: " . $user['account_id'] . ")",
     "Strike: **" . $strike . "**",
     $perm ? "Action: **PERMANENT Free-Zen BAN**" : "Action: **" . $banDays . " days Free-Zen BAN**",
@@ -642,10 +651,16 @@ try {
 
     logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'successful_claim', 'reward:'.DAILY_ZEN_REWARD);
 
-    // Discord claim report
-    discordPostTo(DISCORD_CLAIMS_WEBHOOK_URL, '[DAILY ZEN] CLAIM', array(
+    // Public claims channel (account + reward only)
+    discordPostTo(DISCORD_PUBLIC_CLAIMS_WEBHOOK_URL, '✅ [DAILY ZEN] CLAIM', array(
+      "User: **" . $user['username'] . "**",
+      "Reward: **" . number_format(DAILY_ZEN_REWARD) . "** Zen"
+    ));
+
+    // Admin claims channel (full details)
+    discordPostTo(DISCORD_ADMIN_CLAIMS_WEBHOOK_URL, '✅ [DAILY ZEN] CLAIM', array(
       "User: **" . $user['username'] . "** (account_id: " . $user['account_id'] . ")",
-      "Reward: **" . DAILY_ZEN_REWARD . "** Zen",
+      "Reward: **" . number_format(DAILY_ZEN_REWARD) . "** Zen",
       "IP: `" . $ip . "`",
       "Subnet: `" . $subnet . "`",
       "Device: `" . substr($deviceHash, 0, 10) . "...`",
