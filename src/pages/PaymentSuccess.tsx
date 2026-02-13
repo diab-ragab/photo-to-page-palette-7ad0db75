@@ -27,11 +27,6 @@ const PaymentSuccess = () => {
     const paypalToken = searchParams.get('token'); // PayPal sends ?token=ORDER_ID
     const paypalPayerId = searchParams.get('PayerID');
 
-    // Legacy Stripe params (kept for backward compatibility)
-    const sessionId = searchParams.get('session_id');
-    const paymentIntent = searchParams.get('payment_intent');
-    const redirectStatus = searchParams.get('redirect_status');
-
     if (confirmed) return;
 
     // PayPal flow: capture the order
@@ -66,8 +61,8 @@ const PaymentSuccess = () => {
           setIsConfirming(false);
         });
     } 
-    // Legacy Stripe flow
-    else if (sessionId || (paymentIntent && redirectStatus === 'succeeded')) {
+    // Fallback: if paypalToken exists without explicit flag
+    else if (paypalToken) {
       setIsConfirming(true);
       
       fetch(`${API_BASE}/paypal_capture.php`, {
@@ -75,8 +70,8 @@ const PaymentSuccess = () => {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ 
-          sessionId: sessionId,
-          paymentIntentId: paymentIntent 
+          paypalOrderId: paypalToken,
+          payerId: paypalPayerId,
         }),
       })
         .then(res => res.json())

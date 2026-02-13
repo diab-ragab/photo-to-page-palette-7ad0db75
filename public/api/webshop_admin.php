@@ -5,7 +5,7 @@
  * PHP 5.x compatible - Uses centralized session_helper.php
  * 
  * Products: id, name, item_id, item_quantity, price_real
- * Orders: id, user_id, product_id, quantity, total_real, status, stripe_*, delivered_at, created_at, updated_at
+ * Orders: id, user_id, product_id, quantity, total_real, status, paypal_*, delivered_at, created_at, updated_at
  */
 
 // ---------- Bootstrap (CORS, DB, helpers) ----------
@@ -64,14 +64,14 @@ function ensureTables() {
         quantity INT NOT NULL DEFAULT 1,
         total_real DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         status ENUM('pending','completed','failed','refunded') NOT NULL DEFAULT 'pending',
-        stripe_session_id VARCHAR(255) DEFAULT NULL,
-        stripe_payment_intent VARCHAR(255) DEFAULT NULL,
+        paypal_order_id VARCHAR(255) DEFAULT NULL,
+        paypal_capture_id VARCHAR(255) DEFAULT NULL,
         delivered_at DATETIME DEFAULT NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME DEFAULT NULL,
         INDEX idx_user_id (user_id),
         INDEX idx_status (status),
-        INDEX idx_session (stripe_session_id),
+        INDEX idx_paypal (paypal_order_id),
         INDEX idx_created_at (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 

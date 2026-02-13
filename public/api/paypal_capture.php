@@ -260,7 +260,7 @@ function handleBundleCapture($pdo, $bundleOrderId, $paypalOrderId, $captureId, $
     $stmt->execute(array($captureId, $bundleOrderId));
 
     if ($stmt->rowCount() > 0) {
-      // Fulfill bundle (same as stripe_webhook bundle handling)
+      // Fulfill bundle items via mail delivery
       require_once __DIR__ . '/mail_delivery.php';
       
       $stmt = $pdo->prepare("SELECT * FROM bundle_orders WHERE id = ?");
