@@ -4,9 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Gem, Coins, Check, Crown, Sparkles, Loader2 } from "lucide-react";
 import { SkeletonGrid, ApiEmptyState, ApiErrorState } from "@/components/ui/api-loading-state";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { hapticSuccess } from "@/hooks/useHapticFeedback";
 import { fetchActivePackages, TopUpPackage } from "@/lib/currencyTopupApi";
+import { CharacterSelector } from "@/components/shop/CharacterSelector";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiPost } from "@/lib/apiFetch";
 
 type CurrencyType = "zen" | "coins";
 
@@ -94,7 +97,10 @@ export const CurrencyTopUp = () => {
   const [packages, setPackages] = useState<TopUpPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const { toast } = useToast();
+  const [purchasing, setPurchasing] = useState(false);
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
+  const { isLoggedIn } = useAuth();
 
   // Fetch packages from database
   const loadPackages = async () => {
@@ -119,24 +125,57 @@ export const CurrencyTopUp = () => {
   // Filter packages by currency type
   const filteredPackages = packages.filter(pkg => pkg.currency_type === currencyType);
 
-  const handlePurchase = () => {
+  const handleCharacterSelect = (roleId: number | null, characterName: string | null) => {
+    setSelectedRoleId(roleId);
+    setSelectedCharacterName(characterName);
+  };
+
+  const handlePurchase = async () => {
+    if (!isLoggedIn) {
+      toast.error("Please login to purchase currency");
+      return;
+    }
+
     if (!selectedPackage) {
-      toast({
-        title: "Select a package",
-        description: "Please select a package to continue.",
-        variant: "destructive",
-      });
+      toast.error("Please select a package");
+      return;
+    }
+
+    if (!selectedRoleId) {
+      toast.error("Please select a character to receive the currency");
       return;
     }
 
     const pkg = filteredPackages.find(p => p.id === selectedPackage);
     if (!pkg) return;
 
-    hapticSuccess();
-    toast({
-      title: "Redirecting to checkout... 💳",
-      description: `${formatNumber(pkg.amount + pkg.bonus_amount)} ${currencyType === "zen" ? "Zen" : "Coins"} for €${pkg.price.toFixed(2)}`,
-    });
+    setPurchasing(true);
+
+    try {
+      const data = await apiPost<any>(
+        `/currency_topup.php?action=purchase`,
+        {
+          package_id: pkg.id,
+          character_id: selectedRoleId,
+          character_name: selectedCharacterName,
+        },
+        true,
+        { showErrorToast: false, retries: 1 }
+      );
+
+      if (data.success && data.url) {
+        hapticSuccess();
+        toast.success("Redirecting to PayPal...");
+        window.location.href = data.url;
+      } else {
+        toast.error(data.message || "Failed to initialize payment");
+      }
+    } catch (err: any) {
+      console.error("Top-up purchase error:", err);
+      toast.error(err?.serverMessage || err?.message || "Failed to connect to payment service");
+    } finally {
+      setPurchasing(false);
+    }
   };
 
   // Reset selection when switching currency type
@@ -155,7 +194,7 @@ export const CurrencyTopUp = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold">Top Up Currency</h2>
-            <p className="text-sm text-muted-foreground">Instant delivery to your account</p>
+            <p className="text-sm text-muted-foreground">Instant delivery to your character</p>
           </div>
         </div>
 
@@ -211,30 +250,43 @@ export const CurrencyTopUp = () => {
         </div>
       )}
 
-      {/* Purchase Button */}
+      {/* Character selector & Purchase */}
       {filteredPackages.length > 0 && (
-        <div className="flex justify-center">
+        <div className="max-w-md mx-auto space-y-4">
+          <CharacterSelector
+            onSelect={handleCharacterSelect}
+            selectedRoleId={selectedRoleId}
+          />
+
           <Button 
             onClick={handlePurchase}
-            disabled={!selectedPackage || loading}
+            disabled={!selectedPackage || !selectedRoleId || loading || purchasing}
             size="lg"
-            className="px-8 gap-2"
+            className="w-full gap-2"
           >
-            {loading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+            {purchasing ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Redirecting to PayPal...
+              </>
             ) : currencyType === "zen" ? (
-              <Gem className="h-5 w-5" />
+              <>
+                <Gem className="h-5 w-5" />
+                Purchase Zen via PayPal
+              </>
             ) : (
-              <Coins className="h-5 w-5" />
+              <>
+                <Coins className="h-5 w-5" />
+                Purchase Coins via PayPal
+              </>
             )}
-            Purchase {currencyType === "zen" ? "Zen" : "Coins"}
           </Button>
         </div>
       )}
 
       {/* Info */}
       <p className="text-center text-xs text-muted-foreground">
-        All purchases are instant. Currency is added directly to your account.
+        All purchases are delivered via in-game mail to your selected character.
       </p>
     </div>
   );
