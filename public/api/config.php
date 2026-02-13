@@ -33,7 +33,7 @@ $APP_CONFIG = array(
   ),
 
   'paypal' => array(
-    'client_id'   => 'YOUR_PAYPAL_CLIENT_ID',
+    'client_id'   => 'AWEFJy_edKvt3xKcWnEgeB-lQBtz2VqYGb9eSWnDJB1f7cSyBeZ8R2xoyHF5r_vrnYOxkfkHHrm6EzHs',
     'secret'      => 'YOUR_PAYPAL_SECRET',
     'sandbox'     => false,
     'webhook_id'  => 'YOUR_PAYPAL_WEBHOOK_ID',
