@@ -5,13 +5,16 @@ import { useCart } from "@/contexts/CartContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
-import { ShieldCheck, Lock, ChevronLeft, AlertCircle, Loader2 } from "lucide-react";
+import { ShieldCheck, Lock, ChevronLeft, AlertCircle, Loader2, Gift } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import { SEO } from "@/components/SEO";
 import { CharacterSelector } from "@/components/shop/CharacterSelector";
 import { apiPost, FetchJsonError } from "@/lib/apiFetch";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();
@@ -22,6 +25,8 @@ const Checkout = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
+  const [isGift, setIsGift] = useState(false);
+  const [giftCharacterName, setGiftCharacterName] = useState("");
 
   const handleCharacterSelect = (roleId: number | null, characterName: string | null) => {
     setSelectedRoleId(roleId);
@@ -39,10 +44,18 @@ const Checkout = () => {
       return;
     }
 
-    if (!selectedRoleId) {
-      toast.error("Please select a character to receive the items");
-      setError("Please select a character");
-      return;
+    if (isGift) {
+      if (!giftCharacterName.trim()) {
+        toast.error("Please enter the recipient's character name");
+        setError("Please enter a character name to gift to");
+        return;
+      }
+    } else {
+      if (!selectedRoleId) {
+        toast.error("Please select a character to receive the items");
+        setError("Please select a character");
+        return;
+      }
     }
 
     setIsProcessing(true);
@@ -62,8 +75,10 @@ const Checkout = () => {
         `/paypal_checkout.php?sessionToken=${encodeURIComponent(token)}`,
         { 
           items: cartItems,
-          character_id: selectedRoleId,
-          character_name: selectedCharacterName,
+          character_id: isGift ? 0 : selectedRoleId,
+          character_name: isGift ? "" : selectedCharacterName,
+          is_gift: isGift,
+          gift_character_name: isGift ? giftCharacterName.trim() : "",
           sessionToken: token,
         },
         true,
@@ -148,12 +163,42 @@ const Checkout = () => {
                 </div>
               </div>
 
-              {/* Character Selection */}
+              {/* Gift Toggle */}
               <div className="border-t border-border pt-4">
-                <CharacterSelector 
-                  onSelect={handleCharacterSelect}
-                  selectedRoleId={selectedRoleId}
-                />
+                <div className="flex items-center justify-between mb-4">
+                  <Label htmlFor="gift-toggle" className="flex items-center gap-2 cursor-pointer">
+                    <Gift className="w-4 h-4 text-primary" />
+                    <span className="font-medium">Send as Gift</span>
+                  </Label>
+                  <Switch
+                    id="gift-toggle"
+                    checked={isGift}
+                    onCheckedChange={setIsGift}
+                  />
+                </div>
+
+                {isGift ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="gift-name" className="text-sm text-muted-foreground">
+                      Recipient's Character Name
+                    </Label>
+                    <Input
+                      id="gift-name"
+                      placeholder="Enter character name..."
+                      value={giftCharacterName}
+                      onChange={(e) => setGiftCharacterName(e.target.value)}
+                      maxLength={50}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Items will be delivered to this character's in-game mailbox
+                    </p>
+                  </div>
+                ) : (
+                  <CharacterSelector 
+                    onSelect={handleCharacterSelect}
+                    selectedRoleId={selectedRoleId}
+                  />
+                )}
               </div>
 
               {error && (
