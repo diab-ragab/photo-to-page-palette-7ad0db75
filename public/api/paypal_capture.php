@@ -164,6 +164,15 @@ if ($purchaseType === 'bundle') {
   json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'order_id' => $bundleOrderId, 'message' => 'Bundle purchased!'));
 }
 
+// Handle currency top-up purchases
+if ($purchaseType === 'topup') {
+  $pkgId = isset($metadata['pkg_id']) ? (int)$metadata['pkg_id'] : 0;
+  $charId = isset($metadata['char_id']) ? (int)$metadata['char_id'] : 0;
+  $charName = isset($metadata['char_name']) ? $metadata['char_name'] : '';
+  handleTopUpCapture($pdo, $userId, $pkgId, $charId, $charName, $paypalOrderId, $captureId, $RID);
+  json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'message' => 'Currency delivered!'));
+}
+
 // Regular webshop order fulfillment
 $ordersToProcess = array();
 $stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE paypal_order_id = ? AND status = 'pending'");
@@ -351,4 +360,63 @@ function fulfillOrderPP($pdo, $userId, $productId, $quantity, $orderId, $charact
   }
 
   return $result['success'];
+}
+
+function handleTopUpCapture($pdo, $userId, $pkgId, $charId, $charName, $paypalOrderId, $captureId, $RID) {
+  if ($userId <= 0 || $pkgId <= 0 || $charId <= 0) {
+    error_log("RID={$RID} TOPUP_CAPTURE_INVALID user={$userId} pkg={$pkgId} char={$charId}");
+    return;
+  }
+
+  // Fetch package details
+  $stmt = $pdo->prepare("SELECT * FROM currency_topup_packages WHERE id = ? LIMIT 1");
+  $stmt->execute(array($pkgId));
+  $pkg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+  if (!$pkg) {
+    error_log("RID={$RID} TOPUP_PKG_NOT_FOUND id={$pkgId}");
+    return;
+  }
+
+  $amount = (int)$pkg['amount'];
+  $bonus = (int)$pkg['bonus_amount'];
+  $total = $amount + $bonus;
+  $currencyType = $pkg['currency_type'];
+  $label = $currencyType === 'zen' ? 'Zen' : 'Coins';
+
+  // Deliver via in-game mail
+  require_once __DIR__ . '/mail_delivery.php';
+  $mailer = new GameMailer($pdo);
+
+  $zen = 0;
+  $coins = 0;
+  if ($currencyType === 'zen') {
+    $zen = $total;
+  } else {
+    $coins = $total;
+  }
+
+  $result = $mailer->sendOrderReward($charId, number_format($total) . ' ' . $label . ' Top-Up', 0, 0, $coins, $zen, 0);
+
+  // Update topup_orders
+  try {
+    $stmt = $pdo->prepare("UPDATE topup_orders SET status = 'completed', paypal_capture_id = ?, completed_at = NOW() WHERE paypal_order_id = ? AND status = 'pending'");
+    $stmt->execute(array($captureId, $paypalOrderId));
+  } catch (Exception $e) {
+    error_log("RID={$RID} TOPUP_ORDER_UPDATE_ERR: " . $e->getMessage());
+  }
+
+  // Update webshop_orders too
+  try {
+    $stmt = $pdo->prepare("UPDATE webshop_orders SET status = 'completed', paypal_capture_id = ?, delivered_at = NOW() WHERE paypal_order_id = ? AND status = 'pending'");
+    $stmt->execute(array($captureId, $paypalOrderId));
+  } catch (Exception $e) {
+    error_log("RID={$RID} TOPUP_WEBSHOP_ORDER_ERR: " . $e->getMessage());
+  }
+
+  if ($result['success']) {
+    error_log("RID={$RID} TOPUP_DELIVERED user={$userId} char={$charId} type={$currencyType} total={$total}");
+  } else {
+    error_log("RID={$RID} TOPUP_DELIVERY_FAILED user={$userId} error={$result['message']}");
+  }
 }
