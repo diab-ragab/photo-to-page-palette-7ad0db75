@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Gift, Crown, Plus, Pencil, Trash2, Save, X, Coins, Gem, Package, Diamond, Power } from "lucide-react";
+import { Gift, Crown, Plus, Pencil, Trash2, Save, X, Coins, Gem, Package, Diamond, Power, Search, UserPlus, Ban } from "lucide-react";
 import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 
 type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
@@ -318,6 +318,14 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   const [goldEnabled, setGoldEnabled] = useState(true);
   const [isTogglingEnabled, setIsTogglingEnabled] = useState(false);
 
+  // Assign pass state
+  const [assignSearch, setAssignSearch] = useState("");
+  const [assignResults, setAssignResults] = useState<Array<{ username: string; current_tier: string; expires_at: string | null }>>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [assignTier, setAssignTier] = useState<"elite" | "gold">("elite");
+  const [assignDuration, setAssignDuration] = useState("30");
+  const [isAssigning, setIsAssigning] = useState(false);
+
   useEffect(() => {
     fetchRewards();
     fetchSettings();
@@ -541,6 +549,81 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     }
   };
 
+  const handleSearchUsers = async () => {
+    if (assignSearch.trim().length < 2) {
+      toast({ title: "Error", description: "Enter at least 2 characters", variant: "destructive" });
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=search_users&q=${encodeURIComponent(assignSearch.trim())}`, {
+        headers: { ...getAuthHeaders() },
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAssignResults(data.users || []);
+        if (!data.users?.length) toast({ title: "No users found", description: "Try a different search term" });
+      } else {
+        toast({ title: "Error", description: data.error || "Search failed", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Search failed", variant: "destructive" });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleAssignPass = async (username: string) => {
+    const days = parseInt(assignDuration) || 30;
+    if (!confirm(`Assign ${assignTier.toUpperCase()} Game Pass to "${username}" for ${days} days?`)) return;
+    setIsAssigning(true);
+    try {
+      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=assign_pass`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ username, tier: assignTier, duration_days: days }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: "Success", description: data.message });
+        // Refresh search results
+        handleSearchUsers();
+      } else {
+        toast({ title: "Error", description: data.error || "Failed to assign", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to assign pass", variant: "destructive" });
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const handleRevokePass = async (username: string) => {
+    if (!confirm(`Revoke Game Pass from "${username}"?`)) return;
+    setIsAssigning(true);
+    try {
+      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=revoke_pass`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ username }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: "Revoked", description: data.message });
+        handleSearchUsers();
+      } else {
+        toast({ title: "Error", description: data.error || "Failed to revoke", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to revoke pass", variant: "destructive" });
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   const handleCloseModal = () => {
     setSelectedReward(null);
     setIsEditing(false);
@@ -689,6 +772,110 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
               {isSavingSettings ? "Saving..." : "Save All Settings"}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Assign Game Pass Card */}
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <UserPlus className="h-5 w-5 text-primary" />
+            Assign Game Pass
+          </CardTitle>
+          <CardDescription>
+            Search for a user and assign or revoke their Game Pass tier
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Search */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Search username..."
+              value={assignSearch}
+              onChange={(e) => setAssignSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearchUsers()}
+            />
+            <Button onClick={handleSearchUsers} disabled={isSearching}>
+              <Search className="h-4 w-4 mr-2" />
+              {isSearching ? "..." : "Search"}
+            </Button>
+          </div>
+
+          {/* Tier & Duration controls */}
+          <div className="flex gap-3 flex-wrap">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Tier to Assign</label>
+              <Select value={assignTier} onValueChange={(v: "elite" | "gold") => setAssignTier(v)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="elite">
+                    <span className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Elite</span>
+                  </SelectItem>
+                  <SelectItem value="gold">
+                    <span className="flex items-center gap-2"><Diamond className="h-4 w-4 text-violet-500" /> Gold</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Duration (days)</label>
+              <Input
+                type="number"
+                min={1}
+                max={365}
+                value={assignDuration}
+                onChange={(e) => setAssignDuration(e.target.value)}
+                className="w-[100px]"
+              />
+            </div>
+          </div>
+
+          {/* Results */}
+          {assignResults.length > 0 && (
+            <div className="border rounded-lg divide-y">
+              {assignResults.map((u) => (
+                <div key={u.username} className="flex items-center justify-between p-3 gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{u.username}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>Current:</span>
+                      <Badge variant={u.current_tier === "gold" ? "default" : u.current_tier === "elite" ? "default" : "secondary"}
+                        className={u.current_tier === "gold" ? "bg-violet-500/80 text-xs" : "text-xs"}>
+                        {u.current_tier === "gold" ? <Diamond className="h-3 w-3 mr-1" /> : u.current_tier === "elite" ? <Crown className="h-3 w-3 mr-1" /> : null}
+                        {u.current_tier}
+                      </Badge>
+                      {u.expires_at && u.current_tier !== "free" && (
+                        <span>expires {new Date(u.expires_at).toLocaleDateString()}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={() => handleAssignPass(u.username)}
+                      disabled={isAssigning}
+                    >
+                      <UserPlus className="h-3 w-3 mr-1" />
+                      Assign {assignTier}
+                    </Button>
+                    {u.current_tier !== "free" && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleRevokePass(u.username)}
+                        disabled={isAssigning}
+                      >
+                        <Ban className="h-3 w-3 mr-1" />
+                        Revoke
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
