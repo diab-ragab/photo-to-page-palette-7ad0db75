@@ -5,7 +5,7 @@
  * POST /api/bundle_cancel.php
  * Body: { sessionId: string }
  * 
- * Called when user cancels Stripe checkout or payment fails.
+ * Called when user cancels PayPal checkout or payment fails.
  * Restores reserved stock and marks order as failed.
  */
 
@@ -49,17 +49,14 @@ if (!$body) {
 $sessionId = isset($body['sessionId']) ? trim($body['sessionId']) : '';
 $paypalOrderId = isset($body['paypalOrderId']) ? trim($body['paypalOrderId']) : '';
 
-// Accept either sessionId (legacy Stripe) or paypalOrderId
+// Use paypalOrderId for lookup
 $lookupId = '';
-$lookupColumn = '';
+$lookupColumn = 'paypal_order_id';
 
 if (!empty($paypalOrderId)) {
     $lookupId = $paypalOrderId;
-    $lookupColumn = 'paypal_order_id';
 } elseif (!empty($sessionId)) {
     $lookupId = $sessionId;
-    // Try paypal_order_id first, then stripe_session_id
-    $lookupColumn = 'paypal_order_id';
 }
 
 if (empty($lookupId)) {

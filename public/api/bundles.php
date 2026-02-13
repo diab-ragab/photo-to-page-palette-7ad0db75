@@ -84,38 +84,7 @@ function getBearerToken() {
   return $token;
 }
 
-function stripeCreateCheckoutSession($secretKey, $body, &$httpCode, &$errText) {
-  $httpCode = 0;
-  $errText = '';
-  $headers = array(
-    'Authorization: Bearer ' . $secretKey,
-    'Content-Type: application/x-www-form-urlencoded',
-  );
-  $opts = array(
-    'http' => array(
-      'method' => 'POST',
-      'header' => implode("\r\n", $headers),
-      'content' => $body,
-      'ignore_errors' => true,
-      'timeout' => 30,
-    ),
-    'ssl' => array(
-      'verify_peer' => false,
-      'verify_peer_name' => false,
-    ),
-  );
-  $context = stream_context_create($opts);
-  $resp = @file_get_contents('https://api.stripe.com/v1/checkout/sessions', false, $context);
-  if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
-    if (preg_match('/HTTP\/\d+\.?\d*\s+(\d+)/', $http_response_header[0], $m)) {
-      $httpCode = (int)$m[1];
-    }
-  }
-  if ($resp === false) {
-    $errText = 'file_get_contents failed';
-  }
-  return $resp;
-}
+// PayPal helper is loaded from paypal_helper.php when needed
 
 /**
  * ROUTES

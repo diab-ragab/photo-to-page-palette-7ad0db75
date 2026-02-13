@@ -133,10 +133,11 @@ function getConfig() {
             'pass' => 'root',
             'name' => 'shengui',
         ),
-        'stripe' => array(
-            'secret_key' => '',
-            'publishable_key' => '',
-            'webhook_secret' => '',
+        'paypal' => array(
+            'client_id' => '',
+            'secret' => '',
+            'webhook_id' => '',
+            'sandbox' => false,
         ),
     );
 

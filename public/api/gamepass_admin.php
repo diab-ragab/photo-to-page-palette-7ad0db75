@@ -461,16 +461,16 @@ switch ($action) {
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
         tier VARCHAR(10) NOT NULL,
-        stripe_session_id VARCHAR(255) NOT NULL,
+        paypal_order_id VARCHAR(255) NOT NULL,
         status VARCHAR(20) DEFAULT 'pending',
         created_at DATETIME NOT NULL,
         completed_at DATETIME DEFAULT NULL,
         INDEX idx_user (user_id),
-        INDEX idx_session (stripe_session_id),
+        INDEX idx_paypal (paypal_order_id),
         INDEX idx_status (status)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 
-      $stmt = $pdo->prepare("INSERT INTO gamepass_purchases (user_id, tier, stripe_session_id, status, created_at, completed_at) VALUES (?, ?, ?, 'completed', NOW(), NOW())");
+      $stmt = $pdo->prepare("INSERT INTO gamepass_purchases (user_id, tier, paypal_order_id, status, created_at, completed_at) VALUES (?, ?, ?, 'completed', NOW(), NOW())");
       $stmt->execute(array($targetUserId, $tierInput, 'admin_grant_' . $RID));
     } catch (Exception $e) {
       error_log("GAMEPASS_ADMIN_LOG: " . $e->getMessage());
