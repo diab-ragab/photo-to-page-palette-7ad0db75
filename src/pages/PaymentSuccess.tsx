@@ -22,18 +22,55 @@ const PaymentSuccess = () => {
   } | null>(null);
   const { clearCart } = useCart();
 
-  // Handle redirect from Stripe with session_id in URL
   useEffect(() => {
+    const isPayPal = searchParams.get('paypal') === '1';
+    const paypalToken = searchParams.get('token'); // PayPal sends ?token=ORDER_ID
+    const paypalPayerId = searchParams.get('PayerID');
+
+    // Legacy Stripe params (kept for backward compatibility)
     const sessionId = searchParams.get('session_id');
     const paymentIntent = searchParams.get('payment_intent');
     const redirectStatus = searchParams.get('redirect_status');
 
-    // If we have a session_id or successful payment_intent
-    if ((sessionId || (paymentIntent && redirectStatus === 'succeeded')) && !confirmed) {
+    if (confirmed) return;
+
+    // PayPal flow: capture the order
+    if (isPayPal && paypalToken) {
       setIsConfirming(true);
       
-      // Confirm with backend
-      fetch(`${API_BASE}/payment_confirm.php`, {
+      fetch(`${API_BASE}/paypal_capture.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ 
+          paypalOrderId: paypalToken,
+          payerId: paypalPayerId,
+        }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          console.log("PayPal payment captured:", data);
+          setConfirmed(true);
+          hapticSuccess();
+          clearCart();
+          if (data.order_id) {
+            setOrderDetails({ orderId: data.order_id });
+          }
+        })
+        .catch(err => {
+          console.error("PayPal capture error:", err);
+          setConfirmed(true);
+          clearCart();
+        })
+        .finally(() => {
+          setIsConfirming(false);
+        });
+    } 
+    // Legacy Stripe flow
+    else if (sessionId || (paymentIntent && redirectStatus === 'succeeded')) {
+      setIsConfirming(true);
+      
+      fetch(`${API_BASE}/paypal_capture.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -47,7 +84,6 @@ const PaymentSuccess = () => {
           console.log("Payment confirmed:", data);
           setConfirmed(true);
           hapticSuccess();
-          // Clear cart after successful payment
           clearCart();
           if (data.order_id) {
             setOrderDetails({ orderId: data.order_id });
@@ -55,15 +91,14 @@ const PaymentSuccess = () => {
         })
         .catch(err => {
           console.error("Confirmation error:", err);
-          // Still show success - webhook handles fulfillment
           setConfirmed(true);
           clearCart();
         })
         .finally(() => {
           setIsConfirming(false);
         });
-    } else if (!sessionId && !paymentIntent) {
-      // Direct navigation without Stripe redirect
+    } else {
+      // Direct navigation
       setConfirmed(true);
     }
   }, [searchParams, confirmed, clearCart]);

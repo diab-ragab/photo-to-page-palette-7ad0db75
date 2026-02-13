@@ -57,8 +57,8 @@ interface Order {
   quantity: number;
   total_real: number;
   status: "pending" | "completed" | "failed" | "refunded";
-  stripe_session_id?: string;
-  stripe_payment_intent?: string;
+  paypal_order_id?: string;
+  paypal_capture_id?: string;
   delivered_at: string | null;
   created_at: string;
   updated_at?: string;
@@ -74,8 +74,8 @@ interface BundleOrder {
   character_name?: string;
   total_real: number;
   status: "pending" | "completed" | "failed" | "refunded";
-  stripe_session_id?: string;
-  stripe_payment_intent?: string;
+  paypal_order_id?: string;
+  paypal_capture_id?: string;
   delivered_at: string | null;
   created_at: string;
 }
@@ -680,12 +680,12 @@ export function OrdersManager() {
                 </div>
               </div>
 
-              {(selectedOrder.stripe_session_id || selectedOrder.stripe_payment_intent) && (
+              {(selectedOrder.paypal_order_id || selectedOrder.paypal_capture_id) && (
                 <div className="p-3 rounded-lg bg-muted/50 text-xs space-y-1">
-                  <p className="text-muted-foreground">Stripe Session ID:</p>
-                  <p className="font-mono break-all">{selectedOrder.stripe_session_id || "N/A"}</p>
-                  <p className="text-muted-foreground mt-2">Payment Intent:</p>
-                  <p className="font-mono break-all">{selectedOrder.stripe_payment_intent || "N/A"}</p>
+                  <p className="text-muted-foreground">PayPal Order ID:</p>
+                  <p className="font-mono break-all">{selectedOrder.paypal_order_id || "N/A"}</p>
+                  <p className="text-muted-foreground mt-2">Capture ID:</p>
+                  <p className="font-mono break-all">{selectedOrder.paypal_capture_id || "N/A"}</p>
                 </div>
               )}
 
@@ -785,12 +785,12 @@ export function OrdersManager() {
                 </div>
               </div>
 
-              {(selectedBundleOrder.stripe_session_id || selectedBundleOrder.stripe_payment_intent) && (
+              {(selectedBundleOrder.paypal_order_id || selectedBundleOrder.paypal_capture_id) && (
                 <div className="p-3 rounded-lg bg-muted/50 text-xs space-y-1">
-                  <p className="text-muted-foreground">Stripe Session ID:</p>
-                  <p className="font-mono break-all">{selectedBundleOrder.stripe_session_id || "N/A"}</p>
-                  <p className="text-muted-foreground mt-2">Payment Intent:</p>
-                  <p className="font-mono break-all">{selectedBundleOrder.stripe_payment_intent || "N/A"}</p>
+                  <p className="text-muted-foreground">PayPal Order ID:</p>
+                  <p className="font-mono break-all">{selectedBundleOrder.paypal_order_id || "N/A"}</p>
+                  <p className="text-muted-foreground mt-2">Capture ID:</p>
+                  <p className="font-mono break-all">{selectedBundleOrder.paypal_capture_id || "N/A"}</p>
                 </div>
               )}
 
