@@ -34,7 +34,7 @@ $APP_CONFIG = array(
 
   'paypal' => array(
     'client_id'   => 'AWEFJy_edKvt3xKcWnEgeB-lQBtz2VqYGb9eSWnDJB1f7cSyBeZ8R2xoyHF5r_vrnYOxkfkHHrm6EzHs',
-    'secret'      => 'YOUR_PAYPAL_SECRET',
+    'secret'      => 'EIgcYoXHk2fmkniJeYBmQRi77sTiBgJPgLg5D5mLO5ndIDN_KK7QW4kXF-aB8IrSlFlvOd_RRw9UlVfr',
     'sandbox'     => false,
     'webhook_id'  => 'YOUR_PAYPAL_WEBHOOK_ID',
     'success_url' => 'https://woiendgame.online/checkout/success',
