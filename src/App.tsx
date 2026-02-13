@@ -23,6 +23,7 @@ import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Refund from "./pages/Refund";
+import RefundFAQ from "./pages/RefundFAQ";
 import Support from "./pages/Support";
 import Shop from "./pages/Shop";
 import Cart from "./pages/Cart";
@@ -53,6 +54,7 @@ const AnimatedRoutes = () => {
         <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
         <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
         <Route path="/refund" element={<PageTransition><Refund /></PageTransition>} />
+        <Route path="/refund-faq" element={<PageTransition><RefundFAQ /></PageTransition>} />
         <Route path="/support" element={<PageTransition><Support /></PageTransition>} />
         <Route path="/shop" element={<PageTransition><ProtectedRoute><Shop /></ProtectedRoute></PageTransition>} />
         <Route path="/cart" element={<PageTransition><ProtectedRoute><Cart /></ProtectedRoute></PageTransition>} />
