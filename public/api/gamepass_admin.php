@@ -367,6 +367,145 @@ switch ($action) {
     json_out(200, array('success' => true, 'inserted' => $inserted, 'tier' => $tierInput));
     break;
 
+  case 'search_users':
+    requireAdmin();
+
+    $q = isset($_GET['q']) ? trim($_GET['q']) : '';
+    if (strlen($q) < 2) json_fail(400, 'Search query too short');
+
+    $stmt = $pdo->prepare("
+      SELECT memb___id AS username
+      FROM MEMB_INFO
+      WHERE memb___id LIKE ?
+      ORDER BY memb___id ASC
+      LIMIT 20
+    ");
+    $stmt->execute(array('%' . $q . '%'));
+    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Attach gamepass status to each user
+    $results = array();
+    foreach ($users as $u) {
+      $gpStmt = $pdo->prepare("
+        SELECT ug.is_premium, ug.expires_at, ug.tier
+        FROM user_gamepass ug
+        JOIN users ON users.id = ug.user_id
+        WHERE users.username = ?
+        LIMIT 1
+      ");
+      $gpStmt->execute(array($u['username']));
+      $gp = $gpStmt->fetch(PDO::FETCH_ASSOC);
+
+      $tier = 'free';
+      $expiresAt = null;
+      if ($gp) {
+        $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
+        $isActive = ($expiresAt === null || strtotime($expiresAt) > time());
+        if (isset($gp['tier']) && in_array($gp['tier'], array('elite', 'gold')) && $isActive) {
+          $tier = $gp['tier'];
+        } elseif ((int)$gp['is_premium'] === 1 && $isActive) {
+          $tier = 'elite';
+        }
+      }
+
+      $results[] = array(
+        'username' => $u['username'],
+        'current_tier' => $tier,
+        'expires_at' => $expiresAt
+      );
+    }
+
+    json_out(200, array('success' => true, 'users' => $results));
+    break;
+
+  case 'assign_pass':
+    requireAdmin();
+
+    $input = getJsonInput();
+    $username = isset($input['username']) ? trim($input['username']) : '';
+    $tierInput = isset($input['tier']) ? $input['tier'] : '';
+    $durationDays = isset($input['duration_days']) ? (int)$input['duration_days'] : 30;
+
+    if ($username === '') json_fail(400, 'Username is required');
+    if (!in_array($tierInput, array('elite', 'gold'))) json_fail(400, 'Tier must be elite or gold');
+    if ($durationDays < 1 || $durationDays > 365) json_fail(400, 'Duration must be 1-365 days');
+
+    // Find user
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+    $stmt->execute(array($username));
+    $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$userRow) json_fail(404, 'User not found: ' . $username);
+    $targetUserId = (int)$userRow['id'];
+
+    // Ensure user_gamepass table has tier column
+    try {
+      $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free'");
+    } catch (Exception $e) { /* exists */ }
+
+    $expiresAt = date('Y-m-d H:i:s', time() + ($durationDays * 86400));
+
+    // Upsert
+    $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ?");
+    $stmt->execute(array($targetUserId));
+    if ($stmt->fetch()) {
+      $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = ?, expires_at = ? WHERE user_id = ?");
+      $stmt->execute(array($tierInput, $expiresAt, $targetUserId));
+    } else {
+      $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, expires_at) VALUES (?, 1, ?, ?)");
+      $stmt->execute(array($targetUserId, $tierInput, $expiresAt));
+    }
+
+    // Log in purchases table
+    try {
+      $pdo->exec("CREATE TABLE IF NOT EXISTS gamepass_purchases (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        tier VARCHAR(10) NOT NULL,
+        stripe_session_id VARCHAR(255) NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at DATETIME NOT NULL,
+        completed_at DATETIME DEFAULT NULL,
+        INDEX idx_user (user_id),
+        INDEX idx_session (stripe_session_id),
+        INDEX idx_status (status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+
+      $stmt = $pdo->prepare("INSERT INTO gamepass_purchases (user_id, tier, stripe_session_id, status, created_at, completed_at) VALUES (?, ?, ?, 'completed', NOW(), NOW())");
+      $stmt->execute(array($targetUserId, $tierInput, 'admin_grant_' . $RID));
+    } catch (Exception $e) {
+      error_log("GAMEPASS_ADMIN_LOG: " . $e->getMessage());
+    }
+
+    error_log("GAMEPASS_ADMIN_ASSIGN: user=$username tier=$tierInput duration={$durationDays}d expires=$expiresAt by admin");
+
+    json_out(200, array(
+      'success' => true,
+      'message' => ucfirst($tierInput) . ' Game Pass assigned to ' . $username . ' for ' . $durationDays . ' days',
+      'expires_at' => $expiresAt
+    ));
+    break;
+
+  case 'revoke_pass':
+    requireAdmin();
+
+    $input = getJsonInput();
+    $username = isset($input['username']) ? trim($input['username']) : '';
+    if ($username === '') json_fail(400, 'Username is required');
+
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+    $stmt->execute(array($username));
+    $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$userRow) json_fail(404, 'User not found: ' . $username);
+    $targetUserId = (int)$userRow['id'];
+
+    $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 0, tier = 'free' WHERE user_id = ?");
+    $stmt->execute(array($targetUserId));
+
+    error_log("GAMEPASS_ADMIN_REVOKE: user=$username by admin");
+
+    json_out(200, array('success' => true, 'message' => 'Game Pass revoked from ' . $username));
+    break;
+
   default:
     json_fail(400, 'Invalid action');
 }
