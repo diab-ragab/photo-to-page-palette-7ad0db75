@@ -34,43 +34,76 @@ const Refund = () => {
         
         <div className="prose prose-invert max-w-none space-y-6 text-muted-foreground">
           <section>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-4">1. Donations</h2>
-            <p>All donations are voluntary contributions to support our server. Donations are non-refundable as they are gifts to support the community.</p>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">1. General Policy</h2>
+            <p>All purchases made on WOI Endgame are for digital products delivered in-game.</p>
+            <p className="mt-2">By completing a purchase, you agree to this refund policy.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-4">2. VIP Memberships</h2>
-            <p>VIP membership purchases may be eligible for a refund within 24 hours of purchase if:</p>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">2. Donations</h2>
+            <p>All donations are voluntary contributions made to support the server and community.</p>
+            <p className="mt-2">Donations are non-refundable.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">3. VIP Memberships & Game Pass</h2>
+            <p>VIP memberships and Game Pass purchases may be eligible for a refund within 24 hours of purchase only if:</p>
             <ul className="list-disc list-inside space-y-2 mt-2">
-              <li>No VIP benefits have been used</li>
-              <li>The request is made within 24 hours of purchase</li>
-              <li>This is your first refund request</li>
+              <li>No VIP or Game Pass benefits have been used</li>
+              <li>The request is submitted within 24 hours</li>
+              <li>This is the first refund request on the account</li>
+            </ul>
+            <p className="mt-3">Once VIP or Game Pass benefits have been activated or used, the purchase becomes non-refundable.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">4. Virtual Currency (Zen)</h2>
+            <p>All in-game credit purchases (Zen) are non-refundable once successfully delivered to the account.</p>
+            <p className="mt-2">If Zen was not delivered due to a verified technical issue, users must contact support and the issue will be investigated and resolved.</p>
+            <p className="mt-3">Virtual currency:</p>
+            <ul className="list-disc list-inside space-y-2 mt-2">
+              <li>Has no real-world monetary value</li>
+              <li>Cannot be exchanged for real money</li>
+              <li>Is for in-game use only</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-4">3. In-Game Credits</h2>
-            <p>In-game credit purchases are non-refundable once the credits have been added to your account. If credits were not delivered due to a technical issue, please contact support.</p>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">5. Subscription Cancellation</h2>
+            <p>If applicable, recurring subscriptions may be cancelled at any time.</p>
+            <p className="mt-2">Access to VIP benefits will remain active until the end of the current billing period.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-4">4. Subscription Cancellation</h2>
-            <p>Monthly subscriptions can be cancelled at any time. You will retain access to VIP benefits until the end of your current billing period.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-4">5. How to Request a Refund</h2>
-            <p>To request a refund:</p>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">6. Delivery Issues</h2>
+            <p>If a purchase was completed but not delivered:</p>
             <ul className="list-disc list-inside space-y-2 mt-2">
-              <li>Contact us through our Discord server</li>
-              <li>Provide your username and transaction details</li>
-              <li>Allow up to 7 business days for processing</li>
+              <li>Contact support via the official Discord</li>
+              <li>Provide username and transaction ID</li>
+              <li>Delivery issues are usually resolved quickly after verification</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-4">6. Chargebacks</h2>
-            <p>Filing a chargeback without first contacting us will result in permanent account suspension. Please reach out to us first to resolve any issues.</p>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">7. Chargebacks & Payment Disputes</h2>
+            <p>Opening a chargeback or payment dispute without contacting support first is considered payment abuse.</p>
+            <p className="mt-2">Accounts involved in unauthorized chargebacks may be:</p>
+            <ul className="list-disc list-inside space-y-2 mt-2">
+              <li>Permanently suspended</li>
+              <li>Blocked from future purchases</li>
+              <li>Restricted from services</li>
+            </ul>
+            <p className="mt-3">We strongly encourage contacting support first so we can resolve any issues quickly.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">8. Processing Time</h2>
+            <p>Approved refunds (if applicable) may take 3–7 business days depending on the payment provider.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-display font-semibold text-foreground mb-4">9. Contact</h2>
+            <p>All refund or payment-related requests must be submitted through the official WOI Endgame Discord support channel.</p>
           </section>
         </div>
       </main>
