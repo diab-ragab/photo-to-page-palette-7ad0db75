@@ -347,6 +347,8 @@ switch ($action) {
 
   // PUBLIC: purchase
   case 'purchase':
+    require_once __DIR__ . '/paypal_helper.php';
+
     $token = getSessionToken();
     if (!$token) jsonFail(401, 'Please login to purchase');
 
@@ -370,27 +372,20 @@ switch ($action) {
     $bundle = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$bundle) jsonFail(404, 'Bundle not found or expired');
 
-    // Stripe config
-    $cfg = function_exists('getConfig') ? getConfig() : array();
-    $stripeCfg = isset($cfg['stripe']) ? $cfg['stripe'] : array();
-    $secretKey = isset($stripeCfg['secret_key']) ? $stripeCfg['secret_key'] : '';
-    $currency  = isset($stripeCfg['currency']) ? $stripeCfg['currency'] : 'eur';
-    $successUrl = isset($stripeCfg['success_url']) ? $stripeCfg['success_url'] : '';
-    $cancelUrl  = isset($stripeCfg['cancel_url']) ? $stripeCfg['cancel_url'] : '';
-
-    if (!$secretKey || !$successUrl || !$cancelUrl) jsonFail(500, 'Payment not configured');
+    // PayPal config
+    $ppCfg = getPayPalConfig();
+    if ($ppCfg['client_id'] === '' || $ppCfg['secret'] === '') jsonFail(500, 'Payment not configured');
 
     $salePrice = (float)$bundle['sale_price'];
-    $unitAmount = (int)round($salePrice * 100);
+    $salePriceFormatted = number_format($salePrice, 2, '.', '');
 
-    // Reserve stock + create pending order BEFORE calling Stripe
+    // Reserve stock + create pending order BEFORE calling PayPal
     $orderId = 0;
     $reserved = false;
 
     try {
       $pdo->beginTransaction();
 
-      // Stock check/reserve (only if stock is not NULL)
       if ($bundle['stock'] !== null) {
         $stmt = $pdo->prepare("UPDATE flash_bundles SET stock = stock - 1 WHERE id = ? AND stock > 0");
         $stmt->execute(array($bundleId));
@@ -401,7 +396,6 @@ switch ($action) {
         $reserved = true;
       }
 
-      // Create pending order
       $stmt = $pdo->prepare("
         INSERT INTO bundle_orders
           (user_id, bundle_id, character_id, character_name, total_real, status, created_at)
@@ -418,33 +412,10 @@ switch ($action) {
       jsonFail(500, 'Failed to prepare order');
     }
 
-    // Create Stripe checkout session
-    $fields = array(
-      'mode' => 'payment',
-      'success_url' => $successUrl,
-      'cancel_url' => $cancelUrl,
-      'client_reference_id' => (string)$uid,
-      'metadata[user_id]' => (string)$uid,
-      'metadata[bundle_id]' => (string)$bundleId,
-      'metadata[character_id]' => (string)$characterId,
-      'metadata[character_name]' => $characterName,
-      'metadata[type]' => 'bundle',
-      'metadata[order_id]' => (string)$orderId,
-      'line_items[0][price_data][currency]' => $currency,
-      'line_items[0][price_data][unit_amount]' => $unitAmount,
-      'line_items[0][price_data][product_data][name]' => $bundle['name'],
-      'line_items[0][price_data][product_data][description]' => ($bundle['description'] ? $bundle['description'] : 'Flash Sale Bundle'),
-      'line_items[0][quantity]' => 1,
-    );
-
-    $body = http_build_query($fields);
-    $httpCode = 0;
-    $errText = '';
-    $resp = stripeCreateCheckoutSession($secretKey, $body, $httpCode, $errText);
-
-    if ($resp === false || $httpCode < 200 || $httpCode >= 300) {
-      error_log("BUNDLE_STRIPE_ERR order={$orderId} code={$httpCode} err={$errText} resp=" . substr((string)$resp, 0, 600));
-      // mark failed + restore stock
+    // Get PayPal access token
+    $tokenResult = getPayPalAccessToken($ppCfg['client_id'], $ppCfg['secret'], $ppCfg['sandbox']);
+    if ($tokenResult['error'] !== '') {
+      error_log("BUNDLE_PP_TOKEN_ERR: " . $tokenResult['error']);
       try {
         $pdo->beginTransaction();
         $pdo->prepare("UPDATE bundle_orders SET status='failed' WHERE id=?")->execute(array($orderId));
@@ -452,15 +423,43 @@ switch ($action) {
           $pdo->prepare("UPDATE flash_bundles SET stock = stock + 1 WHERE id=? AND stock IS NOT NULL")->execute(array($bundleId));
         }
         $pdo->commit();
-      } catch (Exception $e) {
-        try { $pdo->rollBack(); } catch (Exception $ignore) {}
-      }
+      } catch (Exception $e) { try { $pdo->rollBack(); } catch (Exception $ignore) {} }
       jsonFail(502, 'Payment service error');
     }
 
-    $stripeData = json_decode($resp, true);
-    if (!is_array($stripeData) || !isset($stripeData['url']) || !isset($stripeData['id'])) {
-      error_log("BUNDLE_STRIPE_BADJSON order={$orderId} resp=" . substr((string)$resp, 0, 600));
+    // Build purchase units
+    $purchaseUnits = array(
+      array(
+        'description' => $bundle['name'],
+        'amount' => array(
+          'currency_code' => $ppCfg['currency'],
+          'value' => $salePriceFormatted,
+        ),
+      ),
+    );
+
+    $metadata = array(
+      'user_id' => $uid,
+      'type' => 'bundle',
+      'bundle_id' => $bundleId,
+      'order_id' => $orderId,
+      'character_id' => $characterId,
+    );
+
+    $successUrl = $ppCfg['success_url'] . '?paypal=1';
+    $cancelUrl = $ppCfg['cancel_url'];
+
+    $orderResult = paypalCreateOrder(
+      $tokenResult['token'],
+      $purchaseUnits,
+      $successUrl,
+      $cancelUrl,
+      $metadata,
+      $ppCfg['sandbox']
+    );
+
+    if ($orderResult['error'] !== '') {
+      error_log("BUNDLE_PP_ORDER_ERR order={$orderId}: " . $orderResult['error']);
       try {
         $pdo->beginTransaction();
         $pdo->prepare("UPDATE bundle_orders SET status='failed' WHERE id=?")->execute(array($orderId));
@@ -468,22 +467,27 @@ switch ($action) {
           $pdo->prepare("UPDATE flash_bundles SET stock = stock + 1 WHERE id=? AND stock IS NOT NULL")->execute(array($bundleId));
         }
         $pdo->commit();
-      } catch (Exception $e) {
-        try { $pdo->rollBack(); } catch (Exception $ignore) {}
-      }
-      jsonFail(502, 'Invalid payment response');
+      } catch (Exception $e) { try { $pdo->rollBack(); } catch (Exception $ignore) {} }
+      jsonFail(502, 'Payment service error');
     }
 
-    // Save stripe session id
+    // Save PayPal order id
     try {
-      $stmt = $pdo->prepare("UPDATE bundle_orders SET stripe_session_id = ? WHERE id = ?");
-      $stmt->execute(array($stripeData['id'], $orderId));
+      $pdo->prepare("ALTER TABLE bundle_orders ADD COLUMN paypal_order_id VARCHAR(255) DEFAULT NULL")->execute();
+    } catch (Exception $e) { /* column exists */ }
+    try {
+      $pdo->prepare("ALTER TABLE bundle_orders ADD COLUMN paypal_capture_id VARCHAR(255) DEFAULT NULL")->execute();
+    } catch (Exception $e) { /* column exists */ }
+
+    try {
+      $stmt = $pdo->prepare("UPDATE bundle_orders SET paypal_order_id = ? WHERE id = ?");
+      $stmt->execute(array($orderResult['id'], $orderId));
     } catch (Exception $e) {
-      error_log("BUNDLE_SAVE_SESSION_WARN order={$orderId} err=" . $e->getMessage());
+      error_log("BUNDLE_SAVE_PP_ORDER_WARN order={$orderId} err=" . $e->getMessage());
     }
 
-    error_log("BUNDLE_ORDER_CREATED order={$orderId} user={$uid} bundle={$bundleId} stripe_session=" . $stripeData['id']);
-    jsonOut(array('success' => true, 'url' => $stripeData['url'], 'order_id' => $orderId));
+    error_log("BUNDLE_ORDER_CREATED order={$orderId} user={$uid} bundle={$bundleId} paypal_order=" . $orderResult['id']);
+    jsonOut(array('success' => true, 'url' => $orderResult['approve_url'], 'order_id' => $orderId));
     break;
 
   // ADMIN: list bundle orders

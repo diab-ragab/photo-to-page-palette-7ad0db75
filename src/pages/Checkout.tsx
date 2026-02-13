@@ -59,7 +59,7 @@ const Checkout = () => {
       }));
 
       const data = await apiPost<any>(
-        `/stripe_checkout.php?sessionToken=${encodeURIComponent(token)}`,
+        `/paypal_checkout.php?sessionToken=${encodeURIComponent(token)}`,
         { 
           items: cartItems,
           character_id: selectedRoleId,
@@ -132,7 +132,7 @@ const Checkout = () => {
                 <div>
                   <h2 className="text-xl font-display font-bold">Secure Payment</h2>
                   <p className="text-sm text-muted-foreground">
-                    You will be redirected to Stripe's secure checkout
+                    You will be redirected to PayPal's secure checkout
                   </p>
                 </div>
               </div>
@@ -172,7 +172,7 @@ const Checkout = () => {
                 {isProcessing ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Redirecting to Stripe...
+                    Redirecting to PayPal...
                   </>
                 ) : (
                   <>

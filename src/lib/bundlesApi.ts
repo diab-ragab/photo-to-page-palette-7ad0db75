@@ -121,13 +121,13 @@ export const bundlesApi = {
     return { url: data.url, order_id: data.order_id };
   },
 
-  async cancelOrder(sessionId: string): Promise<void> {
+  async cancelOrder(orderId: string): Promise<void> {
     try {
       const response = await fetch(`${API_BASE}/bundle_cancel.php`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ paypalOrderId: orderId, sessionId: orderId }),
       });
       const data = await response.json();
       if (!data.success) console.warn("Bundle cancel response:", data.message);

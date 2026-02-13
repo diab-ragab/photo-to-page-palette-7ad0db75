@@ -47,20 +47,34 @@ if (!$body) {
 }
 
 $sessionId = isset($body['sessionId']) ? trim($body['sessionId']) : '';
+$paypalOrderId = isset($body['paypalOrderId']) ? trim($body['paypalOrderId']) : '';
 
-if (empty($sessionId)) {
-    json_fail(400, 'Session ID required');
+// Accept either sessionId (legacy Stripe) or paypalOrderId
+$lookupId = '';
+$lookupColumn = '';
+
+if (!empty($paypalOrderId)) {
+    $lookupId = $paypalOrderId;
+    $lookupColumn = 'paypal_order_id';
+} elseif (!empty($sessionId)) {
+    $lookupId = $sessionId;
+    // Try paypal_order_id first, then stripe_session_id
+    $lookupColumn = 'paypal_order_id';
 }
 
-error_log("RID={$RID} BUNDLE_CANCEL_START session={$sessionId}");
+if (empty($lookupId)) {
+    json_fail(400, 'Order ID required');
+}
 
-// Find pending bundle orders for this session
+error_log("RID={$RID} BUNDLE_CANCEL_START id={$lookupId}");
+
+// Find pending bundle orders
 $stmt = $pdo->prepare("
     SELECT id, bundle_id, status 
     FROM bundle_orders 
-    WHERE stripe_session_id = ? AND status = 'pending'
+    WHERE {$lookupColumn} = ? AND status = 'pending'
 ");
-$stmt->execute(array($sessionId));
+$stmt->execute(array($lookupId));
 $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 if (count($orders) === 0) {

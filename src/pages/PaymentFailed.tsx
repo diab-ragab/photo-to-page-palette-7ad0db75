@@ -16,8 +16,10 @@ const PaymentFailed = () => {
   // Restore bundle stock on payment failure/cancellation
   useEffect(() => {
     const sessionId = searchParams.get("session_id");
-    if (sessionId) {
-      bundlesApi.cancelOrder(sessionId);
+    const paypalToken = searchParams.get("token");
+    const lookupId = paypalToken || sessionId;
+    if (lookupId) {
+      bundlesApi.cancelOrder(lookupId);
     }
   }, [searchParams]);
 

@@ -32,12 +32,14 @@ $APP_CONFIG = array(
     'admin_user_ids' => array(24),
   ),
 
-  'stripe' => array(
-    'secret_key' => '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',
-    'webhook_secret' => 'whsec_aUbYbZffBWZXxvTNjuD0W3bhI7fwrGrn',
-    'success_url' => 'https://woiendgame.online/checkout/success?session_id={CHECKOUT_SESSION_ID}',
+  'paypal' => array(
+    'client_id'   => 'YOUR_PAYPAL_CLIENT_ID',
+    'secret'      => 'YOUR_PAYPAL_SECRET',
+    'sandbox'     => false,
+    'webhook_id'  => 'YOUR_PAYPAL_WEBHOOK_ID',
+    'success_url' => 'https://woiendgame.online/checkout/success',
     'cancel_url'  => 'https://woiendgame.online/shop',
-    'currency'    => 'eur',
+    'currency'    => 'EUR',
   ),
 );
 

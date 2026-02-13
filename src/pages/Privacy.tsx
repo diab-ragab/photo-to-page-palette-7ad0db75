@@ -38,7 +38,7 @@ const Privacy = () => {
             <p>We collect information you provide directly, including:</p>
             <ul className="list-disc list-inside space-y-2 mt-2">
               <li>Account registration details (username, email)</li>
-              <li>Payment information (processed securely through Stripe)</li>
+              <li>Payment information (processed securely through PayPal)</li>
               <li>Game activity and preferences</li>
             </ul>
           </section>
@@ -56,14 +56,14 @@ const Privacy = () => {
 
           <section>
             <h2 className="text-xl font-display font-semibold text-foreground mb-4">3. Data Security</h2>
-            <p>We implement industry-standard security measures to protect your data. Payment information is handled by Stripe and never stored on our servers.</p>
+            <p>We implement industry-standard security measures to protect your data. Payment information is handled by PayPal and never stored on our servers.</p>
           </section>
 
           <section>
             <h2 className="text-xl font-display font-semibold text-foreground mb-4">4. Third-Party Services</h2>
             <p>We use trusted third-party services including:</p>
             <ul className="list-disc list-inside space-y-2 mt-2">
-              <li>Stripe for payment processing</li>
+              <li>PayPal for payment processing</li>
               <li>Discord for community communication</li>
             </ul>
           </section>
