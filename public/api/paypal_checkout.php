@@ -49,7 +49,33 @@ if (count($items) < 1) failPP(400, 'Cart items required');
 
 $characterId = isset($payload['character_id']) ? (int)$payload['character_id'] : 0;
 $characterName = isset($payload['character_name']) ? trim((string)$payload['character_name']) : '';
-if ($characterId <= 0) failPP(400, 'Please select a character to receive the items');
+$isGift = isset($payload['is_gift']) ? (bool)$payload['is_gift'] : false;
+$giftCharacterName = isset($payload['gift_character_name']) ? trim((string)$payload['gift_character_name']) : '';
+
+if ($isGift) {
+  // Gift mode: look up recipient character by name
+  if ($giftCharacterName === '') failPP(400, 'Please enter the recipient character name');
+  if (strlen($giftCharacterName) > 50) failPP(400, 'Character name too long');
+
+  try {
+    $lookupDb = getDB();
+    $stmt = $lookupDb->prepare("SELECT RoleID, Name FROM basetab_sg WHERE Name = ? AND IsDel = 0 LIMIT 1");
+    $stmt->execute(array($giftCharacterName));
+    $recipient = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$recipient) {
+      failPP(400, 'Character "' . $giftCharacterName . '" not found. Please check the name.');
+    }
+
+    $characterId = (int)$recipient['RoleID'];
+    $characterName = $recipient['Name'];
+  } catch (Exception $e) {
+    error_log("RID={$rid} GIFT_LOOKUP_ERR: " . $e->getMessage());
+    failPP(500, 'Failed to look up character');
+  }
+} else {
+  if ($characterId <= 0) failPP(400, 'Please select a character to receive the items');
+}
 
 // PayPal config
 $ppCfg = getPayPalConfig();
