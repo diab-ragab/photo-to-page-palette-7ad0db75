@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { hapticSuccess } from "@/hooks/useHapticFeedback";
 import { bundlesApi, Bundle, getIconEmoji } from "@/lib/bundlesApi";
 import { CharacterSelector } from "@/components/shop/CharacterSelector";
+import { CardPaymentForm } from "@/components/shop/CardPaymentForm";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const formatTime = (ms: number): string => {
   if (ms <= 0) return "00:00:00";
@@ -125,9 +127,9 @@ export const LimitedTimeBundles = () => {
   const [selectedBundle, setSelectedBundle] = useState<Bundle | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
-  const [isPurchasing, setIsPurchasing] = useState(false);
   const { isLoggedIn } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchBundles = async () => {
@@ -170,33 +172,33 @@ export const LimitedTimeBundles = () => {
     setSelectedCharacterName(characterName);
   };
 
-  const handlePurchase = async () => {
+  const handlePurchase = useCallback(async (): Promise<string> => {
     if (!selectedBundle || !selectedRoleId) {
-      toast({
-        title: "Select Character",
-        description: "Please select a character to receive the bundle items",
-        variant: "destructive",
-      });
-      return;
+      throw new Error("Please select a character to receive the bundle items");
     }
 
-    setIsPurchasing(true);
-    try {
-      const { url } = await bundlesApi.purchase(
-        selectedBundle.id,
-        selectedRoleId,
-        selectedCharacterName || ""
-      );
-      hapticSuccess();
-      window.location.href = url;
-    } catch (err: any) {
-      toast({
-        title: "Purchase Failed",
-        description: err.message || "Failed to start checkout",
-        variant: "destructive",
-      });
-      setIsPurchasing(false);
-    }
+    const { url } = await bundlesApi.purchase(
+      selectedBundle.id,
+      selectedRoleId,
+      selectedCharacterName || ""
+    );
+
+    // Extract PayPal order ID from redirect URL (token param)
+    const urlObj = new URL(url);
+    const token = urlObj.searchParams.get("token");
+    if (!token) throw new Error("Failed to create payment order");
+    return token;
+  }, [selectedBundle, selectedRoleId, selectedCharacterName]);
+
+  const handlePaymentSuccess = (data: any) => {
+    hapticSuccess();
+    toast({ title: "🎉 Bundle purchased!", description: "Items are being delivered to your character." });
+    setSelectedBundle(null);
+    navigate("/payment-success");
+  };
+
+  const handlePaymentError = (message: string) => {
+    toast({ title: "Payment Failed", description: message, variant: "destructive" });
   };
 
   if (loading) {
@@ -287,25 +289,29 @@ export const LimitedTimeBundles = () => {
               selectedRoleId={selectedRoleId}
             />
 
-            {/* Purchase Button */}
-            <Button 
-              onClick={handlePurchase}
-              disabled={isPurchasing || !selectedRoleId}
-              className="w-full gap-2"
-              size="lg"
-            >
-              {isPurchasing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Redirecting to PayPal...
-                </>
-              ) : (
-                <>
-                  <ShoppingCart className="h-4 w-4" />
-                  Pay €{Number(selectedBundle?.sale_price || 0).toFixed(2)}
-                </>
-              )}
-            </Button>
+            {/* Card Payment Form */}
+            {selectedRoleId ? (
+              <CardPaymentForm
+                items={[{
+                  id: String(selectedBundle?.id || 0),
+                  name: selectedBundle?.name || "",
+                  price: Number(selectedBundle?.sale_price || 0),
+                  quantity: 1,
+                }]}
+                characterId={selectedRoleId}
+                characterName={selectedCharacterName || ""}
+                isGift={false}
+                giftCharacterName=""
+                totalPrice={Number(selectedBundle?.sale_price || 0)}
+                onSuccess={handlePaymentSuccess}
+                onError={handlePaymentError}
+                createOrderFn={handlePurchase}
+              />
+            ) : (
+              <div className="text-center py-4 text-sm text-muted-foreground">
+                Select a character to continue to payment
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

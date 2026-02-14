@@ -18,6 +18,8 @@ interface CardPaymentFormProps {
   totalPrice: number;
   onSuccess: (data: any) => void;
   onError: (message: string) => void;
+  /** Optional custom createOrder function. Return a PayPal order ID string. */
+  createOrderFn?: () => Promise<string>;
 }
 
 const PAYPAL_CLIENT_ID = "AWEFJy_edKvt3xKcWnEgeB-lQBtz2VqYGb9eSWnDJB1f7cSyBeZ8R2xoyHF5r_vrnYOxkfkHHrm6EzHs";
@@ -31,6 +33,7 @@ export function CardPaymentForm({
   totalPrice,
   onSuccess,
   onError,
+  createOrderFn,
 }: CardPaymentFormProps) {
   const [status, setStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -40,6 +43,12 @@ export function CardPaymentForm({
     setErrorMessage("");
 
     try {
+      // Use custom createOrder function if provided (for bundles, game passes, etc.)
+      if (createOrderFn) {
+        const orderId = await createOrderFn();
+        return orderId;
+      }
+
       const token = localStorage.getItem("woi_session_token") || "";
       const res = await fetch(`${API_BASE}/paypal_create_card_order.php?sessionToken=${encodeURIComponent(token)}`, {
         method: "POST",
@@ -77,7 +86,7 @@ export function CardPaymentForm({
       onError(msg);
       throw err;
     }
-  }, [items, characterId, characterName, isGift, giftCharacterName, onError]);
+  }, [items, characterId, characterName, isGift, giftCharacterName, onError, createOrderFn]);
 
   const handleApprove = useCallback(async (data: any) => {
     setStatus("processing");
