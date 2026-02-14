@@ -43,7 +43,7 @@ class GameMailer {
         $title = substr(trim($title), 0, 100);
         $text  = substr(trim($text),  0, 500);
 
-        if ($itemId === 0) $qty = 0;
+        if ($itemId <= 0) $qty = 0;
         if ($qty < 0) $qty = 0;
 
         $blob = $this->buildMailBlob($title, $text, $coins, $zen, $exp, $itemId, $qty);
@@ -108,7 +108,7 @@ class GameMailer {
      * Send Game Pass reward mail
      */
     public function sendGamePassReward($roleId, $day, $tier, $itemId, $qty, $coins = 0, $zen = 0, $exp = 0) {
-        $tierLabel = ($tier === 'elite') ? 'Elite' : 'Free';
+        $tierLabel = ($tier === 'gold') ? 'Gold' : (($tier === 'elite') ? 'Elite' : 'Free');
         $title = "Game Pass Day {$day}";
         $text  = "{$tierLabel} reward for Day {$day}. Enjoy!";
         return $this->sendMail($roleId, $title, $text, $coins, $zen, $exp, $itemId, $qty);
@@ -144,7 +144,7 @@ class GameMailer {
         $blob = '0x6600010000' . $t_len . '00' . $titleHex . '00' . $txt_len . '00' . $textHex . '0001' . $coinsHex . $zenHex . $expHex;
 
         // Add item data
-        if ($itemId == 0) {
+        if ($itemId <= 0) {
             $blob .= '000000000000000000';
             return $blob;
         }
