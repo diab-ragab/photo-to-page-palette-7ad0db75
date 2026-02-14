@@ -5,23 +5,23 @@ import { useCart } from "@/contexts/CartContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
-import { ShieldCheck, Lock, ChevronLeft, AlertCircle, Loader2, Gift } from "lucide-react";
+import { ShieldCheck, Lock, ChevronLeft, AlertCircle, Gift, CreditCard } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import { SEO } from "@/components/SEO";
 import { CharacterSelector } from "@/components/shop/CharacterSelector";
-import { apiPost, FetchJsonError } from "@/lib/apiFetch";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CardPaymentForm } from "@/components/shop/CardPaymentForm";
+import { hapticSuccess } from "@/hooks/useHapticFeedback";
 
 const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();
   const { t } = useLanguage();
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
-  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
@@ -33,73 +33,26 @@ const Checkout = () => {
     setSelectedCharacterName(characterName);
   };
 
-  const handleCheckout = async () => {
-    if (!isLoggedIn) {
-      toast.error("Please login to complete your purchase");
-      return;
-    }
-
-    if (items.length === 0) {
-      navigate('/cart');
-      return;
-    }
-
+  // Validate before showing card form
+  const isReadyToPay = () => {
+    if (!isLoggedIn) return false;
+    if (items.length === 0) return false;
     if (isGift) {
-      if (!giftCharacterName.trim()) {
-        toast.error("Please enter the recipient's character name");
-        setError("Please enter a character name to gift to");
-        return;
-      }
-    } else {
-      if (!selectedRoleId) {
-        toast.error("Please select a character to receive the items");
-        setError("Please select a character");
-        return;
-      }
+      return giftCharacterName.trim().length > 0;
     }
+    return selectedRoleId !== null && selectedRoleId > 0;
+  };
 
-    setIsProcessing(true);
-    setError(null);
+  const handlePaymentSuccess = (data: any) => {
+    hapticSuccess();
+    clearCart();
+    toast.success("Payment successful! Items are being delivered.");
+    navigate("/payment-success");
+  };
 
-    try {
-      const token = localStorage.getItem("woi_session_token") || "";
-      
-      const cartItems = items.map(item => ({
-        id: item.id,
-        name: item.name,
-        price: Number(item.price),
-        quantity: item.quantity,
-      }));
-
-      const data = await apiPost<any>(
-        `/paypal_checkout.php?sessionToken=${encodeURIComponent(token)}`,
-        { 
-          items: cartItems,
-          character_id: isGift ? 0 : selectedRoleId,
-          character_name: isGift ? "" : selectedCharacterName,
-          is_gift: isGift,
-          gift_character_name: isGift ? giftCharacterName.trim() : "",
-          sessionToken: token,
-        },
-        true,
-        { showErrorToast: false, retries: 1 }
-      );
-
-      if (data.success && data.url) {
-        clearCart();
-        window.location.href = data.url;
-      } else {
-        setError(data.message || "Failed to initialize payment");
-        toast.error(data.message || "Failed to initialize payment");
-      }
-    } catch (err: any) {
-      console.error("Checkout error:", err);
-      const msg = err?.serverMessage || err?.message || "Failed to connect to payment service";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setIsProcessing(false);
-    }
+  const handlePaymentError = (message: string) => {
+    setError(message);
+    toast.error(message);
   };
 
   if (items.length === 0) {
@@ -136,22 +89,24 @@ const Checkout = () => {
         <h1 className="text-4xl font-display font-bold mb-8">{t('checkout.title')}</h1>
         
         <div className="grid lg:grid-cols-2 gap-8">
-          {/* Checkout Action */}
+          {/* Payment Section */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
           >
             <div className="glass-card p-6 space-y-6">
-              <div className="flex items-center gap-3 mb-4">
-                <ShieldCheck className="w-8 h-8 text-primary" />
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-2">
+                <CreditCard className="w-8 h-8 text-primary" />
                 <div>
-                  <h2 className="text-xl font-display font-bold">Secure Payment</h2>
+                  <h2 className="text-xl font-display font-bold">Card Payment</h2>
                   <p className="text-sm text-muted-foreground">
-                    You will be redirected to PayPal's secure checkout
+                    Pay securely with credit or debit card
                   </p>
                 </div>
               </div>
 
+              {/* Security Badges */}
               <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Lock className="w-4 h-4" />
@@ -159,7 +114,7 @@ const Checkout = () => {
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>PCI DSS compliant</span>
+                  <span>PCI DSS compliant · 3D Secure</span>
                 </div>
               </div>
 
@@ -204,6 +159,7 @@ const Checkout = () => {
                 )}
               </div>
 
+              {/* Error */}
               {error && (
                 <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -211,24 +167,38 @@ const Checkout = () => {
                 </div>
               )}
 
-              <Button
-                onClick={handleCheckout}
-                className="w-full gap-2" 
-                size="lg" 
-                disabled={isProcessing}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Redirecting to PayPal...
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4" />
-                    {`${t('checkout.pay')} €${totalPrice.toFixed(2)}`}
-                  </>
-                )}
-              </Button>
+              {/* Card Payment Form */}
+              {isReadyToPay() ? (
+                <div className="border-t border-border pt-4">
+                  <CardPaymentForm
+                    items={items.map(item => ({
+                      id: item.id,
+                      name: item.name,
+                      price: Number(item.price),
+                      quantity: item.quantity,
+                    }))}
+                    characterId={isGift ? 0 : (selectedRoleId || 0)}
+                    characterName={isGift ? "" : (selectedCharacterName || "")}
+                    isGift={isGift}
+                    giftCharacterName={isGift ? giftCharacterName.trim() : ""}
+                    totalPrice={totalPrice}
+                    onSuccess={handlePaymentSuccess}
+                    onError={handlePaymentError}
+                  />
+                </div>
+              ) : (
+                <div className="border-t border-border pt-4">
+                  <div className="text-center py-6 text-muted-foreground">
+                    <CreditCard className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">
+                      {isGift 
+                        ? "Enter a recipient character name to continue"
+                        : "Select a character to continue to payment"
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <p className="text-center text-sm text-muted-foreground">
                 {t('checkout.secureNote')}
