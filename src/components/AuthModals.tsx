@@ -633,7 +633,7 @@ try {
           <form onSubmit={handleRegister} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="register-username" className="text-foreground">
-                Username <span className="text-xs text-muted-foreground">(4-10 characters)</span>
+                Username <span className="text-xs text-muted-foreground">(4-10 characters, lowercase letters & numbers only)</span>
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -642,7 +642,10 @@ try {
                   type="text"
                   placeholder="Enter your username"
                   value={registerData.login}
-                  onChange={(e) => setRegisterData({ ...registerData, login: e.target.value })}
+                  onChange={(e) => {
+                    const sanitized = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    setRegisterData({ ...registerData, login: sanitized });
+                  }}
                   className="pl-10 bg-background border-border focus:border-primary"
                   disabled={registerLoading}
                   minLength={4}
