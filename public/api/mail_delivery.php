@@ -108,9 +108,16 @@ class GameMailer {
      * Send Game Pass reward mail (daily claim)
      */
     public function sendGamePassReward($roleId, $day, $tier, $itemId, $qty, $coins = 0, $zen = 0, $exp = 0) {
-        $tierLabel = ($tier === 'gold') ? 'Gold' : (($tier === 'elite') ? 'Elite' : 'Free');
-        $title = "Game Pass Day {$day}";
-        $text  = "{$tierLabel} reward for Day {$day}. Enjoy!";
+        if ($tier === 'gold') {
+            $title = "Gold Pass - Day {$day}";
+            $text  = "Your Gold Pass Day {$day} reward awaits, Champion! Claim your ultimate treasure from WOI Endgame.";
+        } else if ($tier === 'elite') {
+            $title = "Elite Pass - Day {$day}";
+            $text  = "Your Elite Pass Day {$day} reward is here, Warrior! Enjoy your exclusive loot from WOI Endgame.";
+        } else {
+            $title = "Free Pass - Day {$day}";
+            $text  = "Your Free Pass Day {$day} reward is ready! Keep adventuring in WOI Endgame.";
+        }
         return $this->sendMail($roleId, $title, $text, $coins, $zen, $exp, $itemId, $qty);
     }
 
