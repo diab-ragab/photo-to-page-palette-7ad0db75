@@ -14,19 +14,46 @@ try {
     $purchases = [];
     
     try {
-        // Try webshop_orders table with product info
+        // Combined: webshop + bundle + gamepass orders
         $stmt = $pdo->query("
-            SELECT 
-                u.login as username,
-                wp.name as item_name,
-                wp.icon as item_icon,
-                wo.created_at,
-                wo.total_price as price
-            FROM webshop_orders wo
-            JOIN users u ON wo.user_id = u.ID
-            JOIN webshop_products wp ON wo.product_id = wp.id
-            WHERE wo.status = 'completed'
-            ORDER BY wo.created_at DESC
+            SELECT * FROM (
+                SELECT 
+                    u.login as username,
+                    wp.name as item_name,
+                    wp.icon as item_icon,
+                    wo.created_at,
+                    wo.total_price as price
+                FROM webshop_orders wo
+                JOIN users u ON wo.user_id = u.ID
+                JOIN webshop_products wp ON wo.product_id = wp.id
+                WHERE wo.status = 'completed'
+                
+                UNION ALL
+                
+                SELECT 
+                    u2.login as username,
+                    fb.name as item_name,
+                    '🎉' as item_icon,
+                    bo.created_at,
+                    bo.total_real as price
+                FROM bundle_orders bo
+                JOIN users u2 ON bo.user_id = u2.ID
+                LEFT JOIN flash_bundles fb ON fb.id = bo.bundle_id
+                WHERE bo.status = 'completed'
+                
+                UNION ALL
+                
+                SELECT 
+                    u3.login as username,
+                    CONCAT('Game Pass - ', UPPER(gp.tier)) as item_name,
+                    '🎫' as item_icon,
+                    gp.created_at,
+                    gp.price as price
+                FROM gamepass_purchases gp
+                JOIN users u3 ON gp.user_id = u3.ID
+                WHERE gp.status = 'completed'
+            ) combined
+            ORDER BY created_at DESC
             LIMIT 20
         ");
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);

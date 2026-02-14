@@ -27,7 +27,7 @@ interface Order {
   status: "pending" | "completed" | "failed" | "refunded";
   delivered_at: string | null;
   created_at: string;
-  order_type: "product" | "bundle";
+  order_type: "product" | "bundle" | "gamepass";
   bundle_id: number | null;
 }
 
@@ -158,15 +158,17 @@ export function OrderHistory() {
                   const status = statusConfig[order.status];
                   const StatusIcon = status.icon;
                   const isBundle = order.order_type === "bundle";
+                  const isGamePass = order.order_type === "gamepass";
 
                   return (
                     <div
                       key={`${order.order_type}-${order.id}`}
                       className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                     >
-                    {/* Product/Bundle Icon */}
+                    {/* Product/Bundle/GamePass Icon */}
                       <div className="h-14 w-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0 text-2xl">
-                        {isBundle ? "🎉" :
+                        {isGamePass ? "🎫" :
+                         isBundle ? "🎉" :
                          order.item_id === -1 ? "💎" : 
                          order.item_id === -2 ? "🪙" : 
                          order.item_id === -3 ? "⚡" : "🎁"}
@@ -185,9 +187,14 @@ export function OrderHistory() {
                                   Bundle
                                 </Badge>
                               )}
+                              {isGamePass && (
+                                <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-500 border-amber-500/20">
+                                  Game Pass
+                                </Badge>
+                              )}
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              {isBundle ? formatPrice(order) : `Qty: ${order.quantity} • ${formatPrice(order)}`}
+                              {isGamePass || isBundle ? formatPrice(order) : `Qty: ${order.quantity} • ${formatPrice(order)}`}
                             </p>
                           </div>
                           <Badge variant="outline" className={status.className}>
