@@ -1,12 +1,8 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   PayPalScriptProvider,
-  PayPalCardFieldsProvider,
-  PayPalNameField,
-  PayPalNumberField,
-  PayPalExpiryField,
-  PayPalCVVField,
-  usePayPalCardFields,
+  PayPalButtons,
+  FUNDING,
 } from "@paypal/react-paypal-js";
 import { Button } from "@/components/ui/button";
 import { Loader2, Lock, CreditCard, CheckCircle, AlertCircle } from "lucide-react";
@@ -26,54 +22,6 @@ interface CardPaymentFormProps {
 
 const PAYPAL_CLIENT_ID = "AWEFJy_edKvt3xKcWnEgeB-lQBtz2VqYGb9eSWnDJB1f7cSyBeZ8R2xoyHF5r_vrnYOxkfkHHrm6EzHs";
 
-const cardFieldStyle = {
-  input: {
-    "font-size": "14px",
-    "font-family": "'Inter', sans-serif",
-    color: "#e2e8f0",
-    padding: "12px",
-  },
-  "input:focus": {
-    color: "#f8fafc",
-  },
-  ".invalid": {
-    color: "#ef4444",
-  },
-};
-
-function SubmitButton({ totalPrice, isPaying }: { totalPrice: number; isPaying: boolean }) {
-  const { cardFieldsForm } = usePayPalCardFields();
-
-  const handleClick = async () => {
-    if (!cardFieldsForm) return;
-
-    cardFieldsForm.submit().catch((err: Error) => {
-      console.error("Card submit error:", err);
-    });
-  };
-
-  return (
-    <Button
-      onClick={handleClick}
-      className="w-full gap-2 h-12 text-base"
-      size="lg"
-      disabled={isPaying}
-    >
-      {isPaying ? (
-        <>
-          <Loader2 className="w-5 h-5 animate-spin" />
-          Processing Payment...
-        </>
-      ) : (
-        <>
-          <Lock className="w-4 h-4" />
-          Pay €{totalPrice.toFixed(2)}
-        </>
-      )}
-    </Button>
-  );
-}
-
 export function CardPaymentForm({
   items,
   characterId,
@@ -84,12 +32,10 @@ export function CardPaymentForm({
   onSuccess,
   onError,
 }: CardPaymentFormProps) {
-  const [isPaying, setIsPaying] = useState(false);
   const [status, setStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
   const createOrder = useCallback(async () => {
-    setIsPaying(true);
     setStatus("processing");
     setErrorMessage("");
 
@@ -125,7 +71,6 @@ export function CardPaymentForm({
 
       return data.orderID;
     } catch (err: any) {
-      setIsPaying(false);
       setStatus("error");
       const msg = err?.message || "Failed to create order";
       setErrorMessage(msg);
@@ -134,7 +79,8 @@ export function CardPaymentForm({
     }
   }, [items, characterId, characterName, isGift, giftCharacterName, onError]);
 
-  const onApprove = useCallback(async (data: { orderID: string }) => {
+  const handleApprove = useCallback(async (data: any) => {
+    setStatus("processing");
     try {
       const token = localStorage.getItem("woi_session_token") || "";
       const res = await fetch(`${API_BASE}/paypal_capture.php`, {
@@ -154,13 +100,11 @@ export function CardPaymentForm({
 
       if (captureData.success) {
         setStatus("success");
-        setIsPaying(false);
         onSuccess(captureData);
       } else {
         throw new Error(captureData.message || "Payment capture failed");
       }
     } catch (err: any) {
-      setIsPaying(false);
       setStatus("error");
       const msg = err?.message || "Payment failed";
       setErrorMessage(msg);
@@ -168,14 +112,18 @@ export function CardPaymentForm({
     }
   }, [onSuccess, onError]);
 
-  const onErrorCallback = useCallback((err: Record<string, unknown>) => {
-    console.error("PayPal card error:", err);
-    setIsPaying(false);
+  const handleError = useCallback((err: Record<string, unknown>) => {
+    console.error("PayPal error:", err);
     setStatus("error");
     const msg = "Payment processing failed. Please try again.";
     setErrorMessage(msg);
     onError(msg);
   }, [onError]);
+
+  const handleCancel = useCallback(() => {
+    setStatus("idle");
+    setErrorMessage("");
+  }, []);
 
   if (status === "success") {
     return (
@@ -197,105 +145,94 @@ export function CardPaymentForm({
     <PayPalScriptProvider
       options={{
         clientId: PAYPAL_CLIENT_ID,
-        components: "card-fields",
+        components: "buttons",
         currency: "EUR",
         intent: "capture",
+        disableFunding: "paylater,venmo,sepa,bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sofort",
       }}
     >
-      <PayPalCardFieldsProvider
-        createOrder={createOrder}
-        onApprove={onApprove}
-        onError={onErrorCallback}
-        style={cardFieldStyle}
-      >
-        <div className="space-y-4">
-          {/* Card Holder Name */}
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-              Card Holder Name
-            </label>
-            <div className="rounded-lg border border-input bg-background overflow-hidden paypal-card-field-wrapper">
-              <PayPalNameField
-                style={cardFieldStyle}
-                className="paypal-card-field"
-              />
-            </div>
+      <div className="space-y-4">
+        {status === "processing" && (
+          <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Processing payment...</span>
           </div>
+        )}
 
-          {/* Card Number */}
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-              Card Number
-            </label>
-            <div className="rounded-lg border border-input bg-background overflow-hidden paypal-card-field-wrapper">
-              <PayPalNumberField
-                style={cardFieldStyle}
-                className="paypal-card-field"
-              />
-            </div>
-          </div>
-
-          {/* Expiry + CVV Row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                Expiry Date
-              </label>
-              <div className="rounded-lg border border-input bg-background overflow-hidden paypal-card-field-wrapper">
-                <PayPalExpiryField
-                  style={cardFieldStyle}
-                  className="paypal-card-field"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                CVV
-              </label>
-              <div className="rounded-lg border border-input bg-background overflow-hidden paypal-card-field-wrapper">
-                <PayPalCVVField
-                  style={cardFieldStyle}
-                  className="paypal-card-field"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Error */}
-          <AnimatePresence>
-            {status === "error" && errorMessage && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive"
-              >
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <p className="text-sm">{errorMessage}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Submit */}
-          <SubmitButton totalPrice={totalPrice} isPaying={isPaying} />
-
-          {/* Security badges */}
-          <div className="flex items-center justify-center gap-4 pt-2">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Lock className="w-3 h-3" />
-              <span>SSL Encrypted</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CreditCard className="w-3 h-3" />
-              <span>PCI Compliant</span>
-            </div>
-          </div>
-
-          <p className="text-center text-xs text-muted-foreground">
-            Powered by PayPal · 3D Secure enabled
+        {/* Card Payment Button */}
+        <div>
+          <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+            <CreditCard className="w-4 h-4" />
+            Pay with Credit / Debit Card
           </p>
+          <PayPalButtons
+            fundingSource={FUNDING.CARD}
+            style={{
+              layout: "vertical",
+              color: "black",
+              shape: "rect",
+              label: "pay",
+              height: 48,
+            }}
+            createOrder={createOrder}
+            onApprove={handleApprove}
+            onError={handleError}
+            onCancel={handleCancel}
+          />
         </div>
-      </PayPalCardFieldsProvider>
+
+        {/* PayPal Button */}
+        <div>
+          <p className="text-sm font-medium text-muted-foreground mb-2">
+            Or pay with PayPal
+          </p>
+          <PayPalButtons
+            fundingSource={FUNDING.PAYPAL}
+            style={{
+              layout: "vertical",
+              color: "gold",
+              shape: "rect",
+              label: "pay",
+              height: 48,
+            }}
+            createOrder={createOrder}
+            onApprove={handleApprove}
+            onError={handleError}
+            onCancel={handleCancel}
+          />
+        </div>
+
+        {/* Error */}
+        <AnimatePresence>
+          {status === "error" && errorMessage && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive"
+            >
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <p className="text-sm">{errorMessage}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Security badges */}
+        <div className="flex items-center justify-center gap-4 pt-2">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Lock className="w-3 h-3" />
+            <span>SSL Encrypted</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CreditCard className="w-3 h-3" />
+            <span>PCI Compliant</span>
+          </div>
+        </div>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Powered by PayPal · No PayPal account required for card payments
+        </p>
+      </div>
     </PayPalScriptProvider>
   );
 }
