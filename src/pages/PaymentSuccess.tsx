@@ -33,13 +33,18 @@ const PaymentSuccess = () => {
     if (isPayPal && paypalToken) {
       setIsConfirming(true);
       
+      const sessionToken = localStorage.getItem("woi_session_token") || "";
       fetch(`${API_BASE}/paypal_capture.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-Session-Token": sessionToken,
+        },
         credentials: "include",
         body: JSON.stringify({ 
           paypalOrderId: paypalToken,
           payerId: paypalPayerId,
+          sessionToken: sessionToken,
         }),
       })
         .then(res => res.json())
@@ -65,13 +70,18 @@ const PaymentSuccess = () => {
     else if (paypalToken) {
       setIsConfirming(true);
       
+      const sessionToken2 = localStorage.getItem("woi_session_token") || "";
       fetch(`${API_BASE}/paypal_capture.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-Session-Token": sessionToken2,
+        },
         credentials: "include",
         body: JSON.stringify({ 
           paypalOrderId: paypalToken,
           payerId: paypalPayerId,
+          sessionToken: sessionToken2,
         }),
       })
         .then(res => res.json())

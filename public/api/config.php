@@ -37,6 +37,7 @@ $APP_CONFIG = array(
     'secret'      => 'EIgcYoXHk2fmkniJeYBmQRi77sTiBgJPgLg5D5mLO5ndIDN_KK7QW4kXF-aB8IrSlFlvOd_RRw9UlVfr',
     'sandbox'     => false,
     'webhook_id'  => '8SG55611X6955945V',
+    'merchant_id' => '',
     'success_url' => 'https://woiendgame.online/checkout/success',
     'cancel_url'  => 'https://woiendgame.online/shop',
     'currency'    => 'EUR',

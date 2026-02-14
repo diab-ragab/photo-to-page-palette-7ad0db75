@@ -1,16 +1,24 @@
 <?php
 /**
  * paypal_capture.php - Capture PayPal order after payer approval & fulfill
- * PHP 5.x compatible
+ * PHP 5.x compatible (no closures, no short arrays, no ??)
  *
  * POST { paypalOrderId: string }
- * or GET ?token=PAYPAL_ORDER_ID (redirect from PayPal)
- * Returns { success: true, status: "COMPLETED", order_id: int }
+ * Returns { success: true, status: "COMPLETED", order_id: int, processed_count: int, rid: string }
+ *
+ * Security hardening:
+ *  - EUR-only currency verification
+ *  - Amount match (integer cents comparison)
+ *  - Merchant ID verification
+ *  - Idempotent: duplicate confirms do NOT duplicate delivery
+ *  - Status workflow: pending -> processing -> completed
+ *  - Rate limiting per IP
  */
 
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/session_helper.php';
 require_once __DIR__ . '/paypal_helper.php';
-handleCors(array('GET', 'POST', 'OPTIONS'));
+handleCors(array('POST', 'OPTIONS'));
 
 $RID = substr(md5(uniqid(mt_rand(), true)), 0, 12);
 
@@ -36,26 +44,23 @@ header('Content-Type: application/json; charset=utf-8');
 
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '';
 if ($method === 'OPTIONS') { http_response_code(204); exit; }
+if ($method !== 'POST') json_fail_pc(405, 'Method not allowed');
 
-// Get PayPal order ID from POST body or GET param (PayPal sends ?token=ORDER_ID on redirect)
-$paypalOrderId = '';
+// ── Auth: require logged-in user ──
+$user = getCurrentUser();
+if (!$user) json_fail_pc(401, 'Not authenticated');
+$authedUserId = (int)$user['user_id'];
 
-if ($method === 'POST') {
-  $body = getJsonInput();
-  $paypalOrderId = isset($body['paypalOrderId']) ? trim($body['paypalOrderId']) : '';
-  if ($paypalOrderId === '' && isset($body['token'])) {
-    $paypalOrderId = trim($body['token']);
-  }
-} else {
-  // GET - PayPal redirect sends ?token=ORDER_ID
-  $paypalOrderId = isset($_GET['token']) ? trim($_GET['token']) : '';
+// ── Parse input ──
+$body = getJsonInput();
+$paypalOrderId = isset($body['paypalOrderId']) ? trim($body['paypalOrderId']) : '';
+if ($paypalOrderId === '' && isset($body['token'])) {
+  $paypalOrderId = trim($body['token']);
 }
+if ($paypalOrderId === '') json_fail_pc(400, 'PayPal order ID required');
+if (strlen($paypalOrderId) > 64) json_fail_pc(400, 'Invalid order ID');
 
-if ($paypalOrderId === '') {
-  json_fail_pc(400, 'PayPal order ID required');
-}
-
-// Rate limiting
+// ── Rate limiting ──
 $pdo = getDB();
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS payment_rate_limit (
@@ -79,20 +84,76 @@ if ($rateCheck && (int)$rateCheck['cnt'] >= 20) {
 $stmt = $pdo->prepare("INSERT INTO payment_rate_limit (ip_address, endpoint, request_time) VALUES (?, 'pp_capture', NOW())");
 $stmt->execute(array($clientIP));
 
-// PayPal config
+// ── Idempotency: check if already completed ──
+$alreadyDone = false;
+
+// Check webshop_orders
+$stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE paypal_order_id = ? AND status = 'completed' LIMIT 1");
+$stmt->execute(array($paypalOrderId));
+if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+  $alreadyDone = true;
+}
+
+// Check bundle_orders
+if (!$alreadyDone) {
+  try {
+    $stmt = $pdo->prepare("SELECT id FROM bundle_orders WHERE paypal_order_id = ? AND status = 'completed' LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+      $alreadyDone = true;
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+}
+
+if ($alreadyDone) {
+  error_log("RID={$RID} IDEMPOTENT_SKIP already_completed order={$paypalOrderId}");
+  json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'message' => 'Already fulfilled', 'order_id' => 0, 'processed_count' => 0));
+}
+
+// ── Verify order belongs to authed user (check local DB) ──
+$ownerOk = false;
+$stmt = $pdo->prepare("SELECT user_id FROM webshop_orders WHERE paypal_order_id = ? LIMIT 1");
+$stmt->execute(array($paypalOrderId));
+$ownerRow = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($ownerRow) {
+  if ((int)$ownerRow['user_id'] !== $authedUserId) {
+    error_log("RID={$RID} AUTH_MISMATCH order_user=" . $ownerRow['user_id'] . " authed={$authedUserId}");
+    json_fail_pc(403, 'Order does not belong to you');
+  }
+  $ownerOk = true;
+}
+
+// Also check bundle_orders
+if (!$ownerOk) {
+  try {
+    $stmt = $pdo->prepare("SELECT user_id FROM bundle_orders WHERE paypal_order_id = ? LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    $bOwner = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($bOwner) {
+      if ((int)$bOwner['user_id'] !== $authedUserId) {
+        json_fail_pc(403, 'Order does not belong to you');
+      }
+      $ownerOk = true;
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+}
+
+// ── PayPal config ──
 $ppCfg = getPayPalConfig();
 if ($ppCfg['client_id'] === '' || $ppCfg['secret'] === '') {
   json_fail_pc(500, 'Payment not configured');
 }
+$expectedCurrency = strtoupper($ppCfg['currency']);
+$expectedMerchantId = isset($ppCfg['merchant_id']) ? $ppCfg['merchant_id'] : '';
 
-// Get access token
+// ── Get access token ──
 $tokenResult = getPayPalAccessToken($ppCfg['client_id'], $ppCfg['secret'], $ppCfg['sandbox']);
 if ($tokenResult['error'] !== '') {
   error_log("RID={$RID} PP_CAPTURE_TOKEN_ERR: " . $tokenResult['error']);
   json_fail_pc(502, 'Payment provider error');
 }
 
-// First check order status - might already be captured
+// ── Get order details from PayPal ──
 list($checkCode, $checkData, $checkErr) = paypalGetOrder($tokenResult['token'], $paypalOrderId, $ppCfg['sandbox']);
 
 if ($checkCode < 200 || $checkCode >= 300) {
@@ -103,6 +164,7 @@ if ($checkCode < 200 || $checkCode >= 300) {
 $orderStatus = isset($checkData['status']) ? $checkData['status'] : '';
 error_log("RID={$RID} PP_ORDER_STATUS order={$paypalOrderId} status={$orderStatus}");
 
+// ── Capture if APPROVED ──
 $captureId = '';
 
 if ($orderStatus === 'COMPLETED') {
@@ -111,8 +173,11 @@ if ($orderStatus === 'COMPLETED') {
     $captureId = $checkData['purchase_units'][0]['payments']['captures'][0]['id'];
   }
   error_log("RID={$RID} PP_ALREADY_CAPTURED order={$paypalOrderId} capture={$captureId}");
+
+  // Re-fetch order data so verification below uses captured data
+  list($checkCode, $checkData, $checkErr) = paypalGetOrder($tokenResult['token'], $paypalOrderId, $ppCfg['sandbox']);
+
 } elseif ($orderStatus === 'APPROVED') {
-  // Capture the order
   $captureResult = paypalCaptureOrder($tokenResult['token'], $paypalOrderId, $ppCfg['sandbox']);
 
   if ($captureResult['error'] !== '') {
@@ -130,9 +195,9 @@ if ($orderStatus === 'COMPLETED') {
   }
 
   $captureId = $captureResult['capture_id'];
+  $checkData = $captureResult['data'];
   error_log("RID={$RID} PP_CAPTURED order={$paypalOrderId} capture={$captureId}");
 } else {
-  // Not approved yet
   json_response_pc(array(
     'success' => false,
     'status' => $orderStatus,
@@ -140,28 +205,129 @@ if ($orderStatus === 'COMPLETED') {
   ));
 }
 
+// ══════════════════════════════════════════════
+// SECURITY VERIFICATION (post-capture)
+// ══════════════════════════════════════════════
+
+$pu = isset($checkData['purchase_units'][0]) ? $checkData['purchase_units'][0] : array();
+
+// 1) Verify capture status is COMPLETED
+$captureData = array();
+if (isset($pu['payments']['captures'][0])) {
+  $captureData = $pu['payments']['captures'][0];
+}
+$captureStatus = isset($captureData['status']) ? $captureData['status'] : '';
+if ($captureStatus !== 'COMPLETED') {
+  error_log("RID={$RID} CAPTURE_STATUS_REJECT status={$captureStatus}");
+  json_fail_pc(400, 'Capture not completed');
+}
+
+// 2) Verify currency is EUR
+$paidCurrency = '';
+$paidValue = '';
+if (isset($captureData['amount']['currency_code'])) {
+  $paidCurrency = strtoupper($captureData['amount']['currency_code']);
+}
+if (isset($captureData['amount']['value'])) {
+  $paidValue = $captureData['amount']['value'];
+}
+
+if ($paidCurrency !== $expectedCurrency) {
+  error_log("RID={$RID} CURRENCY_REJECT paid={$paidCurrency} expected={$expectedCurrency}");
+  json_fail_pc(400, 'Currency mismatch: expected ' . $expectedCurrency . ', got ' . $paidCurrency);
+}
+
+// 3) Convert to integer cents for safe comparison
+$paidCents = (int)round(floatval($paidValue) * 100);
+
+// 4) Verify merchant / payee
+if ($expectedMerchantId !== '') {
+  $payeeMerchant = '';
+  if (isset($pu['payee']['merchant_id'])) {
+    $payeeMerchant = $pu['payee']['merchant_id'];
+  }
+  if ($payeeMerchant !== $expectedMerchantId) {
+    error_log("RID={$RID} MERCHANT_REJECT payee={$payeeMerchant} expected={$expectedMerchantId}");
+    json_fail_pc(400, 'Merchant mismatch');
+  }
+}
+
+// 5) Verify amount matches local order total
+$localTotalCents = 0;
+
+// Sum from webshop_orders
+$stmt = $pdo->prepare("SELECT SUM(total_real) as total FROM webshop_orders WHERE paypal_order_id = ?");
+$stmt->execute(array($paypalOrderId));
+$sumRow = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($sumRow && $sumRow['total'] !== null) {
+  $localTotalCents = (int)round(floatval($sumRow['total']) * 100);
+}
+
+// If no webshop orders, check bundle_orders
+if ($localTotalCents <= 0) {
+  try {
+    $stmt = $pdo->prepare("SELECT price_eur FROM bundle_orders WHERE paypal_order_id = ? LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    $bRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($bRow && isset($bRow['price_eur'])) {
+      $localTotalCents = (int)round(floatval($bRow['price_eur']) * 100);
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+}
+
+// If no local orders found, check topup_orders
+if ($localTotalCents <= 0) {
+  try {
+    $stmt = $pdo->prepare("SELECT price_eur FROM topup_orders WHERE paypal_order_id = ? LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    $tRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($tRow && isset($tRow['price_eur'])) {
+      $localTotalCents = (int)round(floatval($tRow['price_eur']) * 100);
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+}
+
+// Only enforce amount check if we have a local record
+if ($localTotalCents > 0 && $paidCents !== $localTotalCents) {
+  error_log("RID={$RID} AMOUNT_REJECT paid_cents={$paidCents} local_cents={$localTotalCents}");
+  json_fail_pc(400, 'Amount mismatch');
+}
+
+error_log("RID={$RID} VERIFICATION_PASSED currency={$paidCurrency} paid_cents={$paidCents} local_cents={$localTotalCents}");
+
+// ══════════════════════════════════════════════
+// FULFILLMENT
+// ══════════════════════════════════════════════
+
 // Parse metadata from custom_id
 $metadata = array();
-if (isset($checkData['purchase_units'][0]['custom_id'])) {
-  $parsed = json_decode($checkData['purchase_units'][0]['custom_id'], true);
+if (isset($pu['custom_id'])) {
+  $parsed = json_decode($pu['custom_id'], true);
   if (is_array($parsed)) $metadata = $parsed;
 }
 
-$userId = isset($metadata['user_id']) ? (int)$metadata['user_id'] : 0;
+$userId = isset($metadata['user_id']) ? (int)$metadata['user_id'] : $authedUserId;
 $purchaseType = isset($metadata['type']) ? $metadata['type'] : 'webshop';
 $purchaseTier = isset($metadata['tier']) ? $metadata['tier'] : '';
+
+// Verify metadata user matches authed user
+if ($userId !== $authedUserId) {
+  error_log("RID={$RID} META_USER_MISMATCH meta={$userId} authed={$authedUserId}");
+  // Use authed user as authoritative
+  $userId = $authedUserId;
+}
 
 // Handle Game Pass purchases
 if ($purchaseType === 'gamepass' && in_array($purchaseTier, array('elite', 'gold'))) {
   handleGamePassCapture($pdo, $userId, $purchaseTier, $paypalOrderId, $captureId, $RID);
-  json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'message' => 'Game Pass activated!'));
+  json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'message' => 'Game Pass activated!', 'order_id' => 0, 'processed_count' => 1));
 }
 
 // Handle bundle purchases
 if ($purchaseType === 'bundle') {
   $bundleOrderId = isset($metadata['order_id']) ? (int)$metadata['order_id'] : 0;
   handleBundleCapture($pdo, $bundleOrderId, $paypalOrderId, $captureId, $userId, $RID);
-  json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'order_id' => $bundleOrderId, 'message' => 'Bundle purchased!'));
+  json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'order_id' => $bundleOrderId, 'processed_count' => 1, 'message' => 'Bundle purchased!'));
 }
 
 // Handle currency top-up purchases
@@ -170,18 +336,25 @@ if ($purchaseType === 'topup') {
   $charId = isset($metadata['char_id']) ? (int)$metadata['char_id'] : 0;
   $charName = isset($metadata['char_name']) ? $metadata['char_name'] : '';
   handleTopUpCapture($pdo, $userId, $pkgId, $charId, $charName, $paypalOrderId, $captureId, $RID);
-  json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'message' => 'Currency delivered!'));
+  json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'message' => 'Currency delivered!', 'order_id' => 0, 'processed_count' => 1));
 }
 
-// Regular webshop order fulfillment
+// ── Regular webshop order fulfillment ──
+
+// Set to processing first (idempotent: only pending orders transition)
+$stmt = $pdo->prepare("UPDATE webshop_orders SET status = 'processing' WHERE paypal_order_id = ? AND status = 'pending'");
+$stmt->execute(array($paypalOrderId));
+$processingCount = $stmt->rowCount();
+
 $ordersToProcess = array();
-$stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE paypal_order_id = ? AND status = 'pending'");
+$stmt = $pdo->prepare("SELECT id FROM webshop_orders WHERE paypal_order_id = ? AND status = 'processing'");
 $stmt->execute(array($paypalOrderId));
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
   $ordersToProcess[] = (int)$row['id'];
 }
 
 $lastOrderId = 0;
+$processedCount = 0;
 
 if (count($ordersToProcess) > 0) {
   require_once __DIR__ . '/mail_delivery.php';
@@ -193,27 +366,55 @@ if (count($ordersToProcess) > 0) {
     if (!$order) continue;
     if ($order['status'] === 'completed') continue;
 
-    // Mark completed
-    try {
-      $stmt = $pdo->prepare("UPDATE webshop_orders SET status = 'completed', paypal_capture_id = ?, delivered_at = NOW(), updated_at = NOW() WHERE id = ?");
-      $stmt->execute(array($captureId, $oid));
-    } catch (Exception $e) {
-      $stmt = $pdo->prepare("UPDATE webshop_orders SET status = 'completed', paypal_capture_id = ?, delivered_at = NOW() WHERE id = ?");
-      $stmt->execute(array($captureId, $oid));
-    }
-
-    if ($userId <= 0 && isset($order['user_id'])) $userId = (int)$order['user_id'];
     $characterId = isset($order['character_id']) ? (int)$order['character_id'] : 0;
     $characterName = isset($order['character_name']) ? $order['character_name'] : '';
     $productId = isset($order['product_id']) ? (int)$order['product_id'] : 0;
     $quantity = isset($order['quantity']) ? (int)$order['quantity'] : 1;
 
+    $delivered = false;
     if ($productId > 0 && $characterId > 0) {
-      fulfillOrderPP($pdo, $userId, $productId, $quantity, $oid, $characterId, $characterName, $RID);
+      $delivered = fulfillOrderPP($pdo, $userId, $productId, $quantity, $oid, $characterId, $characterName, $RID);
+    } else {
+      $delivered = true; // nothing to deliver
+    }
+
+    if ($delivered) {
+      // Mark completed with capture info
+      try {
+        $stmt = $pdo->prepare("UPDATE webshop_orders SET status = 'completed', paypal_capture_id = ?, delivered_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'processing'");
+        $stmt->execute(array($captureId, $oid));
+      } catch (Exception $e) {
+        $stmt = $pdo->prepare("UPDATE webshop_orders SET status = 'completed', paypal_capture_id = ?, delivered_at = NOW() WHERE id = ? AND status = 'processing'");
+        $stmt->execute(array($captureId, $oid));
+      }
+      $processedCount++;
+    } else {
+      // Delivery failed - create pending_deliveries record
+      error_log("RID={$RID} DELIVERY_FAILED order={$oid} - creating pending_deliveries record");
+      try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS pending_deliveries (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          order_id INT NOT NULL,
+          order_type VARCHAR(20) NOT NULL DEFAULT 'webshop',
+          paypal_order_id VARCHAR(64) DEFAULT NULL,
+          user_id INT NOT NULL,
+          retry_count INT NOT NULL DEFAULT 0,
+          last_error TEXT,
+          created_at DATETIME NOT NULL,
+          KEY idx_order (order_id, order_type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+        $ins = $pdo->prepare("INSERT INTO pending_deliveries (order_id, order_type, paypal_order_id, user_id, created_at) VALUES (?, 'webshop', ?, ?, NOW())");
+        $ins->execute(array($oid, $paypalOrderId, $userId));
+      } catch (Exception $e) {
+        error_log("RID={$RID} PENDING_DELIVERY_ERR: " . $e->getMessage());
+      }
+      // Revert to pending
+      $stmt = $pdo->prepare("UPDATE webshop_orders SET status = 'pending' WHERE id = ? AND status = 'processing'");
+      $stmt->execute(array($oid));
     }
 
     $lastOrderId = $oid;
-    error_log("RID={$RID} PP_ORDER_COMPLETED order={$oid} user={$userId} product={$productId}");
+    error_log("RID={$RID} PP_ORDER_PROCESSED order={$oid} user={$userId} product={$productId} delivered=" . ($delivered ? 'yes' : 'no'));
   }
 } else {
   error_log("RID={$RID} PP_NO_ORDERS_FOUND paypal_order={$paypalOrderId}");
@@ -224,6 +425,7 @@ json_response_pc(array(
   'status' => 'COMPLETED',
   'message' => 'Payment confirmed and order fulfilled',
   'order_id' => $lastOrderId,
+  'processed_count' => $processedCount,
 ));
 
 // ============ HANDLERS ============
@@ -233,6 +435,17 @@ function handleGamePassCapture($pdo, $userId, $tier, $paypalOrderId, $captureId,
     error_log("RID={$RID} GAMEPASS_PP_NO_USER order={$paypalOrderId}");
     return;
   }
+
+  // Idempotency check
+  try {
+    $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ? AND paypal_order_id = ?");
+    $stmt->execute(array($userId, $paypalOrderId));
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($existing) {
+      error_log("RID={$RID} GAMEPASS_IDEMPOTENT already_activated user={$userId} order={$paypalOrderId}");
+      return;
+    }
+  } catch (Exception $e) { /* column may not exist yet */ }
 
   try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free'"); } catch (Exception $e) {}
   try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN paypal_order_id VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
@@ -265,11 +478,11 @@ function handleBundleCapture($pdo, $bundleOrderId, $paypalOrderId, $captureId, $
   if ($bundleOrderId <= 0) return;
 
   try {
+    // Idempotency: only update if pending
     $stmt = $pdo->prepare("UPDATE bundle_orders SET status = 'completed', paypal_capture_id = ? WHERE id = ? AND status = 'pending'");
     $stmt->execute(array($captureId, $bundleOrderId));
 
     if ($stmt->rowCount() > 0) {
-      // Fulfill bundle items via mail delivery
       require_once __DIR__ . '/mail_delivery.php';
       
       $stmt = $pdo->prepare("SELECT * FROM bundle_orders WHERE id = ?");
@@ -280,9 +493,7 @@ function handleBundleCapture($pdo, $bundleOrderId, $paypalOrderId, $captureId, $
         $bundleId = (int)$order['bundle_id'];
         $characterId = (int)$order['character_id'];
         $characterName = isset($order['character_name']) ? $order['character_name'] : '';
-        $orderUserId = (int)$order['user_id'];
         
-        // Get bundle items
         $stmt = $pdo->prepare("SELECT * FROM flash_bundle_items WHERE bundle_id = ?");
         $stmt->execute(array($bundleId));
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -306,6 +517,8 @@ function handleBundleCapture($pdo, $bundleOrderId, $paypalOrderId, $captureId, $
       }
 
       error_log("RID={$RID} BUNDLE_PP_COMPLETED order={$bundleOrderId}");
+    } else {
+      error_log("RID={$RID} BUNDLE_IDEMPOTENT_SKIP order={$bundleOrderId} already_completed_or_missing");
     }
   } catch (Exception $e) {
     error_log("RID={$RID} BUNDLE_PP_ERR: " . $e->getMessage());
@@ -330,6 +543,7 @@ function fulfillOrderPP($pdo, $userId, $productId, $quantity, $orderId, $charact
   $roleId = $characterId;
   if ($roleId <= 0) return false;
 
+  require_once __DIR__ . '/mail_delivery.php';
   $mailer = new GameMailer($pdo);
 
   $coins = 0;
@@ -368,7 +582,17 @@ function handleTopUpCapture($pdo, $userId, $pkgId, $charId, $charName, $paypalOr
     return;
   }
 
-  // Fetch package details
+  // Idempotency
+  try {
+    $stmt = $pdo->prepare("SELECT id, status FROM topup_orders WHERE paypal_order_id = ? LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    $tRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($tRow && $tRow['status'] === 'completed') {
+      error_log("RID={$RID} TOPUP_IDEMPOTENT_SKIP order={$paypalOrderId}");
+      return;
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+
   $stmt = $pdo->prepare("SELECT * FROM currency_topup_packages WHERE id = ? LIMIT 1");
   $stmt->execute(array($pkgId));
   $pkg = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -384,7 +608,6 @@ function handleTopUpCapture($pdo, $userId, $pkgId, $charId, $charName, $paypalOr
   $currencyType = $pkg['currency_type'];
   $label = $currencyType === 'zen' ? 'Zen' : 'Coins';
 
-  // Deliver via in-game mail
   require_once __DIR__ . '/mail_delivery.php';
   $mailer = new GameMailer($pdo);
 
@@ -398,7 +621,6 @@ function handleTopUpCapture($pdo, $userId, $pkgId, $charId, $charName, $paypalOr
 
   $result = $mailer->sendOrderReward($charId, number_format($total) . ' ' . $label . ' Top-Up', 0, 0, $coins, $zen, 0);
 
-  // Update topup_orders
   try {
     $stmt = $pdo->prepare("UPDATE topup_orders SET status = 'completed', paypal_capture_id = ?, completed_at = NOW() WHERE paypal_order_id = ? AND status = 'pending'");
     $stmt->execute(array($captureId, $paypalOrderId));
@@ -406,7 +628,6 @@ function handleTopUpCapture($pdo, $userId, $pkgId, $charId, $charName, $paypalOr
     error_log("RID={$RID} TOPUP_ORDER_UPDATE_ERR: " . $e->getMessage());
   }
 
-  // Update webshop_orders too
   try {
     $stmt = $pdo->prepare("UPDATE webshop_orders SET status = 'completed', paypal_capture_id = ?, delivered_at = NOW() WHERE paypal_order_id = ? AND status = 'pending'");
     $stmt->execute(array($captureId, $paypalOrderId));

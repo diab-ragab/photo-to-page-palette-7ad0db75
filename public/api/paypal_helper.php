@@ -245,12 +245,13 @@ if (!function_exists('getPayPalAccessToken')) {
     $cfg = getConfig();
     $pp = isset($cfg['paypal']) ? $cfg['paypal'] : array();
     return array(
-      'client_id'   => isset($pp['client_id']) ? $pp['client_id'] : '',
-      'secret'      => isset($pp['secret']) ? $pp['secret'] : '',
-      'sandbox'     => isset($pp['sandbox']) ? (bool)$pp['sandbox'] : false,
-      'currency'    => isset($pp['currency']) ? strtoupper($pp['currency']) : 'EUR',
-      'success_url' => isset($pp['success_url']) ? $pp['success_url'] : '',
-      'cancel_url'  => isset($pp['cancel_url']) ? $pp['cancel_url'] : '',
+      'client_id'    => isset($pp['client_id']) ? $pp['client_id'] : '',
+      'secret'       => isset($pp['secret']) ? $pp['secret'] : '',
+      'sandbox'      => isset($pp['sandbox']) ? (bool)$pp['sandbox'] : false,
+      'currency'     => isset($pp['currency']) ? strtoupper($pp['currency']) : 'EUR',
+      'merchant_id'  => isset($pp['merchant_id']) ? $pp['merchant_id'] : '',
+      'success_url'  => isset($pp['success_url']) ? $pp['success_url'] : '',
+      'cancel_url'   => isset($pp['cancel_url']) ? $pp['cancel_url'] : '',
     );
   }
 }
