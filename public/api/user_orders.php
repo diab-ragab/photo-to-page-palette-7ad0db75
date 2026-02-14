@@ -41,20 +41,22 @@ if ($action === 'list') {
         $statusParams[] = $status;
     }
     
-    // Count total from both tables
+    // Count total from all three tables
     $countSql = "
         SELECT (
             SELECT COUNT(*) FROM webshop_orders WHERE user_id = ? {$statusFilter}
         ) + (
             SELECT COUNT(*) FROM bundle_orders WHERE user_id = ? {$statusFilter}
+        ) + (
+            SELECT COUNT(*) FROM gamepass_purchases WHERE user_id = ? {$statusFilter}
         ) as total
     ";
-    $countParams = array_merge(array($userId), $statusParams, array($userId), $statusParams);
+    $countParams = array_merge(array($userId), $statusParams, array($userId), $statusParams, array($userId), $statusParams);
     $stmt = $pdo->prepare($countSql);
     $stmt->execute($countParams);
     $total = (int)$stmt->fetchColumn();
     
-    // Get orders from both tables using UNION
+    // Get orders from all three tables using UNION
     $sql = "
         SELECT 
             o.id,
@@ -90,11 +92,28 @@ if ($action === 'list') {
         LEFT JOIN flash_bundles fb ON fb.id = bo.bundle_id
         WHERE bo.user_id = ? {$statusFilter}
         
+        UNION ALL
+        
+        SELECT 
+            gp.id,
+            NULL as product_id,
+            1 as quantity,
+            gp.price as total_real,
+            gp.status,
+            NULL as delivered_at,
+            gp.created_at,
+            CONCAT('Game Pass - ', UPPER(gp.tier)) as product_name,
+            0 as item_id,
+            'gamepass' as order_type,
+            NULL as bundle_id
+        FROM gamepass_purchases gp
+        WHERE gp.user_id = ? {$statusFilter}
+        
         ORDER BY created_at DESC
         LIMIT {$offset}, {$limit}
     ";
     
-    $orderParams = array_merge(array($userId), $statusParams, array($userId), $statusParams);
+    $orderParams = array_merge(array($userId), $statusParams, array($userId), $statusParams, array($userId), $statusParams);
     $stmt = $pdo->prepare($sql);
     $stmt->execute($orderParams);
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);

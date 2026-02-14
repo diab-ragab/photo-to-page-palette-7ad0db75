@@ -85,23 +85,59 @@ try {
     }
 } catch (Exception $e) {}
 
-// Recent orders (last 10)
+// Recent orders (last 10) - includes webshop, bundles, and game passes
 try {
     $stmt = $pdo->query("
-        SELECT 
-            o.id,
-            o.user_id,
-            o.product_id,
-            o.quantity,
-            o.total_real,
-            o.status,
-            o.created_at,
-            u.{$usernameCol} as username,
-            p.name as product_name
-        FROM webshop_orders o
-        LEFT JOIN users u ON u.ID = o.user_id
-        LEFT JOIN webshop_products p ON p.id = o.product_id
-        ORDER BY o.created_at DESC
+        SELECT * FROM (
+            SELECT 
+                o.id,
+                o.user_id,
+                o.product_id,
+                o.quantity,
+                o.total_real,
+                o.status,
+                o.created_at,
+                u.{$usernameCol} as username,
+                p.name as product_name,
+                'product' as order_type
+            FROM webshop_orders o
+            LEFT JOIN users u ON u.ID = o.user_id
+            LEFT JOIN webshop_products p ON p.id = o.product_id
+            
+            UNION ALL
+            
+            SELECT 
+                bo.id,
+                bo.user_id,
+                NULL as product_id,
+                1 as quantity,
+                bo.total_real,
+                bo.status,
+                bo.created_at,
+                u2.{$usernameCol} as username,
+                fb.name as product_name,
+                'bundle' as order_type
+            FROM bundle_orders bo
+            LEFT JOIN users u2 ON u2.ID = bo.user_id
+            LEFT JOIN flash_bundles fb ON fb.id = bo.bundle_id
+            
+            UNION ALL
+            
+            SELECT 
+                gp.id,
+                gp.user_id,
+                NULL as product_id,
+                1 as quantity,
+                gp.price as total_real,
+                gp.status,
+                gp.created_at,
+                u3.{$usernameCol} as username,
+                CONCAT('Game Pass - ', UPPER(gp.tier)) as product_name,
+                'gamepass' as order_type
+            FROM gamepass_purchases gp
+            LEFT JOIN users u3 ON u3.ID = gp.user_id
+        ) combined
+        ORDER BY created_at DESC
         LIMIT 10
     ");
     $recentOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -111,12 +147,13 @@ try {
             'id' => (int)$order['id'],
             'user_id' => (int)$order['user_id'],
             'username' => $order['username'] ? $order['username'] : 'User #' . $order['user_id'],
-            'product_id' => (int)$order['product_id'],
-            'product_name' => $order['product_name'] ? $order['product_name'] : 'Product #' . $order['product_id'],
+            'product_id' => $order['product_id'] ? (int)$order['product_id'] : 0,
+            'product_name' => $order['product_name'] ? $order['product_name'] : 'Product #' . $order['id'],
             'quantity' => (int)$order['quantity'],
             'total_real' => (float)$order['total_real'],
             'status' => $order['status'],
             'created_at' => $order['created_at'],
+            'order_type' => $order['order_type'],
         );
     }
     
