@@ -104,29 +104,6 @@ Options -Indexes
 </IfModule>
 
 # -------------------------
-# CORS: Handle OPTIONS preflight for /api/ endpoints
-# Apache answers OPTIONS before PHP runs, preventing CORS blocks
+# CORS is handled entirely by bootstrap.php / handleCors()
+# Do NOT set Access-Control-* headers here to avoid duplicates
 # -------------------------
-<IfModule mod_headers.c>
-  <IfModule mod_setenvif.c>
-    SetEnvIf Origin "^https://(woiendgame\.online|www\.woiendgame\.online|woiendgame\.lovable\.app|[a-z0-9-]+\.lovableproject\.com|[a-z0-9-]+\.lovable\.app)$" CORS_ORIGIN=$0
-    SetEnvIf Origin "^http://localhost:(5173|3000|8080)$" CORS_ORIGIN=$0
-  </IfModule>
-  <FilesMatch "\.(php)$">
-    Header always set Access-Control-Allow-Origin "%{CORS_ORIGIN}e" env=CORS_ORIGIN
-    Header always set Access-Control-Allow-Credentials "true" env=CORS_ORIGIN
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" env=CORS_ORIGIN
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-CSRF-Token, X-Session-Token, X-Requested-With, Accept" env=CORS_ORIGIN
-    Header always set Access-Control-Max-Age "86400" env=CORS_ORIGIN
-    Header always set Vary "Origin" env=CORS_ORIGIN
-  </FilesMatch>
-</IfModule>
-
-# -------------------------
-# Quick 204 for OPTIONS preflight (before PHP)
-# -------------------------
-<IfModule mod_rewrite.c>
-  RewriteCond %{REQUEST_METHOD} OPTIONS
-  RewriteCond %{REQUEST_URI} ^/api/ [NC]
-  RewriteRule ^ - [R=204,L]
-</IfModule>
