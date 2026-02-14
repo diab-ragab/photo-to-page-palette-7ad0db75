@@ -14,6 +14,7 @@
 
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/paypal_helper.php';
+require_once __DIR__ . '/gamepass_helpers.php';
 
 $RID = substr(md5(uniqid(mt_rand(), true)), 0, 12);
 
@@ -107,42 +108,42 @@ switch ($eventType) {
     $purchaseType = isset($metadata['type']) ? $metadata['type'] : '';
     $purchaseTier = isset($metadata['tier']) ? $metadata['tier'] : '';
 
-    // Handle Game Pass
-    if ($purchaseType === 'gamepass' && in_array($purchaseTier, array('elite', 'gold'))) {
-      // Get paypal order ID from supplementary_data or links
-      $ppOrderId = '';
-      if (isset($resource['supplementary_data']['related_ids']['order_id'])) {
-        $ppOrderId = $resource['supplementary_data']['related_ids']['order_id'];
-      }
-      
-      if ($userId > 0) {
-        try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free'"); } catch (Exception $e) {}
-        
-        $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ?");
-        $stmt->execute(array($userId));
-        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-        $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
-        
-        if ($existing) {
-          $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = ?, expires_at = ? WHERE user_id = ?");
-          $stmt->execute(array($purchaseTier, $expiresAt, $userId));
-        } else {
-          $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, expires_at, created_at) VALUES (?, 1, ?, ?, NOW())");
-          $stmt->execute(array($userId, $purchaseTier, $expiresAt));
-        }
-        
-        error_log("RID={$RID} GAMEPASS_WH_ACTIVATED user={$userId} tier={$purchaseTier}");
-      }
-      break;
-    }
-
-    // Handle webshop orders - find by paypal_order_id or fallback
-    // The capture webhook may not have order_id directly, so we check supplementary_data
+    // Get paypal order ID from supplementary_data
     $ppOrderId = '';
     if (isset($resource['supplementary_data']['related_ids']['order_id'])) {
       $ppOrderId = $resource['supplementary_data']['related_ids']['order_id'];
     }
-    
+
+    // ── Handle Game Pass (from metadata) ──
+    if ($purchaseType === 'gamepass' && in_array($purchaseTier, array('elite', 'gold')) && $userId > 0) {
+      ensureGamePassTables($pdo);
+      activatePaidGamePass($pdo, $userId, $purchaseTier, $ppOrderId, $captureId, $RID);
+      error_log("RID={$RID} GAMEPASS_WH_ACTIVATED_META user={$userId} tier={$purchaseTier}");
+      break;
+    }
+
+    // ── Fallback: detect gamepass from DB if metadata missing ──
+    if ($ppOrderId !== '' && $purchaseType !== 'gamepass') {
+      try {
+        $gpStmt = $pdo->prepare("SELECT user_id, tier, status FROM gamepass_purchases WHERE paypal_order_id = ? LIMIT 1");
+        $gpStmt->execute(array($ppOrderId));
+        $gpRow = $gpStmt->fetch(PDO::FETCH_ASSOC);
+        if ($gpRow && $gpRow['status'] !== 'completed') {
+          $gpUserId = (int)$gpRow['user_id'];
+          $gpTier = $gpRow['tier'];
+          if (in_array($gpTier, array('elite', 'gold')) && $gpUserId > 0) {
+            ensureGamePassTables($pdo);
+            activatePaidGamePass($pdo, $gpUserId, $gpTier, $ppOrderId, $captureId, $RID);
+            error_log("RID={$RID} GAMEPASS_WH_ACTIVATED_DB user={$gpUserId} tier={$gpTier}");
+            break;
+          }
+        }
+      } catch (Exception $e) {
+        error_log("RID={$RID} GAMEPASS_WH_FALLBACK_ERR: " . $e->getMessage());
+      }
+    }
+
+    // ── Handle webshop orders ──
     if ($ppOrderId !== '') {
       $stmt = $pdo->prepare("UPDATE webshop_orders SET status = 'completed', paypal_capture_id = ?, delivered_at = NOW() WHERE paypal_order_id = ? AND status = 'pending'");
       $stmt->execute(array($captureId, $ppOrderId));
@@ -162,6 +163,12 @@ switch ($eventType) {
     
     $stmt = $pdo->prepare("UPDATE webshop_orders SET status = ? WHERE paypal_capture_id = ? AND status IN ('pending', 'completed')");
     $stmt->execute(array($status, $captureId));
+
+    // Also update gamepass_purchases if applicable
+    try {
+      $stmt = $pdo->prepare("UPDATE gamepass_purchases SET status = ? WHERE paypal_capture_id = ? AND status IN ('pending', 'completed')");
+      $stmt->execute(array($status, $captureId));
+    } catch (Exception $e) { /* table may not exist */ }
     break;
 
   default:
