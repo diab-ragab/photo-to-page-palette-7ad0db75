@@ -464,6 +464,22 @@ function handleGamePassCapture($pdo, $userId, $tier, $paypalOrderId, $captureId,
     return;
   }
 
+  // Ensure table exists
+  $pdo->exec("CREATE TABLE IF NOT EXISTS user_gamepass (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    is_premium TINYINT(1) DEFAULT 0,
+    tier VARCHAR(10) DEFAULT 'free',
+    expires_at DATETIME DEFAULT NULL,
+    paypal_order_id VARCHAR(255) DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    KEY idx_user (user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+
+  // Ensure columns exist (may already exist)
+  try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free'"); } catch (Exception $e) {}
+  try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN paypal_order_id VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
+
   // Idempotency check
   try {
     $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ? AND paypal_order_id = ?");
@@ -473,10 +489,9 @@ function handleGamePassCapture($pdo, $userId, $tier, $paypalOrderId, $captureId,
       error_log("RID={$RID} GAMEPASS_IDEMPOTENT already_activated user={$userId} order={$paypalOrderId}");
       return;
     }
-  } catch (Exception $e) { /* column may not exist yet */ }
-
-  try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free'"); } catch (Exception $e) {}
-  try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN paypal_order_id VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
+  } catch (Exception $e) {
+    error_log("RID={$RID} GAMEPASS_IDEMP_ERR: " . $e->getMessage());
+  }
 
   $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ?");
   $stmt->execute(array($userId));
