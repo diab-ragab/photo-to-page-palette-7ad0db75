@@ -292,6 +292,20 @@ const RewardFormContent = memo(function RewardFormContent({
   );
 });
 
+// Helper to append sessionToken to URL for servers that strip auth headers
+function adminUrl(path: string): string {
+  const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken") || "";
+  const sep = path.includes("?") ? "&" : "?";
+  return token ? `${API_BASE}/${path}${sep}sessionToken=${encodeURIComponent(token)}` : `${API_BASE}/${path}`;
+}
+
+// Helper to inject sessionToken into POST body for header-stripping fallback
+function withToken(body: Record<string, unknown>): string {
+  const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken") || "";
+  if (token) body.sessionToken = token;
+  return JSON.stringify(body);
+}
+
 export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps) {
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -333,7 +347,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=get_settings`, {
+      const response = await fetch(adminUrl("gamepass_admin.php?action=get_settings"), {
         headers: { ...getAuthHeaders() },
         credentials: "include",
       });
@@ -359,11 +373,11 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   const handleToggleEnabled = async (key: string, enabled: boolean) => {
     setIsTogglingEnabled(true);
     try {
-      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=update_settings`, {
+      const response = await fetch(adminUrl("gamepass_admin.php?action=update_settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: JSON.stringify({ [key]: enabled }),
+        body: withToken({ [key]: enabled }),
       });
       const data = await response.json();
       if (data.success) {
@@ -397,11 +411,11 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     
     setIsSavingSettings(true);
     try {
-      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=update_settings`, {
+      const response = await fetch(adminUrl("gamepass_admin.php?action=update_settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: JSON.stringify({ zen_skip_cost: cost, elite_price_cents: epCents, gold_price_cents: gpCents }),
+        body: withToken({ zen_skip_cost: cost, elite_price_cents: epCents, gold_price_cents: gpCents }),
       });
       const data = await response.json();
       if (data.success) {
@@ -447,15 +461,13 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
 
     setIsSubmitting(true);
     try {
-      const endpoint = selectedReward 
-        ? `${API_BASE}/gamepass_admin.php?action=update_reward`
-        : `${API_BASE}/gamepass_admin.php?action=add_reward`;
+      const action = selectedReward ? "update_reward" : "add_reward";
       
-      const response = await fetch(endpoint, {
+      const response = await fetch(adminUrl(`gamepass_admin.php?action=${action}`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: JSON.stringify({
+        body: withToken({
           ...editData,
           id: selectedReward?.id,
           updated_by: username || "GM",
@@ -481,11 +493,11 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
 
   const handleDeleteReward = async (id: number) => {
     try {
-      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=delete_reward`, {
+      const response = await fetch(adminUrl("gamepass_admin.php?action=delete_reward"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: JSON.stringify({ id }),
+        body: withToken({ id }),
       });
 
       const data = await response.json();
@@ -528,11 +540,11 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     if (!confirm(`This will DELETE all existing ${tier.toUpperCase()} rewards and replace them with 30 seeded rewards. Continue?`)) return;
     setIsSeeding(true);
     try {
-      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=seed_rewards`, {
+      const response = await fetch(adminUrl("gamepass_admin.php?action=seed_rewards"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: JSON.stringify({ tier }),
+        body: withToken({ tier }),
       });
       const data = await response.json();
       if (data.success) {
@@ -556,7 +568,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     }
     setIsSearching(true);
     try {
-      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=search_users&q=${encodeURIComponent(assignSearch.trim())}`, {
+      const response = await fetch(adminUrl(`gamepass_admin.php?action=search_users&q=${encodeURIComponent(assignSearch.trim())}`), {
         headers: { ...getAuthHeaders() },
         credentials: "include",
       });
@@ -579,16 +591,15 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     if (!confirm(`Assign ${assignTier.toUpperCase()} Game Pass to "${username}" for ${days} days?`)) return;
     setIsAssigning(true);
     try {
-      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=assign_pass`, {
+      const response = await fetch(adminUrl("gamepass_admin.php?action=assign_pass"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: JSON.stringify({ username, tier: assignTier, duration_days: days }),
+        body: withToken({ username, tier: assignTier, duration_days: days }),
       });
       const data = await response.json();
       if (data.success) {
         toast({ title: "Success", description: data.message });
-        // Refresh search results
         handleSearchUsers();
       } else {
         toast({ title: "Error", description: data.error || "Failed to assign", variant: "destructive" });
@@ -604,11 +615,11 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     if (!confirm(`Revoke Game Pass from "${username}"?`)) return;
     setIsAssigning(true);
     try {
-      const response = await fetch(`${API_BASE}/gamepass_admin.php?action=revoke_pass`, {
+      const response = await fetch(adminUrl("gamepass_admin.php?action=revoke_pass"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: JSON.stringify({ username }),
+        body: withToken({ username }),
       });
       const data = await response.json();
       if (data.success) {
