@@ -49,7 +49,7 @@ $pdo = getDB();
 $freePassResult = autoActivateFreePass($pdo, $userId, $RID);
 
 // Get current gamepass info
-$gamepass = array('tier' => 'free', 'is_premium' => false, 'expires_at' => null);
+$gamepass = array('tier' => 'free', 'is_premium' => false, 'expires_at' => null, 'remaining_days' => 0, 'is_active' => false);
 try {
   $stmt = $pdo->prepare("SELECT tier, is_premium, expires_at FROM user_gamepass WHERE user_id = ? LIMIT 1");
   $stmt->execute(array($userId));
@@ -58,6 +58,15 @@ try {
     $gamepass['tier'] = isset($gpRow['tier']) ? $gpRow['tier'] : 'free';
     $gamepass['is_premium'] = (int)$gpRow['is_premium'] === 1;
     $gamepass['expires_at'] = isset($gpRow['expires_at']) ? $gpRow['expires_at'] : null;
+    
+    $expiryTime = $gamepass['expires_at'] ? strtotime($gamepass['expires_at']) : 0;
+    $now = time();
+    if ($expiryTime > $now) {
+      $gamepass['remaining_days'] = (int)ceil(($expiryTime - $now) / 86400);
+      $gamepass['is_active'] = true;
+    } elseif ($gamepass['expires_at'] === null && $gamepass['tier'] === 'free') {
+      $gamepass['is_active'] = true; // free pass is always active
+    }
   }
 } catch (Exception $e) {
   error_log("RID={$RID} ME_GAMEPASS_ERR: " . $e->getMessage());

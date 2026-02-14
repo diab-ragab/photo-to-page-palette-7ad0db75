@@ -33,10 +33,17 @@ export interface GamePassOrderPayload {
   upgrade: boolean;
 }
 
+export interface GamePassExtendOrderPayload {
+  type: "gamepass_extend";
+  tier: "elite" | "gold";
+  days: number;
+}
+
 export type OrderPayload =
   | WebshopOrderPayload
   | BundleOrderPayload
-  | GamePassOrderPayload;
+  | GamePassOrderPayload
+  | GamePassExtendOrderPayload;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -125,6 +132,29 @@ export async function createPayPalOrder(payload: OrderPayload): Promise<string> 
       const data = await res.json();
       if (!data.success || !data.url) {
         throw new Error(data.error || data.message || "Failed to start game pass purchase");
+      }
+      return extractPayPalToken(data.url);
+    }
+
+    // ── Game Pass Extension ─────────────────────────────────────────
+    case "gamepass_extend": {
+      const res = await fetch(
+        `${API_BASE}/gamepass_extend.php?sessionToken=${encodeURIComponent(token)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          credentials: "include",
+          body: JSON.stringify({
+            tier: payload.tier,
+            days: payload.days,
+            sessionToken: token,
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (!data.success || !data.url) {
+        throw new Error(data.error || data.message || "Failed to start pass extension");
       }
       return extractPayPalToken(data.url);
     }

@@ -117,6 +117,17 @@ if (!$alreadyDone) {
   } catch (Exception $e) { /* table may not exist */ }
 }
 
+// Check gamepass_extensions
+if (!$alreadyDone) {
+  try {
+    $stmt = $pdo->prepare("SELECT id FROM gamepass_extensions WHERE paypal_order_id = ? AND status = 'completed' LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+      $alreadyDone = true;
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+}
+
 if ($alreadyDone) {
   error_log("RID={$RID} IDEMPOTENT_SKIP already_completed order={$paypalOrderId}");
   json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'message' => 'Already fulfilled', 'order_id' => 0, 'processed_count' => 0));
@@ -158,6 +169,21 @@ if (!$ownerOk) {
     $gpOwner = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($gpOwner) {
       if ((int)$gpOwner['user_id'] !== $authedUserId) {
+        json_fail_pc(403, 'Order does not belong to you');
+      }
+      $ownerOk = true;
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+}
+
+// Also check gamepass_extensions
+if (!$ownerOk) {
+  try {
+    $stmt = $pdo->prepare("SELECT user_id FROM gamepass_extensions WHERE paypal_order_id = ? LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    $extOwner = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($extOwner) {
+      if ((int)$extOwner['user_id'] !== $authedUserId) {
         json_fail_pc(403, 'Order does not belong to you');
       }
       $ownerOk = true;
@@ -326,6 +352,18 @@ if ($localTotalCents <= 0) {
   } catch (Exception $e) { /* table may not exist */ }
 }
 
+// If no local orders found, check gamepass_extensions
+if ($localTotalCents <= 0) {
+  try {
+    $stmt = $pdo->prepare("SELECT price_eur FROM gamepass_extensions WHERE paypal_order_id = ? LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    $extRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($extRow && isset($extRow['price_eur'])) {
+      $localTotalCents = (int)round(floatval($extRow['price_eur']) * 100);
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+}
+
 // Only enforce amount check if we have a local record
 if ($localTotalCents > 0 && $paidCents !== $localTotalCents) {
   error_log("RID={$RID} AMOUNT_REJECT paid_cents={$paidCents} local_cents={$localTotalCents}");
@@ -373,6 +411,25 @@ if (!isset($metadata['type']) || $metadata['type'] === 'webshop') {
   }
 }
 
+// Fallback: check gamepass_extensions table
+if (!isset($metadata['type']) || $metadata['type'] === 'webshop') {
+  try {
+    $extStmt = $pdo->prepare("SELECT id, user_id, tier, days_added FROM gamepass_extensions WHERE paypal_order_id = ? AND status = 'pending' LIMIT 1");
+    $extStmt->execute(array($paypalOrderId));
+    $extRow = $extStmt->fetch(PDO::FETCH_ASSOC);
+    if ($extRow) {
+      $metadata['type'] = 'gamepass_extend';
+      $metadata['tier'] = $extRow['tier'];
+      $metadata['days'] = (int)$extRow['days_added'];
+      $metadata['extension_id'] = (int)$extRow['id'];
+      $metadata['user_id'] = (int)$extRow['user_id'];
+      error_log("RID={$RID} EXTEND_DETECTED_FROM_DB tier={$extRow['tier']} days={$extRow['days_added']} user={$extRow['user_id']}");
+    }
+  } catch (Exception $e) {
+    error_log("RID={$RID} EXTEND_FALLBACK_CHECK_ERR: " . $e->getMessage());
+  }
+}
+
 $userId = isset($metadata['user_id']) ? (int)$metadata['user_id'] : $authedUserId;
 $purchaseType = isset($metadata['type']) ? $metadata['type'] : 'webshop';
 $purchaseTier = isset($metadata['tier']) ? $metadata['tier'] : '';
@@ -388,6 +445,30 @@ if ($userId !== $authedUserId) {
 if ($purchaseType === 'gamepass' && in_array($purchaseTier, array('elite', 'gold'))) {
   activatePaidGamePass($pdo, $userId, $purchaseTier, $paypalOrderId, $captureId, $RID);
   json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'message' => 'Game Pass activated!', 'order_id' => 0, 'processed_count' => 1));
+}
+
+// Handle Game Pass extension purchases
+if ($purchaseType === 'gamepass_extend') {
+  $extDays = isset($metadata['days']) ? (int)$metadata['days'] : 0;
+  $extId = isset($metadata['extension_id']) ? (int)$metadata['extension_id'] : 0;
+  $extTier = isset($metadata['tier']) ? $metadata['tier'] : 'elite';
+  
+  if ($extDays > 0 && $extId > 0) {
+    ensureExtensionTable($pdo);
+    $extResult = extendGamePass($pdo, $userId, $extTier, $extDays, $paypalOrderId, $captureId, $extId, $RID);
+    json_response_pc(array(
+      'success' => true, 
+      'status' => 'COMPLETED', 
+      'message' => 'Game Pass extended by ' . $extDays . ' days!', 
+      'new_until' => isset($extResult['new_until']) ? $extResult['new_until'] : null,
+      'days_added' => $extDays,
+      'order_id' => 0, 
+      'processed_count' => 1
+    ));
+  } else {
+    error_log("RID={$RID} EXTEND_MISSING_DATA days={$extDays} extId={$extId}");
+    json_fail_pc(400, 'Extension data incomplete');
+  }
 }
 
 // Handle bundle purchases

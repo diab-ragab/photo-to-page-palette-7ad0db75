@@ -335,7 +335,9 @@ try {
         'elite_enabled' => $eliteEnabled,
         'gold_enabled' => $goldEnabled,
         'rewards' => formatRewards($rewards),
-        'expires_at' => isset($expiresAt) ? $expiresAt : null
+        'expires_at' => isset($expiresAt) ? $expiresAt : null,
+        'remaining_days' => (isset($expiresAt) && $expiresAt !== null && strtotime($expiresAt) > time()) ? (int)ceil((strtotime($expiresAt) - time()) / 86400) : 0,
+        'pass_active' => $isPremium
       ));
       break;
 
