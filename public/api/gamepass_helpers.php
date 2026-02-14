@@ -165,6 +165,104 @@ if (!function_exists('autoActivateFreePass')) {
 }
 
 /**
+ * Ensure gamepass_extensions table exists
+ * 
+ * @param PDO $pdo
+ */
+if (!function_exists('ensureExtensionTable')) {
+    function ensureExtensionTable($pdo) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS gamepass_extensions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            tier VARCHAR(10) NOT NULL,
+            days_added INT NOT NULL DEFAULT 0,
+            old_until DATETIME DEFAULT NULL,
+            new_until DATETIME DEFAULT NULL,
+            price_eur DECIMAL(10,2) DEFAULT 0.00,
+            paypal_order_id VARCHAR(64) DEFAULT NULL,
+            paypal_capture_id VARCHAR(64) DEFAULT NULL,
+            status VARCHAR(20) DEFAULT 'pending',
+            created_at DATETIME NOT NULL,
+            completed_at DATETIME DEFAULT NULL,
+            INDEX idx_user (user_id),
+            INDEX idx_paypal_order (paypal_order_id),
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+    }
+}
+
+/**
+ * Extend a Game Pass by adding days (stackable)
+ * Idempotent by paypal_order_id
+ * 
+ * @param PDO $pdo
+ * @param int $userId
+ * @param string $tier
+ * @param int $days
+ * @param string $paypalOrderId
+ * @param string $captureId
+ * @param int $extensionId (from gamepass_extensions table)
+ * @param string $RID
+ * @return array result with new_until
+ */
+if (!function_exists('extendGamePass')) {
+    function extendGamePass($pdo, $userId, $tier, $days, $paypalOrderId, $captureId, $extensionId, $RID) {
+        $userId = (int)$userId;
+        $days = (int)$days;
+        if ($userId <= 0 || $days < 1 || $days > 90) {
+            return array('success' => false, 'message' => 'Invalid parameters');
+        }
+
+        ensureExtensionTable($pdo);
+
+        // Idempotency: check if already completed
+        $stmt = $pdo->prepare("SELECT id FROM gamepass_extensions WHERE paypal_order_id = ? AND status = 'completed' LIMIT 1");
+        $stmt->execute(array($paypalOrderId));
+        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+            error_log("RID={$RID} EXTEND_IDEMPOTENT already_completed order={$paypalOrderId}");
+            return array('success' => true, 'message' => 'Already extended', 'idempotent' => true);
+        }
+
+        // Get current expiry
+        $stmt = $pdo->prepare("SELECT expires_at, tier FROM user_gamepass WHERE user_id = ? LIMIT 1");
+        $stmt->execute(array($userId));
+        $gp = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $now = time();
+        $oldUntil = null;
+        $baseTime = $now;
+
+        if ($gp && isset($gp['expires_at']) && $gp['expires_at'] !== null) {
+            $oldUntil = $gp['expires_at'];
+            $expiryTs = strtotime($gp['expires_at']);
+            // If currently active, stack on top of existing expiry
+            if ($expiryTs > $now) {
+                $baseTime = $expiryTs;
+            }
+        }
+
+        $newUntil = date('Y-m-d H:i:s', $baseTime + ($days * 86400));
+
+        // Update user_gamepass
+        if ($gp) {
+            $stmt = $pdo->prepare("UPDATE user_gamepass SET expires_at = ?, is_premium = 1, tier = ?, updated_at = NOW() WHERE user_id = ?");
+            $stmt->execute(array($newUntil, $tier, $userId));
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, expires_at, created_at, updated_at) VALUES (?, 1, ?, ?, NOW(), NOW())");
+            $stmt->execute(array($userId, $tier, $newUntil));
+        }
+
+        // Update extension record
+        $stmt = $pdo->prepare("UPDATE gamepass_extensions SET status = 'completed', old_until = ?, new_until = ?, paypal_capture_id = ?, completed_at = NOW() WHERE id = ?");
+        $stmt->execute(array($oldUntil, $newUntil, $captureId, $extensionId));
+
+        error_log("RID={$RID} EXTEND_COMPLETED user={$userId} tier={$tier} days={$days} old={$oldUntil} new={$newUntil}");
+
+        return array('success' => true, 'message' => 'Pass extended', 'old_until' => $oldUntil, 'new_until' => $newUntil, 'days_added' => $days);
+    }
+}
+
+/**
  * Activate a paid Game Pass (elite/gold) idempotently
  * Also sends activation mail ONE TIME
  * 
@@ -205,11 +303,18 @@ if (!function_exists('activatePaidGamePass')) {
         $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
 
         // Upsert user_gamepass
-        $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ?");
+        $stmt = $pdo->prepare("SELECT id, expires_at FROM user_gamepass WHERE user_id = ?");
         $stmt->execute(array($userId));
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($existing) {
+            // If existing pass is still active, stack 30 days on top
+            $now = time();
+            $existExpiry = isset($existing['expires_at']) ? $existing['expires_at'] : null;
+            if ($existExpiry !== null && strtotime($existExpiry) > $now) {
+                $expiresAt = date('Y-m-d H:i:s', strtotime($existExpiry) + (30 * 86400));
+            }
+
             $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = ?, expires_at = ?, paypal_order_id = ?, updated_at = NOW() WHERE user_id = ?");
             $stmt->execute(array($tier, $expiresAt, $paypalOrderId, $userId));
         } else {

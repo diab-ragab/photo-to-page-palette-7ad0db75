@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Shield, Crown, Diamond, Check, X, Sparkles, Zap, Gift, Star, Gem, Trophy, Power } from "lucide-react";
 import { ElitePassUpsell } from "@/components/ElitePassUpsell";
+import { GamePassExtender } from "@/components/shop/GamePassExtender";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiGet } from "@/lib/apiFetch";
 import { motion } from "framer-motion";
@@ -247,6 +248,16 @@ export const GamePassSection = () => {
           gamepassEnabled={gamepassEnabled}
           eliteEnabled={eliteEnabled}
           goldEnabled={goldEnabled}
+        />
+      </div>
+
+      {/* Extension section for active pass holders */}
+      <div className="max-w-3xl mx-auto">
+        <GamePassExtender
+          currentTier={currentTier}
+          expiresAt={expiresAt}
+          elitePerDayCents={Math.ceil(elitePriceCents / 30)}
+          goldPerDayCents={Math.ceil(goldPriceCents / 30)}
         />
       </div>
     </div>
