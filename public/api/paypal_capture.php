@@ -306,6 +306,34 @@ if (isset($pu['custom_id'])) {
   if (is_array($parsed)) $metadata = $parsed;
 }
 
+// If custom_id metadata is missing or incomplete, re-fetch order details
+if (empty($metadata) || !isset($metadata['type'])) {
+  error_log("RID={$RID} METADATA_MISSING_FROM_CAPTURE, re-fetching order details");
+  list($refetchCode, $refetchData, $refetchErr) = paypalGetOrder($tokenResult['token'], $paypalOrderId, $ppCfg['sandbox']);
+  if ($refetchCode >= 200 && $refetchCode < 300 && isset($refetchData['purchase_units'][0]['custom_id'])) {
+    $parsed2 = json_decode($refetchData['purchase_units'][0]['custom_id'], true);
+    if (is_array($parsed2)) $metadata = $parsed2;
+    error_log("RID={$RID} METADATA_REFETCHED type=" . (isset($metadata['type']) ? $metadata['type'] : 'none'));
+  }
+}
+
+// Fallback: check gamepass_purchases table by paypal_order_id
+if (!isset($metadata['type']) || $metadata['type'] === 'webshop') {
+  try {
+    $gpStmt = $pdo->prepare("SELECT user_id, tier FROM gamepass_purchases WHERE paypal_order_id = ? AND status = 'pending' LIMIT 1");
+    $gpStmt->execute(array($paypalOrderId));
+    $gpRow = $gpStmt->fetch(PDO::FETCH_ASSOC);
+    if ($gpRow) {
+      $metadata['type'] = 'gamepass';
+      $metadata['tier'] = $gpRow['tier'];
+      $metadata['user_id'] = (int)$gpRow['user_id'];
+      error_log("RID={$RID} GAMEPASS_DETECTED_FROM_DB tier={$gpRow['tier']} user={$gpRow['user_id']}");
+    }
+  } catch (Exception $e) {
+    error_log("RID={$RID} GAMEPASS_FALLBACK_CHECK_ERR: " . $e->getMessage());
+  }
+}
+
 $userId = isset($metadata['user_id']) ? (int)$metadata['user_id'] : $authedUserId;
 $purchaseType = isset($metadata['type']) ? $metadata['type'] : 'webshop';
 $purchaseTier = isset($metadata['tier']) ? $metadata['tier'] : '';
