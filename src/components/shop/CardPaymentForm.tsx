@@ -147,6 +147,7 @@ export function CardPaymentForm({
     <PayPalScriptProvider
       options={{
         clientId: PAYPAL_CLIENT_ID,
+        merchantId: "GNY2CWYMNG7K4",
         components: "buttons",
         currency: "EUR",
         intent: "capture",
