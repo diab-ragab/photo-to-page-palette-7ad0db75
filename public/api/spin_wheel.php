@@ -877,4 +877,103 @@ if ($method === 'GET' && $action === 'leaderboard') {
     jsonResponse(array('success' => true, 'leaderboard' => $leaderboard, 'rid' => $RID));
 }
 
+// Public: Top Spinners (daily spin count leaderboard - exact counts)
+if ($method === 'GET' && $action === 'top_spinners') {
+    $limit = isset($_GET['limit']) ? min(20, max(1, (int)$_GET['limit'])) : 10;
+    
+    $stmt = $pdo->prepare("
+        SELECT 
+            us.user_id,
+            us.role_id,
+            COUNT(*) AS spin_count,
+            b.Name AS char_name
+        FROM user_spins us
+        LEFT JOIN basetab_sg b ON b.RoleID = us.role_id
+        WHERE DATE(us.spun_at) = CURDATE()
+        GROUP BY us.user_id, us.role_id
+        ORDER BY spin_count DESC
+        LIMIT ?
+    ");
+    $stmt->execute(array($limit));
+    $topSpinners = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($topSpinners as $idx => $entry) {
+        if (!isset($entry['char_name']) || $entry['char_name'] === null || $entry['char_name'] === '') {
+            $topSpinners[$idx]['char_name'] = 'Unknown';
+        }
+        $topSpinners[$idx]['spin_count'] = (int)$entry['spin_count'];
+    }
+    
+    // Get top spinner reward settings
+    $rewardSettings = array(
+        'enabled' => '0',
+        'reward_type' => 'zen',
+        'reward_value' => '10000'
+    );
+    $rewardKeys = array('top_spinner_enabled', 'top_spinner_reward_type', 'top_spinner_reward_value');
+    foreach ($rewardKeys as $rk) {
+        try {
+            $stmt = $pdo->prepare("SELECT setting_value FROM spin_settings WHERE setting_key = ?");
+            $stmt->execute(array($rk));
+            $val = $stmt->fetchColumn();
+            if ($val !== false) {
+                $shortKey = str_replace('top_spinner_', '', $rk);
+                $rewardSettings[$shortKey] = $val;
+            }
+        } catch (Exception $e) {}
+    }
+    
+    jsonResponse(array(
+        'success' => true,
+        'top_spinners' => $topSpinners,
+        'reward' => $rewardSettings,
+        'rid' => $RID
+    ));
+}
+
+// Admin: Top Spinner Reward Settings
+if ($action === 'admin_top_spinner') {
+    $user = requireAdmin();
+}
+
+if ($method === 'GET' && $action === 'admin_top_spinner') {
+    $rewardSettings = array(
+        'enabled' => '0',
+        'reward_type' => 'zen',
+        'reward_value' => '10000'
+    );
+    $rewardKeys = array('top_spinner_enabled', 'top_spinner_reward_type', 'top_spinner_reward_value');
+    foreach ($rewardKeys as $rk) {
+        try {
+            $stmt = $pdo->prepare("SELECT setting_value FROM spin_settings WHERE setting_key = ?");
+            $stmt->execute(array($rk));
+            $val = $stmt->fetchColumn();
+            if ($val !== false) {
+                $shortKey = str_replace('top_spinner_', '', $rk);
+                $rewardSettings[$shortKey] = $val;
+            }
+        } catch (Exception $e) {}
+    }
+    jsonResponse(array('success' => true, 'settings' => $rewardSettings, 'rid' => $RID));
+}
+
+if ($method === 'POST' && $action === 'admin_top_spinner') {
+    $raw = file_get_contents('php://input');
+    $input = json_decode($raw, true);
+    
+    $allowedKeys = array('enabled', 'reward_type', 'reward_value');
+    foreach ($allowedKeys as $ak) {
+        if (isset($input[$ak])) {
+            $dbKey = 'top_spinner_' . $ak;
+            $stmt = $pdo->prepare("
+                INSERT INTO spin_settings (setting_key, setting_value)
+                VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE setting_value = ?
+            ");
+            $stmt->execute(array($dbKey, (string)$input[$ak], (string)$input[$ak]));
+        }
+    }
+    jsonResponse(array('success' => true, 'rid' => $RID));
+}
+
 jsonResponse(array('success' => false, 'message' => 'Invalid action', 'rid' => $RID), 400);

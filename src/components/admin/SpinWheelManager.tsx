@@ -41,7 +41,8 @@ import {
   Zap,
   Gift,
   X,
-  Save
+  Save,
+  Trophy
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -53,9 +54,12 @@ import {
   updateSpinSettings,
   fetchSpinStats,
   seedRewards,
+  fetchTopSpinnerSettings,
+  updateTopSpinnerSettings,
   type WheelSegment,
   type SpinSettings,
-  type SpinStats
+  type SpinStats,
+  type TopSpinnerRewardSettings
 } from '@/lib/spinWheelApi';
 
 const REWARD_TYPES = [
@@ -114,6 +118,12 @@ export function SpinWheelManager() {
   const [formData, setFormData] = useState<SegmentFormData>(defaultFormData);
   
   const [showSettings, setShowSettings] = useState(false);
+  const [showTopSpinnerSettings, setShowTopSpinnerSettings] = useState(false);
+  const [topSpinnerForm, setTopSpinnerForm] = useState({
+    enabled: '0',
+    reward_type: 'zen',
+    reward_value: '10000'
+  });
   const [settingsForm, setSettingsForm] = useState({
     spins_per_day: '1',
     cooldown_hours: '24',
@@ -128,14 +138,20 @@ export function SpinWheelManager() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [segs, sets, sts] = await Promise.all([
+      const [segs, sets, sts, topSets] = await Promise.all([
         fetchAdminSegments(),
         fetchSpinSettings(),
-        fetchSpinStats()
+        fetchSpinStats(),
+        fetchTopSpinnerSettings().catch(() => ({ enabled: '0', reward_type: 'zen', reward_value: '10000' }))
       ]);
       setSegments(segs);
       setSettings(sets);
       setStats(sts);
+      setTopSpinnerForm({
+        enabled: topSets.enabled || '0',
+        reward_type: topSets.reward_type || 'zen',
+        reward_value: topSets.reward_value || '10000'
+      });
       setSettingsForm({
         spins_per_day: sets.spins_per_day || '1',
         cooldown_hours: sets.cooldown_hours || '24',
@@ -338,6 +354,10 @@ export function SpinWheelManager() {
             >
               <Gift className="h-4 w-4 mr-2" />
               {seeding ? 'Seeding...' : 'Seed 30 Rewards'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowTopSpinnerSettings(true)}>
+              <Trophy className="h-4 w-4 mr-2" />
+              Top Spinner Reward
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowSettings(true)}>
               <Settings className="h-4 w-4 mr-2" />
@@ -601,6 +621,93 @@ export function SpinWheelManager() {
             <Button onClick={handleSaveSettings} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
               {saving ? 'Saving...' : 'Save Settings'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Top Spinner Reward Dialog */}
+      <Dialog open={showTopSpinnerSettings} onOpenChange={setShowTopSpinnerSettings}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-amber-500" />
+              Top Spinner Daily Reward
+            </DialogTitle>
+            <DialogDescription>
+              Configure the daily reward sent to the player with the most spins each day.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Enabled</Label>
+                <p className="text-xs text-muted-foreground">Send daily reward to #1 spinner</p>
+              </div>
+              <Switch
+                checked={topSpinnerForm.enabled === '1'}
+                onCheckedChange={(checked) => setTopSpinnerForm({ ...topSpinnerForm, enabled: checked ? '1' : '0' })}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Reward Type</Label>
+              <Select
+                value={topSpinnerForm.reward_type}
+                onValueChange={(v) => setTopSpinnerForm({ ...topSpinnerForm, reward_type: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REWARD_TYPES.filter(rt => rt.value !== 'nothing').map((rt) => (
+                    <SelectItem key={rt.value} value={rt.value}>
+                      <div className="flex items-center gap-2">
+                        <rt.icon className="h-4 w-4" />
+                        {rt.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Reward Value</Label>
+              <Input
+                type="number"
+                min="1"
+                value={topSpinnerForm.reward_value}
+                onChange={(e) => setTopSpinnerForm({ ...topSpinnerForm, reward_value: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Amount of {topSpinnerForm.reward_type} to send to the top spinner
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTopSpinnerSettings(false)}>
+              Cancel
+            </Button>
+            <Button 
+              disabled={saving}
+              onClick={async () => {
+                try {
+                  setSaving(true);
+                  await updateTopSpinnerSettings(topSpinnerForm);
+                  toast.success('Top spinner reward settings saved');
+                  setShowTopSpinnerSettings(false);
+                } catch {
+                  toast.error('Failed to save settings');
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>

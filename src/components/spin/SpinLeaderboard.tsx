@@ -4,10 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Trophy, Medal, Award, Sparkles, Coins, Crown, Zap, Gift, History, RefreshCw } from 'lucide-react';
+import { Trophy, Medal, Award, Sparkles, Coins, Crown, Zap, Gift, History, RefreshCw, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchJsonOrThrow, API_BASE } from '@/lib/apiFetch';
 import { SpinHistoryList } from './SpinHistory';
+import { TopSpinnersTab } from './TopSpinnersTab';
 import { useJackpotSound } from '@/hooks/useJackpotSound';
 
 interface SpinLeaderboardEntry {
@@ -167,10 +168,14 @@ export function SpinLeaderboard() {
 
   return (
     <Tabs defaultValue="winners" className="w-full">
-      <TabsList className="grid w-full grid-cols-2 mb-3 bg-muted/50">
+      <TabsList className="grid w-full grid-cols-3 mb-3 bg-muted/50">
         <TabsTrigger value="winners" className="gap-1.5 text-xs font-medium data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500/20 data-[state=active]:to-orange-500/20">
           <Trophy className="h-3.5 w-3.5" />
           Winners
+        </TabsTrigger>
+        <TabsTrigger value="top" className="gap-1.5 text-xs font-medium data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500/20 data-[state=active]:to-blue-500/20">
+          <RotateCw className="h-3.5 w-3.5" />
+          Top Spinners
         </TabsTrigger>
         <TabsTrigger value="history" className="gap-1.5 text-xs font-medium data-[state=active]:bg-primary/20">
           <History className="h-3.5 w-3.5" />
@@ -308,6 +313,10 @@ export function SpinLeaderboard() {
             </ScrollArea>
           </CardContent>
         </Card>
+      </TabsContent>
+      
+      <TabsContent value="top" className="mt-0">
+        <TopSpinnersTab />
       </TabsContent>
       
       <TabsContent value="history" className="mt-0">

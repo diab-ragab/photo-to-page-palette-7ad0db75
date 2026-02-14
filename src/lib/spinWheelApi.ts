@@ -134,6 +134,26 @@ export async function buyExtraSpins(count: number = 1): Promise<BuySpinResult> {
   );
 }
 
+// Top Spinners (daily spin count leaderboard)
+export interface TopSpinnerEntry {
+  user_id: number;
+  role_id: number;
+  char_name: string;
+  spin_count: number;
+}
+
+export interface TopSpinnerRewardSettings {
+  enabled: string;
+  reward_type: string;
+  reward_value: string;
+}
+
+export async function fetchTopSpinners(limit = 10): Promise<{ top_spinners: TopSpinnerEntry[]; reward: TopSpinnerRewardSettings }> {
+  return fetchJsonOrThrow<{ success: boolean; top_spinners: TopSpinnerEntry[]; reward: TopSpinnerRewardSettings }>(
+    `${API_BASE}/spin_wheel.php?action=top_spinners&limit=${limit}`
+  );
+}
+
 // Admin endpoints
 export async function fetchAdminSegments(): Promise<WheelSegment[]> {
   const data = await fetchJsonOrThrow<{ success: boolean; segments: WheelSegment[] }>(
@@ -196,4 +216,19 @@ export async function seedRewards(): Promise<{ inserted: number; message: string
       body: JSON.stringify({ operation: 'seed_rewards' })
     }
   );
+}
+
+// Admin: Top Spinner Reward Settings
+export async function fetchTopSpinnerSettings(): Promise<TopSpinnerRewardSettings> {
+  const data = await fetchJsonOrThrow<{ success: boolean; settings: TopSpinnerRewardSettings }>(
+    `${API_BASE}/spin_wheel.php?action=admin_top_spinner`
+  );
+  return data.settings;
+}
+
+export async function updateTopSpinnerSettings(settings: Partial<TopSpinnerRewardSettings>): Promise<void> {
+  await fetchJsonOrThrow(`${API_BASE}/spin_wheel.php?action=admin_top_spinner`, {
+    method: 'POST',
+    body: JSON.stringify(settings)
+  });
 }
