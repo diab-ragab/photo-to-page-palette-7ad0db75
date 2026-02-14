@@ -1,14 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Crown, Sparkles, Gift, Zap, Star, ChevronRight, Diamond, Gem, ArrowUp, ShieldCheck, Clock, Power } from "lucide-react";
-import { apiPost } from "@/lib/apiFetch";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { CardPaymentForm } from "@/components/shop/CardPaymentForm";
 import { useNavigate } from "react-router-dom";
 import { hapticSuccess } from "@/hooks/useHapticFeedback";
+import { OrderPayload } from "@/lib/paypalOrderApi";
 
 interface PassUpsellProps {
   compact?: boolean;
@@ -29,23 +29,9 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
   const elitePriceStr = `€${(elitePriceCents / 100).toFixed(2)}`;
   const goldPriceStr = `€${(goldPriceCents / 100).toFixed(2)}`;
 
-  const createOrderFn = useCallback(async (): Promise<string> => {
-    if (!purchaseTier) throw new Error("No tier selected");
-    const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken") || "";
-    const data = await apiPost<any>(
-      `/gamepass_purchase.php?sessionToken=${encodeURIComponent(token)}`,
-      { tier: purchaseTier.tier, sessionToken: token, upgrade: purchaseTier.isUpgrade },
-      true,
-      { showErrorToast: false }
-    );
-    if (data?.success && data.url) {
-      const urlObj = new URL(data.url);
-      const orderId = urlObj.searchParams.get("token");
-      if (!orderId) throw new Error("Failed to create payment order");
-      return orderId;
-    }
-    throw new Error(data?.error || "Failed to start purchase");
-  }, [purchaseTier]);
+  const gamepassPayload: OrderPayload | undefined = purchaseTier
+    ? { type: "gamepass", tier: purchaseTier.tier, upgrade: purchaseTier.isUpgrade }
+    : undefined;
 
   if (!gamepassEnabled) {
     return (
@@ -198,20 +184,10 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
                 <span className="text-primary font-bold">€{(activeTierPrice / 100).toFixed(2)}</span>
               </div>
               <CardPaymentForm
-                items={[{
-                  id: `gamepass_${purchaseTier?.tier || "elite"}`,
-                  name: activeTierLabel,
-                  price: activeTierPrice / 100,
-                  quantity: 1,
-                }]}
-                characterId={0}
-                characterName=""
-                isGift={false}
-                giftCharacterName=""
+                orderPayload={gamepassPayload}
                 totalPrice={activeTierPrice / 100}
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
-                createOrderFn={createOrderFn}
               />
             </div>
           </DialogContent>
@@ -430,20 +406,10 @@ export const ElitePassUpsell = ({ compact = false, currentTier = "free", expires
               <span className="text-primary font-bold">€{(activeTierPrice / 100).toFixed(2)}</span>
             </div>
             <CardPaymentForm
-              items={[{
-                id: `gamepass_${purchaseTier?.tier || "elite"}`,
-                name: activeTierLabel,
-                price: activeTierPrice / 100,
-                quantity: 1,
-              }]}
-              characterId={0}
-              characterName=""
-              isGift={false}
-              giftCharacterName=""
+              orderPayload={gamepassPayload}
               totalPrice={activeTierPrice / 100}
               onSuccess={handlePaymentSuccess}
               onError={handlePaymentError}
-              createOrderFn={createOrderFn}
             />
           </div>
         </DialogContent>

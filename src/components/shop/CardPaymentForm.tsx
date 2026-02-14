@@ -4,32 +4,37 @@ import {
   PayPalButtons,
   FUNDING,
 } from "@paypal/react-paypal-js";
-import { Button } from "@/components/ui/button";
 import { Loader2, Lock, CreditCard, CheckCircle, AlertCircle } from "lucide-react";
-import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 import { motion, AnimatePresence } from "framer-motion";
+import { createPayPalOrder, OrderPayload } from "@/lib/paypalOrderApi";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 
 interface CardPaymentFormProps {
-  items: { id: string; name: string; price: number; quantity: number }[];
-  characterId: number;
-  characterName: string;
-  isGift: boolean;
-  giftCharacterName: string;
+  /** Order payload describing what is being purchased. When provided, the
+   *  unified `createPayPalOrder` utility is used automatically. */
+  orderPayload?: OrderPayload;
+  /** Legacy: explicit items list (used when orderPayload is not provided) */
+  items?: { id: string; name: string; price: number; quantity: number }[];
+  characterId?: number;
+  characterName?: string;
+  isGift?: boolean;
+  giftCharacterName?: string;
   totalPrice: number;
   onSuccess: (data: any) => void;
   onError: (message: string) => void;
-  /** Optional custom createOrder function. Return a PayPal order ID string. */
+  /** @deprecated Prefer `orderPayload`. Custom createOrder fallback. */
   createOrderFn?: () => Promise<string>;
 }
 
 const PAYPAL_CLIENT_ID = "AWEFJy_edKvt3xKcWnEgeB-lQBtz2VqYGb9eSWnDJB1f7cSyBeZ8R2xoyHF5r_vrnYOxkfkHHrm6EzHs";
 
 export function CardPaymentForm({
+  orderPayload,
   items,
-  characterId,
-  characterName,
-  isGift,
-  giftCharacterName,
+  characterId = 0,
+  characterName = "",
+  isGift = false,
+  giftCharacterName = "",
   totalPrice,
   onSuccess,
   onError,
@@ -43,42 +48,30 @@ export function CardPaymentForm({
     setErrorMessage("");
 
     try {
-      // Use custom createOrder function if provided (for bundles, game passes, etc.)
+      // 1. Preferred: unified orderPayload
+      if (orderPayload) {
+        return await createPayPalOrder(orderPayload);
+      }
+
+      // 2. Legacy: explicit createOrderFn
       if (createOrderFn) {
-        const orderId = await createOrderFn();
-        return orderId;
+        return await createOrderFn();
       }
 
-      const token = localStorage.getItem("woi_session_token") || "";
-      const res = await fetch(`${API_BASE}/paypal_create_card_order.php?sessionToken=${encodeURIComponent(token)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          items: items.map(item => ({
-            id: item.id,
-            name: item.name,
-            price: Number(item.price),
-            quantity: item.quantity,
-          })),
-          character_id: isGift ? 0 : characterId,
-          character_name: isGift ? "" : characterName,
-          is_gift: isGift,
-          gift_character_name: isGift ? giftCharacterName.trim() : "",
-          sessionToken: token,
-        }),
+      // 3. Fallback: build webshop payload from individual props
+      return await createPayPalOrder({
+        type: "webshop",
+        items: (items || []).map((i) => ({
+          id: i.id,
+          name: i.name,
+          price: Number(i.price),
+          quantity: i.quantity,
+        })),
+        characterId,
+        characterName,
+        isGift,
+        giftCharacterName: giftCharacterName.trim(),
       });
-
-      const data = await res.json();
-
-      if (!data.success || !data.orderID) {
-        throw new Error(data.message || "Failed to create order");
-      }
-
-      return data.orderID;
     } catch (err: any) {
       setStatus("error");
       const msg = err?.message || "Failed to create order";
@@ -86,7 +79,7 @@ export function CardPaymentForm({
       onError(msg);
       throw err;
     }
-  }, [items, characterId, characterName, isGift, giftCharacterName, onError, createOrderFn]);
+  }, [orderPayload, items, characterId, characterName, isGift, giftCharacterName, onError, createOrderFn]);
 
   const handleApprove = useCallback(async (data: any) => {
     setStatus("processing");

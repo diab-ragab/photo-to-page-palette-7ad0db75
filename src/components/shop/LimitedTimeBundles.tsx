@@ -12,6 +12,7 @@ import { CharacterSelector } from "@/components/shop/CharacterSelector";
 import { CardPaymentForm } from "@/components/shop/CardPaymentForm";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { OrderPayload } from "@/lib/paypalOrderApi";
 
 const formatTime = (ms: number): string => {
   if (ms <= 0) return "00:00:00";
@@ -172,23 +173,15 @@ export const LimitedTimeBundles = () => {
     setSelectedCharacterName(characterName);
   };
 
-  const handlePurchase = useCallback(async (): Promise<string> => {
-    if (!selectedBundle || !selectedRoleId) {
-      throw new Error("Please select a character to receive the bundle items");
-    }
-
-    const { url } = await bundlesApi.purchase(
-      selectedBundle.id,
-      selectedRoleId,
-      selectedCharacterName || ""
-    );
-
-    // Extract PayPal order ID from redirect URL (token param)
-    const urlObj = new URL(url);
-    const token = urlObj.searchParams.get("token");
-    if (!token) throw new Error("Failed to create payment order");
-    return token;
-  }, [selectedBundle, selectedRoleId, selectedCharacterName]);
+  const bundleOrderPayload: OrderPayload | undefined =
+    selectedBundle && selectedRoleId
+      ? {
+          type: "bundle",
+          bundleId: selectedBundle.id,
+          characterId: selectedRoleId,
+          characterName: selectedCharacterName || "",
+        }
+      : undefined;
 
   const handlePaymentSuccess = (data: any) => {
     hapticSuccess();
@@ -290,22 +283,12 @@ export const LimitedTimeBundles = () => {
             />
 
             {/* Card Payment Form */}
-            {selectedRoleId ? (
+            {selectedRoleId && bundleOrderPayload ? (
               <CardPaymentForm
-                items={[{
-                  id: String(selectedBundle?.id || 0),
-                  name: selectedBundle?.name || "",
-                  price: Number(selectedBundle?.sale_price || 0),
-                  quantity: 1,
-                }]}
-                characterId={selectedRoleId}
-                characterName={selectedCharacterName || ""}
-                isGift={false}
-                giftCharacterName=""
+                orderPayload={bundleOrderPayload}
                 totalPrice={Number(selectedBundle?.sale_price || 0)}
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
-                createOrderFn={handlePurchase}
               />
             ) : (
               <div className="text-center py-4 text-sm text-muted-foreground">

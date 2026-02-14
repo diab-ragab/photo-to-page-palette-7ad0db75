@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import { SEO } from "@/components/SEO";
 import { CharacterSelector } from "@/components/shop/CharacterSelector";
+import { OrderPayload } from "@/lib/paypalOrderApi";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -168,25 +169,30 @@ const Checkout = () => {
               )}
 
               {/* Card Payment Form */}
-              {isReadyToPay() ? (
+              {isReadyToPay() && (
                 <div className="border-t border-border pt-4">
                   <CardPaymentForm
-                    items={items.map(item => ({
-                      id: item.id,
-                      name: item.name,
-                      price: Number(item.price),
-                      quantity: item.quantity,
-                    }))}
-                    characterId={isGift ? 0 : (selectedRoleId || 0)}
-                    characterName={isGift ? "" : (selectedCharacterName || "")}
-                    isGift={isGift}
-                    giftCharacterName={isGift ? giftCharacterName.trim() : ""}
+                    orderPayload={{
+                      type: "webshop",
+                      items: items.map(item => ({
+                        id: item.id,
+                        name: item.name,
+                        price: Number(item.price),
+                        quantity: item.quantity,
+                      })),
+                      characterId: isGift ? 0 : (selectedRoleId || 0),
+                      characterName: isGift ? "" : (selectedCharacterName || ""),
+                      isGift,
+                      giftCharacterName: isGift ? giftCharacterName.trim() : "",
+                    } satisfies OrderPayload}
                     totalPrice={totalPrice}
                     onSuccess={handlePaymentSuccess}
                     onError={handlePaymentError}
                   />
                 </div>
-              ) : (
+              )}
+
+              {!isReadyToPay() && (
                 <div className="border-t border-border pt-4">
                   <div className="text-center py-6 text-muted-foreground">
                     <CreditCard className="w-10 h-10 mx-auto mb-3 opacity-30" />
