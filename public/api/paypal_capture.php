@@ -18,6 +18,7 @@
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/session_helper.php';
 require_once __DIR__ . '/paypal_helper.php';
+require_once __DIR__ . '/gamepass_helpers.php';
 handleCors(array('POST', 'OPTIONS'));
 
 $RID = substr(md5(uniqid(mt_rand(), true)), 0, 12);
@@ -105,6 +106,17 @@ if (!$alreadyDone) {
   } catch (Exception $e) { /* table may not exist */ }
 }
 
+// Check gamepass_purchases
+if (!$alreadyDone) {
+  try {
+    $stmt = $pdo->prepare("SELECT id FROM gamepass_purchases WHERE paypal_order_id = ? AND status = 'completed' LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+      $alreadyDone = true;
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+}
+
 if ($alreadyDone) {
   error_log("RID={$RID} IDEMPOTENT_SKIP already_completed order={$paypalOrderId}");
   json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'message' => 'Already fulfilled', 'order_id' => 0, 'processed_count' => 0));
@@ -131,6 +143,21 @@ if (!$ownerOk) {
     $bOwner = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($bOwner) {
       if ((int)$bOwner['user_id'] !== $authedUserId) {
+        json_fail_pc(403, 'Order does not belong to you');
+      }
+      $ownerOk = true;
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+}
+
+// Also check gamepass_purchases
+if (!$ownerOk) {
+  try {
+    $stmt = $pdo->prepare("SELECT user_id FROM gamepass_purchases WHERE paypal_order_id = ? LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    $gpOwner = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($gpOwner) {
+      if ((int)$gpOwner['user_id'] !== $authedUserId) {
         json_fail_pc(403, 'Order does not belong to you');
       }
       $ownerOk = true;
@@ -287,6 +314,18 @@ if ($localTotalCents <= 0) {
   } catch (Exception $e) { /* table may not exist */ }
 }
 
+// If no local orders found, check gamepass_purchases
+if ($localTotalCents <= 0) {
+  try {
+    $stmt = $pdo->prepare("SELECT price_eur FROM gamepass_purchases WHERE paypal_order_id = ? LIMIT 1");
+    $stmt->execute(array($paypalOrderId));
+    $gpRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($gpRow && isset($gpRow['price_eur'])) {
+      $localTotalCents = (int)round(floatval($gpRow['price_eur']) * 100);
+    }
+  } catch (Exception $e) { /* table may not exist */ }
+}
+
 // Only enforce amount check if we have a local record
 if ($localTotalCents > 0 && $paidCents !== $localTotalCents) {
   error_log("RID={$RID} AMOUNT_REJECT paid_cents={$paidCents} local_cents={$localTotalCents}");
@@ -345,9 +384,9 @@ if ($userId !== $authedUserId) {
   $userId = $authedUserId;
 }
 
-// Handle Game Pass purchases
+// Handle Game Pass purchases (uses shared activatePaidGamePass for idempotency + mail)
 if ($purchaseType === 'gamepass' && in_array($purchaseTier, array('elite', 'gold'))) {
-  handleGamePassCapture($pdo, $userId, $purchaseTier, $paypalOrderId, $captureId, $RID);
+  activatePaidGamePass($pdo, $userId, $purchaseTier, $paypalOrderId, $captureId, $RID);
   json_response_pc(array('success' => true, 'status' => 'COMPLETED', 'message' => 'Game Pass activated!', 'order_id' => 0, 'processed_count' => 1));
 }
 
@@ -457,65 +496,6 @@ json_response_pc(array(
 ));
 
 // ============ HANDLERS ============
-
-function handleGamePassCapture($pdo, $userId, $tier, $paypalOrderId, $captureId, $RID) {
-  if ($userId <= 0) {
-    error_log("RID={$RID} GAMEPASS_PP_NO_USER order={$paypalOrderId}");
-    return;
-  }
-
-  // Ensure table exists
-  $pdo->exec("CREATE TABLE IF NOT EXISTS user_gamepass (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    is_premium TINYINT(1) DEFAULT 0,
-    tier VARCHAR(10) DEFAULT 'free',
-    expires_at DATETIME DEFAULT NULL,
-    paypal_order_id VARCHAR(255) DEFAULT NULL,
-    created_at DATETIME NOT NULL,
-    KEY idx_user (user_id)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
-
-  // Ensure columns exist (may already exist)
-  try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free'"); } catch (Exception $e) {}
-  try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN paypal_order_id VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
-
-  // Idempotency check
-  try {
-    $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ? AND paypal_order_id = ?");
-    $stmt->execute(array($userId, $paypalOrderId));
-    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($existing) {
-      error_log("RID={$RID} GAMEPASS_IDEMPOTENT already_activated user={$userId} order={$paypalOrderId}");
-      return;
-    }
-  } catch (Exception $e) {
-    error_log("RID={$RID} GAMEPASS_IDEMP_ERR: " . $e->getMessage());
-  }
-
-  $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ?");
-  $stmt->execute(array($userId));
-  $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-  $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
-
-  if ($existing) {
-    $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = ?, expires_at = ?, paypal_order_id = ? WHERE user_id = ?");
-    $stmt->execute(array($tier, $expiresAt, $paypalOrderId, $userId));
-  } else {
-    $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, expires_at, paypal_order_id, created_at) VALUES (?, 1, ?, ?, ?, NOW())");
-    $stmt->execute(array($userId, $tier, $expiresAt, $paypalOrderId));
-  }
-
-  try {
-    $stmt = $pdo->prepare("UPDATE gamepass_purchases SET status = 'completed', completed_at = NOW() WHERE paypal_order_id = ?");
-    $stmt->execute(array($paypalOrderId));
-  } catch (Exception $e) {
-    error_log("RID={$RID} GAMEPASS_PURCHASE_LOG_ERR: " . $e->getMessage());
-  }
-
-  error_log("RID={$RID} GAMEPASS_PP_ACTIVATED user={$userId} tier={$tier} expires={$expiresAt}");
-}
 
 function handleBundleCapture($pdo, $bundleOrderId, $paypalOrderId, $captureId, $userId, $RID) {
   if ($bundleOrderId <= 0) return;

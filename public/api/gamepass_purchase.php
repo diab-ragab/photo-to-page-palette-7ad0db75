@@ -3,8 +3,10 @@
  * gamepass_purchase.php - Create PayPal Checkout for Game Pass purchase
  * PHP 5.x compatible
  *
- * POST { tier: "elite" | "gold" }
- * Returns { success: true, url: "https://www.paypal.com/checkoutnow?token=..." }
+ * POST { tier: "free" | "elite" | "gold" }
+ * Returns:
+ *   free  => { success: true, message: "Free Pass activated" }
+ *   elite/gold => { success: true, url: "https://...", paypal_order_id: "..." }
  */
 
 ini_set('display_errors', '0');
@@ -14,6 +16,7 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/session_helper.php';
 require_once __DIR__ . '/paypal_helper.php';
+require_once __DIR__ . '/gamepass_helpers.php';
 handleCors(array('POST', 'OPTIONS'));
 header('Content-Type: application/json; charset=utf-8');
 
@@ -43,41 +46,50 @@ $userId = (int)$user['user_id'];
 
 // Parse input
 $input = getJsonInput();
-$tierInput = isset($input['tier']) ? $input['tier'] : '';
-if (!in_array($tierInput, array('elite', 'gold'))) {
-  json_fail_gp(400, 'Invalid tier. Must be elite or gold.');
+$tierInput = isset($input['tier']) ? strtolower(trim($input['tier'])) : '';
+if (!in_array($tierInput, array('free', 'elite', 'gold'))) {
+  json_fail_gp(400, 'Invalid tier. Must be free, elite, or gold.');
 }
 
-$isUpgrade = isset($input['upgrade']) && ($input['upgrade'] === true || $input['upgrade'] === 'true' || $input['upgrade'] === '1');
-
-// One tier per user - check if user already has an active pass
 $pdo = getDB();
-$existingTier = 'free';
-try {
-  $stmt = $pdo->prepare("SELECT tier, expires_at, is_premium FROM user_gamepass WHERE user_id = ?");
-  $stmt->execute(array($userId));
-  $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-  if ($existing) {
-    $expiresAt = isset($existing['expires_at']) ? $existing['expires_at'] : null;
-    $isActive = ($expiresAt === null || strtotime($expiresAt) > time());
-    $et = isset($existing['tier']) ? $existing['tier'] : ((int)$existing['is_premium'] === 1 ? 'elite' : 'free');
-    if ($isActive && in_array($et, array('elite', 'gold'))) {
-      $existingTier = $et;
-    }
-  }
-} catch (Exception $e) {
-  error_log("RID={$RID} GAMEPASS_TIER_CHECK_ERR: " . $e->getMessage());
+ensureGamePassTables($pdo);
+
+// ── Free Pass: activate immediately, no payment ──
+if ($tierInput === 'free') {
+  $result = autoActivateFreePass($pdo, $userId, $RID);
+  json_out_gp(200, array(
+    'success' => true,
+    'message' => $result['new'] ? 'Free Pass activated!' : 'Free Pass already active.',
+    'tier' => 'free',
+    'rid' => $RID
+  ));
 }
 
-// Block duplicate or downgrade purchase
-if ($existingTier === 'gold') {
-  json_fail_gp(400, 'You already have an active Gold Game Pass.');
+// ── Paid Pass (elite / gold) ──
+
+// Check current active pass
+$existingTier = 'free';
+$stmt = $pdo->prepare("SELECT tier, expires_at, is_premium FROM user_gamepass WHERE user_id = ?");
+$stmt->execute(array($userId));
+$existing = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($existing) {
+  $expiresAt = isset($existing['expires_at']) ? $existing['expires_at'] : null;
+  $isActive = ($expiresAt === null || strtotime($expiresAt) > time());
+  $et = isset($existing['tier']) ? $existing['tier'] : ((int)$existing['is_premium'] === 1 ? 'elite' : 'free');
+  if ($isActive && in_array($et, array('elite', 'gold'))) {
+    $existingTier = $et;
+  }
 }
-if ($existingTier === 'elite' && $tierInput === 'elite') {
-  json_fail_gp(400, 'You already have an active Elite Game Pass.');
+
+// Block duplicate or same-tier purchase
+if ($existingTier === $tierInput) {
+  $label = ($tierInput === 'elite') ? 'Elite' : 'Gold';
+  json_fail_gp(400, 'You already have an active ' . $label . ' Game Pass.');
 }
-if ($existingTier === 'elite' && $tierInput === 'gold') {
-  $isUpgrade = true;
+
+// Block downgrade (gold -> elite not allowed as paid purchase)
+if ($existingTier === 'gold' && $tierInput === 'elite') {
+  json_fail_gp(400, 'You already have an active Gold Game Pass. Cannot purchase Elite.');
 }
 
 // PayPal config
@@ -86,7 +98,7 @@ if ($ppCfg['client_id'] === '' || $ppCfg['secret'] === '') {
   json_fail_gp(500, 'Payment not configured');
 }
 
-// Prices in cents - read from DB settings, fallback to defaults
+// Prices - read from DB settings, fallback to defaults
 $elitePriceCents = 999;
 $goldPriceCents = 1999;
 try {
@@ -106,18 +118,21 @@ $tierPrices = array(
   'gold'  => $goldPriceCents,
 );
 $tierNames = array(
-  'elite' => 'Elite Game Pass',
-  'gold'  => 'Gold Game Pass',
+  'elite' => 'Elite Pass',
+  'gold'  => 'Gold Pass',
 );
 
 $unitAmountCents = $tierPrices[$tierInput];
 $productName = $tierNames[$tierInput];
-if ($isUpgrade && $existingTier === 'elite' && $tierInput === 'gold') {
-  $productName = 'Gold Game Pass (Upgrade from Elite)';
-}
+$priceEur = round($unitAmountCents / 100, 2);
 
 // Convert cents to decimal for PayPal
 $unitAmountDecimal = number_format($unitAmountCents / 100, 2, '.', '');
+
+// Insert pending purchase record FIRST
+$stmt = $pdo->prepare("INSERT INTO gamepass_purchases (user_id, tier, price_eur, status, created_at) VALUES (?, ?, ?, 'pending', NOW())");
+$stmt->execute(array($userId, $tierInput, $priceEur));
+$purchaseId = $pdo->lastInsertId();
 
 // Get PayPal access token
 $tokenResult = getPayPalAccessToken($ppCfg['client_id'], $ppCfg['secret'], $ppCfg['sandbox']);
@@ -142,7 +157,6 @@ $metadata = array(
   'type' => 'gamepass',
   'tier' => $tierInput,
   'rid' => $RID,
-  'upgrade' => $isUpgrade ? '1' : '0',
 );
 
 $successUrl = 'https://woiendgame.online/dashboard?gamepass_purchased=' . $tierInput . '&paypal=1';
@@ -159,33 +173,27 @@ $orderResult = paypalCreateOrder(
 
 if ($orderResult['error'] !== '') {
   error_log("RID={$RID} GAMEPASS_PP_ORDER_ERR: " . $orderResult['error']);
+  // Mark purchase as failed
+  try {
+    $stmt = $pdo->prepare("UPDATE gamepass_purchases SET status = 'failed' WHERE id = ?");
+    $stmt->execute(array($purchaseId));
+  } catch (Exception $e) {}
   json_fail_gp(502, 'Payment provider error');
 }
 
-// Save pending purchase record
+// Update purchase record with paypal order ID
 try {
-  try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free'"); } catch (Exception $e) {}
-  try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN paypal_order_id VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
-
-  $pdo->exec("CREATE TABLE IF NOT EXISTS gamepass_purchases (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    tier VARCHAR(10) NOT NULL,
-    paypal_order_id VARCHAR(255) DEFAULT NULL,
-    status VARCHAR(20) DEFAULT 'pending',
-    created_at DATETIME NOT NULL,
-    completed_at DATETIME DEFAULT NULL,
-    INDEX idx_user (user_id),
-    INDEX idx_paypal_order (paypal_order_id),
-    INDEX idx_status (status)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
-
-  $stmt = $pdo->prepare("INSERT INTO gamepass_purchases (user_id, tier, paypal_order_id, status, created_at) VALUES (?, ?, ?, 'pending', NOW())");
-  $stmt->execute(array($userId, $tierInput, $orderResult['id']));
-
-  error_log("RID={$RID} GAMEPASS_PURCHASE user={$userId} tier={$tierInput} paypal_order={$orderResult['id']}");
+  $stmt = $pdo->prepare("UPDATE gamepass_purchases SET paypal_order_id = ? WHERE id = ?");
+  $stmt->execute(array($orderResult['id'], $purchaseId));
 } catch (Exception $e) {
-  error_log("RID={$RID} GAMEPASS_PURCHASE_DB_ERR: " . $e->getMessage());
+  error_log("RID={$RID} GAMEPASS_PURCHASE_UPDATE_ERR: " . $e->getMessage());
 }
 
-json_out_gp(200, array('success' => true, 'url' => $orderResult['approve_url'], 'paypal_order_id' => $orderResult['id']));
+error_log("RID={$RID} GAMEPASS_PURCHASE user={$userId} tier={$tierInput} price={$unitAmountDecimal} paypal_order={$orderResult['id']}");
+
+json_out_gp(200, array(
+  'success' => true,
+  'url' => $orderResult['approve_url'],
+  'paypal_order_id' => $orderResult['id'],
+  'rid' => $RID
+));

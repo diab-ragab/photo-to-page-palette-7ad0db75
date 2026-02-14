@@ -105,13 +105,49 @@ class GameMailer {
     }
 
     /**
-     * Send Game Pass reward mail
+     * Send Game Pass reward mail (daily claim)
      */
     public function sendGamePassReward($roleId, $day, $tier, $itemId, $qty, $coins = 0, $zen = 0, $exp = 0) {
         $tierLabel = ($tier === 'gold') ? 'Gold' : (($tier === 'elite') ? 'Elite' : 'Free');
         $title = "Game Pass Day {$day}";
         $text  = "{$tierLabel} reward for Day {$day}. Enjoy!";
         return $this->sendMail($roleId, $title, $text, $coins, $zen, $exp, $itemId, $qty);
+    }
+
+    /**
+     * Send Game Pass activation mail (one-time, no attachments)
+     * 
+     * @param int $roleId - Character ID
+     * @param string $tier - 'free', 'elite', or 'gold'
+     * @return array - Result with success status
+     */
+    public function sendGamePassActivationMail($roleId, $tier) {
+        $roleId = intval($roleId);
+        if ($roleId <= 0) {
+            return array('success' => false, 'message' => 'Invalid role ID');
+        }
+
+        $tier = strtolower(trim($tier));
+        if (!in_array($tier, array('free', 'elite', 'gold'))) {
+            return array('success' => false, 'message' => 'Invalid tier');
+        }
+
+        $title = '';
+        $text  = '';
+
+        if ($tier === 'free') {
+            $title = 'Free Pass Activated';
+            $text  = 'Welcome to WOI Endgame! Your Free Pass is now active. Enjoy the free track rewards!';
+        } else if ($tier === 'elite') {
+            $title = 'Elite Pass Activated';
+            $text  = 'Thank you for purchasing WOI Endgame Elite Pass! Your Elite Pass is active for 30 days. Enjoy exclusive premium rewards!';
+        } else if ($tier === 'gold') {
+            $title = 'Gold Pass Activated';
+            $text  = 'Thank you for purchasing WOI Endgame Gold Pass! Your Gold Pass is active for 30 days. Enjoy ultimate premium rewards!';
+        }
+
+        // No attachments for activation mail
+        return $this->sendMail($roleId, $title, $text, 0, 0, 0, 0, 0);
     }
 
     /**
