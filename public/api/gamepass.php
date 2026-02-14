@@ -156,16 +156,17 @@ function fetchRewards($whereClause = '', $params = array()) {
       'icon' => isset($r['icon']) && $r['icon'] !== '' ? $r['icon'] : 'GIFT'
     );
     
-    // If using reward_type system, derive coins/zen/exp from item_id rules
-    // item_id: -1 = zen, -2 = coins, -3 = exp
+    // For currency rewards (item_id <= 0), the actual amounts are in coins/zen/exp columns.
+    // Only fall back to quantity if the dedicated column is 0 (legacy data).
+    // item_id: -1 = zen, -2 = coins, -3 = exp, -4 = spins
     if ($reward['item_id'] === -1) {
-      $reward['zen'] = $reward['quantity'];
+      if ($reward['zen'] <= 0) $reward['zen'] = $reward['quantity'];
       $reward['quantity'] = 0;
     } elseif ($reward['item_id'] === -2) {
-      $reward['coins'] = $reward['quantity'];
+      if ($reward['coins'] <= 0) $reward['coins'] = $reward['quantity'];
       $reward['quantity'] = 0;
     } elseif ($reward['item_id'] === -3) {
-      $reward['exp'] = $reward['quantity'];
+      if ($reward['exp'] <= 0) $reward['exp'] = $reward['quantity'];
       $reward['quantity'] = 0;
     }
     
