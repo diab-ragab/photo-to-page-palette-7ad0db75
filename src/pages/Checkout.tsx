@@ -186,7 +186,10 @@ const Checkout = () => {
                       id="gift-name"
                       placeholder="Enter character name..."
                       value={giftCharacterName}
-                      onChange={(e) => setGiftCharacterName(e.target.value)}
+                      onChange={(e) => {
+                        const sanitized = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        setGiftCharacterName(sanitized);
+                      }}
                       maxLength={50}
                     />
                     <p className="text-xs text-muted-foreground">
