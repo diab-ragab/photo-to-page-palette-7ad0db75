@@ -5,6 +5,8 @@
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/session_helper.php';
 
+handleCors(array('GET', 'POST', 'OPTIONS'));
+
 header('Content-Type: application/json; charset=utf-8');
 
 $rid = substr(bin2hex(random_bytes(6)), 0, 12);
