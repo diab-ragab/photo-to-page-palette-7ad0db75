@@ -182,13 +182,16 @@ if (!function_exists('resolveSessionRow')) {
             }
         } catch (Exception $e) {}
 
+        // NOTE: expires_at check uses MySQL NOW() for clock consistency
+        // (avoids PHP/MySQL timezone drift that causes premature expiry)
+
         // 1) Try raw token in session_token
         try {
             $stmt = $pdo->prepare("
                 SELECT us.user_id, u.`{$usernameCol}` as name, us.expires_at
                 FROM user_sessions us
                 JOIN users u ON u.ID = us.user_id
-                WHERE us.session_token = ?
+                WHERE us.session_token = ? AND us.expires_at > NOW()
                 LIMIT 1
             ");
             $stmt->execute(array($token));
@@ -204,7 +207,7 @@ if (!function_exists('resolveSessionRow')) {
                 SELECT us.user_id, u.`{$usernameCol}` as name, us.expires_at
                 FROM user_sessions us
                 JOIN users u ON u.ID = us.user_id
-                WHERE us.session_token = ?
+                WHERE us.session_token = ? AND us.expires_at > NOW()
                 LIMIT 1
             ");
             $stmt->execute(array($hash));
@@ -222,7 +225,7 @@ if (!function_exists('resolveSessionRow')) {
                     SELECT us.user_id, u.`{$usernameCol}` as name, us.expires_at
                     FROM user_sessions us
                     JOIN users u ON u.ID = us.user_id
-                    WHERE us.`$col` = ?
+                    WHERE us.`$col` = ? AND us.expires_at > NOW()
                     LIMIT 1
                 ");
                 $stmt->execute(array($hash));
@@ -283,30 +286,32 @@ if (!function_exists('extendSession')) {
 
         $pdo = getDB();
         $hash = hash('sha256', $token);
-        $newExpires = date('Y-m-d H:i:s', time() + ((int)$minutes * 60));
+        $mins = (int)$minutes;
+
+        // Use MySQL NOW() for clock consistency with expires_at checks
 
         // raw
         try {
-            $pdo->prepare("UPDATE user_sessions SET expires_at = ?, last_activity = NOW() WHERE session_token = ?")
-                ->execute(array($newExpires, $token));
+            $pdo->prepare("UPDATE user_sessions SET expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE), last_activity = NOW() WHERE session_token = ?")
+                ->execute(array($mins, $token));
         } catch (Exception $e) {}
 
         // hash-in-session_token
         try {
-            $pdo->prepare("UPDATE user_sessions SET expires_at = ?, last_activity = NOW() WHERE session_token = ?")
-                ->execute(array($newExpires, $hash));
+            $pdo->prepare("UPDATE user_sessions SET expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE), last_activity = NOW() WHERE session_token = ?")
+                ->execute(array($mins, $hash));
         } catch (Exception $e) {}
 
         // optional hash columns
         $optionalColumns = array('token_hash', 'session_token_hash');
         foreach ($optionalColumns as $col) {
             try {
-                $pdo->prepare("UPDATE user_sessions SET expires_at = ?, last_activity = NOW() WHERE `$col` = ?")
-                    ->execute(array($newExpires, $hash));
+                $pdo->prepare("UPDATE user_sessions SET expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE), last_activity = NOW() WHERE `$col` = ?")
+                    ->execute(array($mins, $hash));
             } catch (Exception $e) {}
         }
 
-        return $newExpires;
+        return true;
     }
 }
 
@@ -315,12 +320,9 @@ if (!function_exists('getCurrentUser')) {
         $token = getSessionToken();
         if ($token === '') return null;
 
+        // resolveSessionRow already filters by expires_at > NOW() (MySQL clock)
         $sess = resolveSessionRow($token);
         if (!$sess) return null;
-
-        if (!isset($sess['expires_at']) || isSessionExpired($sess['expires_at'])) {
-            return null;
-        }
 
         // Sliding expiration: extend TTL on every authenticated request
         extendSession($token, 60);
