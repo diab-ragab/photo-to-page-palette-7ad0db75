@@ -18,7 +18,7 @@ interface GamePassExtenderProps {
   goldPerDayCents?: number;
 }
 
-const DAY_OPTIONS = [1, 7, 15, 30, 60, 90];
+const DAY_OPTIONS = [30, 60, 90];
 
 export const GamePassExtender = ({
   currentTier,
@@ -125,7 +125,7 @@ export const GamePassExtender = ({
           </div>
 
           {/* Day selector */}
-          <div className="grid grid-cols-6 gap-2 mb-4">
+          <div className="grid grid-cols-3 gap-2 mb-4">
             {DAY_OPTIONS.map((d) => (
               <button
                 key={d}
