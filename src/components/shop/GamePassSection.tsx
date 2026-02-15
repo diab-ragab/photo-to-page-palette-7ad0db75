@@ -20,10 +20,10 @@ const features = [
 ];
 
 export const GamePassSection = () => {
-  const { user } = useAuth();
-  const currentTier = (user as any)?.gamepassTier || "free";
-  const expiresAt = (user as any)?.gamepassExpiresAt || null;
+  const { user, isLoggedIn } = useAuth();
 
+  const [currentTier, setCurrentTier] = useState<"free" | "elite" | "gold">("free");
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [elitePriceCents, setElitePriceCents] = useState(999);
   const [goldPriceCents, setGoldPriceCents] = useState(1999);
   const [gamepassEnabled, setGamepassEnabled] = useState(true);
@@ -34,19 +34,33 @@ export const GamePassSection = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const data = await apiGet<any>(`/gamepass.php?action=rewards&rid=${Date.now()}`, false, { showErrorToast: false });
-        if (data?.success) {
-          if (data.elite_price_cents) setElitePriceCents(data.elite_price_cents);
-          if (data.gold_price_cents) setGoldPriceCents(data.gold_price_cents);
-          if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
-          if (data.elite_enabled !== undefined) setEliteEnabled(data.elite_enabled);
-          if (data.gold_enabled !== undefined) setGoldEnabled(data.gold_enabled);
+        // If logged in, use status endpoint to get user tier + prices
+        if (isLoggedIn) {
+          const data = await apiGet<any>(`/gamepass.php?action=status&rid=${Date.now()}`, true, { showErrorToast: false });
+          if (data?.success) {
+            if (data.user_tier && ["free", "elite", "gold"].includes(data.user_tier)) setCurrentTier(data.user_tier as "free" | "elite" | "gold");
+            if (data.expires_at) setExpiresAt(data.expires_at);
+            if (data.elite_price_cents) setElitePriceCents(data.elite_price_cents);
+            if (data.gold_price_cents) setGoldPriceCents(data.gold_price_cents);
+            if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
+            if (data.elite_enabled !== undefined) setEliteEnabled(data.elite_enabled);
+            if (data.gold_enabled !== undefined) setGoldEnabled(data.gold_enabled);
+          }
+        } else {
+          const data = await apiGet<any>(`/gamepass.php?action=rewards&rid=${Date.now()}`, false, { showErrorToast: false });
+          if (data?.success) {
+            if (data.elite_price_cents) setElitePriceCents(data.elite_price_cents);
+            if (data.gold_price_cents) setGoldPriceCents(data.gold_price_cents);
+            if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
+            if (data.elite_enabled !== undefined) setEliteEnabled(data.elite_enabled);
+            if (data.gold_enabled !== undefined) setGoldEnabled(data.gold_enabled);
+          }
         }
       } catch {}
       setLoaded(true);
     };
     fetchSettings();
-  }, []);
+  }, [isLoggedIn]);
 
   if (loaded && !gamepassEnabled) {
     return (
