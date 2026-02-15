@@ -153,10 +153,17 @@ export async function createPayPalOrder(payload: OrderPayload): Promise<string> 
       );
 
       const data = await res.json();
-      if (!data.success || !data.url) {
+      if (!data.success) {
         throw new Error(data.error || data.message || "Failed to start pass extension");
       }
-      return extractPayPalToken(data.url);
+      // Use direct order ID if available, fall back to URL extraction
+      if (data.paypal_order_id) {
+        return data.paypal_order_id;
+      }
+      if (data.url) {
+        return extractPayPalToken(data.url);
+      }
+      throw new Error("No PayPal order ID returned");
     }
   }
 }
