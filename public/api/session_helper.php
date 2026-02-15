@@ -278,7 +278,7 @@ if (!function_exists('touchSession')) {
 }
 
 if (!function_exists('extendSession')) {
-    function extendSession($token, $minutes = 120) {
+    function extendSession($token, $minutes = 60) {
         if ($token === '') return null;
 
         $pdo = getDB();
@@ -322,7 +322,8 @@ if (!function_exists('getCurrentUser')) {
             return null;
         }
 
-        touchSession($token);
+        // Sliding expiration: extend TTL on every authenticated request
+        extendSession($token, 60);
         return $sess;
     }
 }
@@ -377,7 +378,7 @@ if (!function_exists('isUserAdmin')) {
 }
 
 if (!function_exists('requireAdmin')) {
-    function requireAdmin($jsonResponse = true, $extendMinutes = 120) {
+    function requireAdmin($jsonResponse = true, $extendMinutes = 60) {
         $user = requireAuth($jsonResponse);
 
         $userId = (int)$user['user_id'];

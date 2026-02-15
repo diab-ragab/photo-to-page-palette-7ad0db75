@@ -156,7 +156,7 @@ $confirmPasswd = (string)($_POST['confirmPasswd'] ?? '');
 $sessionTokenBody = (string)($_POST['sessionToken'] ?? '');
 $rememberMe = (bool)($_POST['remember_me'] ?? false);
 
-define('SESSION_MINUTES', 30);
+define('SESSION_MINUTES', 60);
 define('SESSION_REMEMBER_MINUTES', 10080);
 
 // ----- Actions -----
@@ -249,9 +249,12 @@ if ($action === 'check_session') {
   $s = $stmt->fetch(PDO::FETCH_ASSOC);
   if (!$s) fail(401,"Session expired or invalid",$RID);
 
-  $pdo->prepare("UPDATE user_sessions SET last_activity=NOW() WHERE session_token=?")->execute([$token]);
+  // Sliding expiration: extend TTL by SESSION_MINUTES on every check
+  $newExpires = date('Y-m-d H:i:s', time() + SESSION_MINUTES * 60);
+  $pdo->prepare("UPDATE user_sessions SET last_activity=NOW(), expires_at=? WHERE session_token=?")->execute([$newExpires, $token]);
+  error_log("RID={$RID} SESSION_CHECK_EXTEND user_id={$s['user_id']} new_expires={$newExpires}");
 
-  out_json(200, ["success"=>true,"valid"=>true,"user"=>["id"=>$s['user_id'],"username"=>$s['name'],"email"=>$s['email'] ?? ""],"csrf_token"=>$s['csrf_token'],"expiresAt"=>$s['expires_at'],"rid"=>$RID]);
+  out_json(200, ["success"=>true,"valid"=>true,"user"=>["id"=>$s['user_id'],"username"=>$s['name'],"email"=>$s['email'] ?? ""],"csrf_token"=>$s['csrf_token'],"expiresAt"=>$newExpires,"rid"=>$RID]);
 }
 
 if ($action === 'refresh_session') {
@@ -268,10 +271,8 @@ if ($action === 'refresh_session') {
   $newToken = bin2hex(random_bytes(32));
   $newCsrf  = csrf();
 
-  $createdTs = strtotime($s['created_at']);
-  $expiresTs = strtotime($s['expires_at']);
-  $mins = max(SESSION_MINUTES, (int)(($expiresTs - $createdTs)/60));
-  $newExpires = date('Y-m-d H:i:s', time() + $mins*60);
+  $mins = SESSION_MINUTES;
+  $newExpires = date('Y-m-d H:i:s', time() + $mins * 60);
 
   $pdo->prepare("UPDATE user_sessions SET session_token=?, csrf_token=?, expires_at=?, last_activity=NOW() WHERE session_token=?")
       ->execute([$newToken,$newCsrf,$newExpires,$token]);

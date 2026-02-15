@@ -3,8 +3,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 import { useToast } from "@/hooks/use-toast";
 
-const DEFAULT_SESSION_TIMEOUT_MS = 120 * 60 * 1000; // 2 hours
-const REMEMBER_ME_TIMEOUT_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const DEFAULT_SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour sliding window
+const REMEMBER_ME_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const WARNING_BEFORE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes warning before timeout
 const SERVER_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // Refresh server session every 5 minutes
 
@@ -183,8 +183,8 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
       lastServerRefreshRef.current = Date.now();
       
       const extendMessage = rememberMe
-        ? "Your session has been extended for another 30 days."
-        : "Your session has been extended for another 2 hours.";
+        ? "Your session has been extended for another 7 days."
+        : "Your session has been extended for another 60 minutes.";
       
       toast({
         title: "Session Extended",
