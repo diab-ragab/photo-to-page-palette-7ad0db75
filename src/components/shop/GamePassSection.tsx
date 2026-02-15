@@ -34,9 +34,10 @@ export const GamePassSection = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        // If logged in, use status endpoint to get user tier + prices
-        if (isLoggedIn) {
-          const data = await apiGet<any>(`/gamepass.php?action=status&rid=${Date.now()}`, true, { showErrorToast: false });
+        // If logged in and session token is available, use status endpoint
+        const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken") || "";
+        if (isLoggedIn && token) {
+          const data = await apiGet<any>(`/gamepass.php?action=status&rid=${Date.now()}`, true, { showErrorToast: false, silentStatuses: [401, 403] });
           if (data?.success) {
             if (data.user_tier && ["free", "elite", "gold"].includes(data.user_tier)) setCurrentTier(data.user_tier as "free" | "elite" | "gold");
             if (data.expires_at) setExpiresAt(data.expires_at);
@@ -60,7 +61,7 @@ export const GamePassSection = () => {
       setLoaded(true);
     };
     fetchSettings();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, user]);
 
   if (loaded && !gamepassEnabled) {
     return (
