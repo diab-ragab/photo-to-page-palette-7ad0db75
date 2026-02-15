@@ -28,6 +28,9 @@ import Support from "./pages/Support";
 import Shop from "./pages/Shop";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
+import ShopSuccess from "./pages/ShopSuccess";
+import ShopCancel from "./pages/ShopCancel";
+import ShopFailed from "./pages/ShopFailed";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import DownloadPage from "./pages/Download";
@@ -35,8 +38,6 @@ import Dashboard from "./pages/Dashboard";
 import SeasonHistory from "./pages/SeasonHistory";
 import AdminDashboard from "./pages/AdminDashboard";
 import ClassPage from "./pages/ClassPage";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentFailed from "./pages/PaymentFailed";
 
 const queryClient = new QueryClient();
 
@@ -59,10 +60,9 @@ const AnimatedRoutes = () => {
         <Route path="/shop" element={<PageTransition><ProtectedRoute><Shop /></ProtectedRoute></PageTransition>} />
         <Route path="/cart" element={<PageTransition><ProtectedRoute><Cart /></ProtectedRoute></PageTransition>} />
         <Route path="/checkout" element={<PageTransition><ProtectedRoute><Checkout /></ProtectedRoute></PageTransition>} />
-        <Route path="/payment-success" element={<PageTransition><PaymentSuccess /></PageTransition>} />
-        <Route path="/checkout/success" element={<PageTransition><PaymentSuccess /></PageTransition>} />
-        <Route path="/payment-failed" element={<PageTransition><PaymentFailed /></PageTransition>} />
-        <Route path="/checkout/cancel" element={<PageTransition><PaymentFailed /></PageTransition>} />
+        <Route path="/shop/success" element={<PageTransition><ShopSuccess /></PageTransition>} />
+        <Route path="/shop/cancel" element={<PageTransition><ShopCancel /></PageTransition>} />
+        <Route path="/shop/failed" element={<PageTransition><ShopFailed /></PageTransition>} />
         <Route path="/blog" element={<PageTransition><Blog /></PageTransition>} />
         <Route path="/blog/:slug" element={<PageTransition><BlogPost /></PageTransition>} />
         <Route path="/download" element={<PageTransition><DownloadPage /></PageTransition>} />

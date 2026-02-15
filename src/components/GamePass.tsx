@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { CharacterSelector } from "@/components/shop/CharacterSelector";
-import { ElitePassUpsell } from "@/components/ElitePassUpsell";
+// CharacterSelector and ElitePassUpsell removed (old webshop)
 import {
   Crown,
   Lock,
@@ -639,30 +638,21 @@ export const GamePass = () => {
           </div>
         </div>
 
-        {/* Character Selector */}
-        {user && (
+        {/* Character selection - users select from dropdown built inline */}
+        {user && selectedCharacterName && (
           <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border/50 backdrop-blur-sm">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">Deliver Rewards To</span>
-              {selectedCharacterName && (
-                <Badge variant="outline" className="ml-auto text-xs border-primary/40 text-primary bg-primary/10">
-                  <Zap className="h-3 w-3 mr-1" />
-                  {selectedCharacterName}
-                </Badge>
-              )}
+              <span className="text-sm font-semibold">Delivering to:</span>
+              <Badge variant="outline" className="text-xs border-primary/40 text-primary bg-primary/10">
+                <Zap className="h-3 w-3 mr-1" />
+                {selectedCharacterName}
+              </Badge>
             </div>
-            <CharacterSelector onSelect={handleCharacterSelect} selectedRoleId={selectedRoleId} />
           </div>
         )}
       </div>
 
-      {/* Pass Upsell Banner */}
-      {userTier !== "gold" && (
-        <div className="mb-6">
-          <ElitePassUpsell compact currentTier={userTier} expiresAt={passExpiresAt} elitePriceCents={elitePriceCents} goldPriceCents={goldPriceCents} gamepassEnabled={gamepassEnabled} eliteEnabled={eliteEnabled} goldEnabled={goldEnabled} />
-        </div>
-      )}
 
       {/* Pass Track */}
       <div className="relative z-10 pb-6">
