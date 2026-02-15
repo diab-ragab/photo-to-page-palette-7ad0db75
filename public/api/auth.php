@@ -249,9 +249,14 @@ if ($action === 'check_session') {
   $s = $stmt->fetch(PDO::FETCH_ASSOC);
   if (!$s) fail(401,"Session expired or invalid",$RID);
 
-  // Sliding expiration: extend TTL by SESSION_MINUTES on every check
-  $newExpires = date('Y-m-d H:i:s', time() + SESSION_MINUTES * 60);
-  $pdo->prepare("UPDATE user_sessions SET last_activity=NOW(), expires_at=? WHERE session_token=?")->execute([$newExpires, $token]);
+  // Sliding expiration: extend TTL by SESSION_MINUTES using MySQL clock
+  $pdo->prepare("UPDATE user_sessions SET last_activity=NOW(), expires_at=DATE_ADD(NOW(), INTERVAL ? MINUTE) WHERE session_token=?")->execute([SESSION_MINUTES, $token]);
+  
+  // Fetch the new expires_at from MySQL for the response
+  $stmt2 = $pdo->prepare("SELECT expires_at FROM user_sessions WHERE session_token=? LIMIT 1");
+  $stmt2->execute([$token]);
+  $row2 = $stmt2->fetch(PDO::FETCH_ASSOC);
+  $newExpires = $row2 ? $row2['expires_at'] : '';
   error_log("RID={$RID} SESSION_CHECK_EXTEND user_id={$s['user_id']} new_expires={$newExpires}");
 
   out_json(200, ["success"=>true,"valid"=>true,"user"=>["id"=>$s['user_id'],"username"=>$s['name'],"email"=>$s['email'] ?? ""],"csrf_token"=>$s['csrf_token'],"expiresAt"=>$newExpires,"rid"=>$RID]);
@@ -269,14 +274,17 @@ if ($action === 'refresh_session') {
   if (!$s) fail(401,"Session expired or invalid",$RID);
 
   // Sliding expiration: extend TTL without rotating token (prevents race conditions)
-  $mins = SESSION_MINUTES;
-  $newExpires = date('Y-m-d H:i:s', time() + $mins * 60);
-
-  $pdo->prepare("UPDATE user_sessions SET expires_at=?, last_activity=NOW() WHERE session_token=?")
-      ->execute([$newExpires, $token]);
+  // Sliding expiration using MySQL clock for consistency
+  $pdo->prepare("UPDATE user_sessions SET expires_at=DATE_ADD(NOW(), INTERVAL ? MINUTE), last_activity=NOW() WHERE session_token=?")
+      ->execute([SESSION_MINUTES, $token]);
+  
+  $stmt2 = $pdo->prepare("SELECT expires_at FROM user_sessions WHERE session_token=? LIMIT 1");
+  $stmt2->execute([$token]);
+  $row2 = $stmt2->fetch(PDO::FETCH_ASSOC);
+  $newExpires = $row2 ? $row2['expires_at'] : '';
   error_log("RID={$RID} SESSION_REFRESH_EXTEND user_id={$s['user_id']} new_expires={$newExpires}");
 
-  out_json(200, ["success"=>true,"message"=>"Session refreshed","sessionToken"=>$token,"csrf_token"=>$s['csrf_token'],"expiresAt"=>$newExpires,"sessionMinutes"=>$mins,"rid"=>$RID]);
+  out_json(200, ["success"=>true,"message"=>"Session refreshed","sessionToken"=>$token,"csrf_token"=>$s['csrf_token'],"expiresAt"=>$newExpires,"sessionMinutes"=>SESSION_MINUTES,"rid"=>$RID]);
 }
 
 if ($action === 'reset') {
