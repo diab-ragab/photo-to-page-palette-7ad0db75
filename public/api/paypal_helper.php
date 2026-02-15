@@ -2,6 +2,7 @@
 /**
  * paypal_helper.php - PayPal REST API v2 helpers (PHP 5.x compatible)
  * 
+ * LIVE-ONLY: All requests go to https://api-m.paypal.com
  * Uses file_get_contents (no cURL, no SDK) for PayPal REST API calls.
  * Provides: getPayPalAccessToken(), paypalCreateOrder(), paypalCaptureOrder()
  */
@@ -12,13 +13,12 @@ if (!function_exists('getPayPalAccessToken')) {
    * Get PayPal OAuth2 access token
    * @param string $clientId
    * @param string $secret
-   * @param bool $sandbox  Use sandbox endpoint
+   * @param bool $sandbox  IGNORED — always uses LIVE endpoint
    * @return array  array('token' => string, 'error' => string)
    */
   function getPayPalAccessToken($clientId, $secret, $sandbox = false) {
-    $baseUrl = $sandbox
-      ? 'https://api-m.sandbox.paypal.com'
-      : 'https://api-m.paypal.com';
+    // FORCE LIVE — ignore sandbox parameter
+    $baseUrl = 'https://api-m.paypal.com';
 
     $url = $baseUrl . '/v1/oauth2/token';
     $auth = base64_encode($clientId . ':' . $secret);
@@ -120,14 +120,13 @@ if (!function_exists('getPayPalAccessToken')) {
   }
 
   /**
-   * Get PayPal API base URL
-   * @param bool $sandbox
+   * Get PayPal API base URL — ALWAYS LIVE
+   * @param bool $sandbox  IGNORED
    * @return string
    */
   function getPayPalBaseUrl($sandbox = false) {
-    return $sandbox
-      ? 'https://api-m.sandbox.paypal.com'
-      : 'https://api-m.paypal.com';
+    // FORCE LIVE — ignore sandbox parameter
+    return 'https://api-m.paypal.com';
   }
 
   /**
@@ -137,11 +136,11 @@ if (!function_exists('getPayPalAccessToken')) {
    * @param string $returnUrl
    * @param string $cancelUrl
    * @param array  $metadata       Custom metadata to store (saved in custom_id as JSON)
-   * @param bool   $sandbox
+   * @param bool   $sandbox  IGNORED
    * @return array  array('id' => string, 'approve_url' => string, 'error' => string)
    */
   function paypalCreateOrder($accessToken, $purchaseUnits, $returnUrl, $cancelUrl, $metadata = array(), $sandbox = false) {
-    $baseUrl = getPayPalBaseUrl($sandbox);
+    $baseUrl = getPayPalBaseUrl(false);
     $url = $baseUrl . '/v2/checkout/orders';
 
     // Encode metadata into custom_id of first purchase unit (max 127 chars)
@@ -198,11 +197,11 @@ if (!function_exists('getPayPalAccessToken')) {
    * Capture a PayPal order after payer approval
    * @param string $accessToken
    * @param string $orderId   PayPal order ID
-   * @param bool   $sandbox
+   * @param bool   $sandbox  IGNORED
    * @return array  array('status' => string, 'capture_id' => string, 'data' => array, 'error' => string)
    */
   function paypalCaptureOrder($accessToken, $orderId, $sandbox = false) {
-    $baseUrl = getPayPalBaseUrl($sandbox);
+    $baseUrl = getPayPalBaseUrl(false);
     $url = $baseUrl . '/v2/checkout/orders/' . urlencode($orderId) . '/capture';
 
     list($code, $data, $err) = paypalRequest('POST', $url, $accessToken, new stdClass());
@@ -228,11 +227,11 @@ if (!function_exists('getPayPalAccessToken')) {
    * Get PayPal order details
    * @param string $accessToken
    * @param string $orderId
-   * @param bool   $sandbox
+   * @param bool   $sandbox  IGNORED
    * @return array  array($httpCode, $data, $error)
    */
   function paypalGetOrder($accessToken, $orderId, $sandbox = false) {
-    $baseUrl = getPayPalBaseUrl($sandbox);
+    $baseUrl = getPayPalBaseUrl(false);
     $url = $baseUrl . '/v2/checkout/orders/' . urlencode($orderId);
     return paypalRequest('GET', $url, $accessToken);
   }
@@ -247,7 +246,7 @@ if (!function_exists('getPayPalAccessToken')) {
     return array(
       'client_id'    => isset($pp['client_id']) ? $pp['client_id'] : '',
       'secret'       => isset($pp['secret']) ? $pp['secret'] : '',
-      'sandbox'      => isset($pp['sandbox']) ? (bool)$pp['sandbox'] : false,
+      'sandbox'      => false,  // FORCED LIVE
       'currency'     => isset($pp['currency']) ? strtoupper($pp['currency']) : 'EUR',
       'merchant_id'  => isset($pp['merchant_id']) ? $pp['merchant_id'] : '',
       'success_url'  => isset($pp['success_url']) ? $pp['success_url'] : '',

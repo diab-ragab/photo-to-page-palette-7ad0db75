@@ -1,16 +1,34 @@
 // Service Worker for Push Notifications
-const CACHE_NAME = 'woi-notifications-v1';
+// Cache version bumped to force refresh and clear any cached sandbox PayPal SDK
+const CACHE_NAME = 'woi-notifications-v2';
 
-// Install event
+// Install event - force activate immediately
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker...');
+  console.log('[SW] Installing service worker v2...');
+  // Delete old caches
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.filter((name) => name !== CACHE_NAME).map((name) => {
+          console.log('[SW] Deleting old cache:', name);
+          return caches.delete(name);
+        })
+      );
+    })
+  );
   self.skipWaiting();
 });
 
-// Activate event
+// Activate event - claim clients immediately
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker...');
-  event.waitUntil(clients.claim());
+  console.log('[SW] Activating service worker v2...');
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
+      );
+    }).then(() => clients.claim())
+  );
 });
 
 // Push notification event
@@ -61,14 +79,12 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // Try to focus an existing window
         for (const client of clientList) {
           if (client.url.includes(self.location.origin) && 'focus' in client) {
             client.navigate(urlToOpen);
             return client.focus();
           }
         }
-        // Open a new window if none exist
         if (clients.openWindow) {
           return clients.openWindow(urlToOpen);
         }
@@ -84,7 +100,5 @@ self.addEventListener('sync', (event) => {
 });
 
 async function checkScheduledNotifications() {
-  // This would be called by the background sync
-  // For now, we rely on the frontend to trigger notifications
   console.log('[SW] Checking scheduled notifications...');
 }

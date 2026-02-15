@@ -26,7 +26,9 @@ interface CardPaymentFormProps {
   createOrderFn?: () => Promise<string>;
 }
 
+// LIVE PayPal Client ID — must match the Live credentials in config.php
 const PAYPAL_CLIENT_ID = "AWEFJy_edKvt3xKcWnEgeB-lQBtz2VqYGb9eSWnDJB1f7cSyBeZ8R2xoyHF5r_vrnYOxkfkHHrm6EzHs";
+const PAYPAL_MERCHANT_ID = "GNY2CWYMNG7K4";
 
 export function CardPaymentForm({
   orderPayload,
@@ -147,11 +149,12 @@ export function CardPaymentForm({
     <PayPalScriptProvider
       options={{
         clientId: PAYPAL_CLIENT_ID,
-        merchantId: "GNY2CWYMNG7K4",
+        merchantId: PAYPAL_MERCHANT_ID,
         components: "buttons",
         currency: "EUR",
         intent: "capture",
         disableFunding: "paylater,venmo,sepa,bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sofort",
+        dataNamespace: "paypal_sdk",
       }}
     >
       <div className="space-y-4">
