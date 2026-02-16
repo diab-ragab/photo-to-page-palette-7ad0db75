@@ -8,6 +8,7 @@ import { captureShopOrder, CaptureOrderResponse } from "@/lib/shopApi";
 import { useCart } from "@/contexts/CartContext";
 import { CheckCircle, XCircle, Loader2, Package, ShoppingBag } from "lucide-react";
 import { motion } from "framer-motion";
+import { PurchaseConfetti } from "@/components/shop/PurchaseConfetti";
 
 const ShopSuccess = () => {
   const [searchParams] = useSearchParams();
@@ -42,6 +43,7 @@ const ShopSuccess = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <PurchaseConfetti trigger={status === "success"} />
       <SEO title="Order Status" noIndex />
       <Navbar />
       <div className="container mx-auto px-4 py-32 max-w-lg text-center">
