@@ -121,7 +121,7 @@ foreach ($orderItems as $oi) {
 }
 
 // --- Create PayPal order ---
-$tokenRes = getPayPalAccessToken($ppCfg['client_id'], $ppCfg['secret'], false);
+$tokenRes = getPayPalAccessToken($ppCfg['client_id'], $ppCfg['secret'], $ppCfg['sandbox']);
 if ($tokenRes['error'] !== '') {
     error_log("RID={$RID} PAYPAL_TOKEN_FAIL: " . $tokenRes['error']);
     $pdo->prepare("UPDATE shop_orders SET status='failed', updated_at=NOW() WHERE id=?")->execute(array($orderId));
@@ -158,7 +158,7 @@ $baseUrl = 'https://woiendgame.online';
 $successUrl = $baseUrl . '/shop/success';
 $cancelUrl  = $baseUrl . '/shop/cancel';
 
-$ppResult = paypalCreateOrder($tokenRes['token'], $purchaseUnits, $successUrl, $cancelUrl, $metadata, false);
+$ppResult = paypalCreateOrder($tokenRes['token'], $purchaseUnits, $successUrl, $cancelUrl, $metadata, $ppCfg['sandbox']);
 
 if ($ppResult['error'] !== '') {
     error_log("RID={$RID} PAYPAL_CREATE_FAIL: " . $ppResult['error']);

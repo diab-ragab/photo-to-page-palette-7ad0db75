@@ -73,14 +73,14 @@ $pdo->prepare("UPDATE shop_orders SET status='processing', updated_at=NOW() WHER
 
 // --- Capture PayPal ---
 $ppCfg = getPayPalConfig();
-$tokenRes = getPayPalAccessToken($ppCfg['client_id'], $ppCfg['secret'], false);
+$tokenRes = getPayPalAccessToken($ppCfg['client_id'], $ppCfg['secret'], $ppCfg['sandbox']);
 if ($tokenRes['error'] !== '') {
     error_log("RID={$RID} CAPTURE_TOKEN_FAIL: " . $tokenRes['error']);
     $pdo->prepare("UPDATE shop_orders SET status='pending', updated_at=NOW() WHERE id=?")->execute(array($orderId));
     jsonFail(502, 'Payment gateway error', $RID);
 }
 
-$capResult = paypalCaptureOrder($tokenRes['token'], $ppOrderId, false);
+$capResult = paypalCaptureOrder($tokenRes['token'], $ppOrderId, $ppCfg['sandbox']);
 
 // Log raw txn
 $pdo->prepare("INSERT INTO shop_paypal_txn (order_id, paypal_order_id, capture_id, status, raw_json, created_at) VALUES (?, ?, ?, ?, ?, NOW())")

@@ -2,24 +2,38 @@
 /**
  * paypal_helper.php - PayPal REST API v2 helpers (PHP 5.x compatible)
  * 
- * LIVE-ONLY: All requests go to https://api-m.paypal.com
- * Uses file_get_contents (no cURL, no SDK) for PayPal REST API calls.
- * Provides: getPayPalAccessToken(), paypalCreateOrder(), paypalCaptureOrder()
+ * Respects config.php paypal.sandbox flag:
+ *   sandbox=true  -> https://api-m.sandbox.paypal.com
+ *   sandbox=false -> https://api-m.paypal.com
+ *
+ * Uses file_get_contents (no cURL, no SDK).
+ * Provides: getPayPalConfig(), getPayPalBaseUrl(), getPayPalAccessToken(),
+ *           paypalCreateOrder(), paypalCaptureOrder(), paypalGetOrder()
  */
 
 if (!function_exists('getPayPalAccessToken')) {
 
   /**
+   * Get PayPal API base URL based on sandbox flag
+   * @param bool $sandbox
+   * @return string
+   */
+  function getPayPalBaseUrl($sandbox) {
+    if ($sandbox) {
+      return 'https://api-m.sandbox.paypal.com';
+    }
+    return 'https://api-m.paypal.com';
+  }
+
+  /**
    * Get PayPal OAuth2 access token
    * @param string $clientId
    * @param string $secret
-   * @param bool $sandbox  IGNORED — always uses LIVE endpoint
+   * @param bool   $sandbox
    * @return array  array('token' => string, 'error' => string)
    */
-  function getPayPalAccessToken($clientId, $secret, $sandbox = false) {
-    // FORCE LIVE — ignore sandbox parameter
-    $baseUrl = 'https://api-m.paypal.com';
-
+  function getPayPalAccessToken($clientId, $secret, $sandbox) {
+    $baseUrl = getPayPalBaseUrl($sandbox);
     $url = $baseUrl . '/v1/oauth2/token';
     $auth = base64_encode($clientId . ':' . $secret);
 
@@ -54,7 +68,8 @@ if (!function_exists('getPayPalAccessToken')) {
     }
 
     if ($resp === false || $code < 200 || $code >= 300) {
-      return array('token' => '', 'error' => 'Failed to get PayPal access token (HTTP ' . $code . ')');
+      $env = $sandbox ? 'SANDBOX' : 'LIVE';
+      return array('token' => '', 'error' => "Failed to get PayPal access token ({$env}, HTTP {$code})");
     }
 
     $data = json_decode($resp, true);
@@ -120,30 +135,20 @@ if (!function_exists('getPayPalAccessToken')) {
   }
 
   /**
-   * Get PayPal API base URL — ALWAYS LIVE
-   * @param bool $sandbox  IGNORED
-   * @return string
-   */
-  function getPayPalBaseUrl($sandbox = false) {
-    // FORCE LIVE — ignore sandbox parameter
-    return 'https://api-m.paypal.com';
-  }
-
-  /**
    * Create a PayPal order (checkout)
    * @param string $accessToken
-   * @param array  $purchaseUnits  Array of purchase unit arrays
+   * @param array  $purchaseUnits
    * @param string $returnUrl
    * @param string $cancelUrl
-   * @param array  $metadata       Custom metadata to store (saved in custom_id as JSON)
-   * @param bool   $sandbox  IGNORED
+   * @param array  $metadata       Saved in custom_id as JSON (max 127 chars)
+   * @param bool   $sandbox
    * @return array  array('id' => string, 'approve_url' => string, 'error' => string)
    */
-  function paypalCreateOrder($accessToken, $purchaseUnits, $returnUrl, $cancelUrl, $metadata = array(), $sandbox = false) {
-    $baseUrl = getPayPalBaseUrl(false);
+  function paypalCreateOrder($accessToken, $purchaseUnits, $returnUrl, $cancelUrl, $metadata, $sandbox) {
+    $baseUrl = getPayPalBaseUrl($sandbox);
     $url = $baseUrl . '/v2/checkout/orders';
 
-    // Encode metadata into custom_id of first purchase unit (max 127 chars)
+    // Encode metadata into custom_id of first purchase unit
     if (!empty($metadata) && isset($purchaseUnits[0])) {
       $purchaseUnits[0]['custom_id'] = substr(json_encode($metadata), 0, 127);
     }
@@ -197,11 +202,11 @@ if (!function_exists('getPayPalAccessToken')) {
    * Capture a PayPal order after payer approval
    * @param string $accessToken
    * @param string $orderId   PayPal order ID
-   * @param bool   $sandbox  IGNORED
+   * @param bool   $sandbox
    * @return array  array('status' => string, 'capture_id' => string, 'data' => array, 'error' => string)
    */
-  function paypalCaptureOrder($accessToken, $orderId, $sandbox = false) {
-    $baseUrl = getPayPalBaseUrl(false);
+  function paypalCaptureOrder($accessToken, $orderId, $sandbox) {
+    $baseUrl = getPayPalBaseUrl($sandbox);
     $url = $baseUrl . '/v2/checkout/orders/' . urlencode($orderId) . '/capture';
 
     list($code, $data, $err) = paypalRequest('POST', $url, $accessToken, new stdClass());
@@ -215,7 +220,6 @@ if (!function_exists('getPayPalAccessToken')) {
     $status = isset($data['status']) ? $data['status'] : '';
     $captureId = '';
 
-    // Extract capture ID from purchase_units
     if (isset($data['purchase_units'][0]['payments']['captures'][0]['id'])) {
       $captureId = $data['purchase_units'][0]['payments']['captures'][0]['id'];
     }
@@ -227,30 +231,30 @@ if (!function_exists('getPayPalAccessToken')) {
    * Get PayPal order details
    * @param string $accessToken
    * @param string $orderId
-   * @param bool   $sandbox  IGNORED
+   * @param bool   $sandbox
    * @return array  array($httpCode, $data, $error)
    */
-  function paypalGetOrder($accessToken, $orderId, $sandbox = false) {
-    $baseUrl = getPayPalBaseUrl(false);
+  function paypalGetOrder($accessToken, $orderId, $sandbox) {
+    $baseUrl = getPayPalBaseUrl($sandbox);
     $url = $baseUrl . '/v2/checkout/orders/' . urlencode($orderId);
     return paypalRequest('GET', $url, $accessToken);
   }
 
   /**
    * Get PayPal config from app config
-   * @return array  array('client_id', 'secret', 'sandbox', 'currency', 'success_url', 'cancel_url')
+   * @return array
    */
   function getPayPalConfig() {
     $cfg = getConfig();
     $pp = isset($cfg['paypal']) ? $cfg['paypal'] : array();
     return array(
-      'client_id'    => isset($pp['client_id']) ? $pp['client_id'] : '',
-      'secret'       => isset($pp['secret']) ? $pp['secret'] : '',
-      'sandbox'      => false,  // FORCED LIVE
-      'currency'     => isset($pp['currency']) ? strtoupper($pp['currency']) : 'EUR',
+      'client_id'    => isset($pp['client_id'])   ? $pp['client_id']   : '',
+      'secret'       => isset($pp['secret'])      ? $pp['secret']      : '',
+      'sandbox'      => isset($pp['sandbox'])     ? (bool)$pp['sandbox'] : false,
+      'currency'     => isset($pp['currency'])    ? strtoupper($pp['currency']) : 'EUR',
       'merchant_id'  => isset($pp['merchant_id']) ? $pp['merchant_id'] : '',
       'success_url'  => isset($pp['success_url']) ? $pp['success_url'] : '',
-      'cancel_url'   => isset($pp['cancel_url']) ? $pp['cancel_url'] : '',
+      'cancel_url'   => isset($pp['cancel_url'])  ? $pp['cancel_url']  : '',
     );
   }
 }
