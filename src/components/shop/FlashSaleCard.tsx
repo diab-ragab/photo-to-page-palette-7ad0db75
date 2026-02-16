@@ -168,17 +168,31 @@ export const FlashSaleCard = ({ product, index, onAdd }: FlashSaleCardProps) => 
                 />
               )}
 
-              {/* Info bar */}
-              <div className="p-4 flex items-center justify-between">
-                <div>
-                  <h3 className="font-display font-bold text-base">{product.name}</h3>
+              {/* Info bar with Add to Cart */}
+              <div className="p-4 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-display font-bold text-base truncate">{product.name}</h3>
                   {product.description && (
-                    <p className="text-sm text-muted-foreground mt-0.5">{product.description}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{product.description}</p>
                   )}
                 </div>
-                <span className="font-display font-bold text-lg text-primary shrink-0 ml-4">
-                  €{(product.price_cents / 100).toFixed(2)}
-                </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="font-display font-bold text-lg text-primary">
+                    €{(product.price_cents / 100).toFixed(2)}
+                  </span>
+                  <Button
+                    size="sm"
+                    className="gap-2 rounded-lg"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAdd(product);
+                      setShowMedia(false);
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add to Cart
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
