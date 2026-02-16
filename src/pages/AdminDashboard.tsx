@@ -16,7 +16,6 @@ import { VoteSitesManager } from "@/components/admin/VoteSitesManager";
 import { NotificationsManager } from "@/components/admin/NotificationsManager";
 import { PushNotificationManager } from "@/components/admin/PushNotificationManager";
 import { UsersManager } from "@/components/admin/UsersManager";
-// WebshopManager removed (old webshop)
 import { OrdersManager } from "@/components/admin/OrdersManager";
 import { ServerStatsCard } from "@/components/admin/ServerStatsCard";
 import { SettingsManager } from "@/components/admin/SettingsManager";
@@ -24,7 +23,6 @@ import { AchievementsManager } from "@/components/admin/AchievementsManager";
 import { SpinWheelManager } from "@/components/admin/SpinWheelManager";
 import { EventsManager } from "@/components/admin/EventsManager";
 import { ChangelogManager } from "@/components/admin/ChangelogManager";
-// BundlesManager and CurrencyTopUpManager removed (old webshop)
 import {
   Shield,
   Users, 
@@ -234,7 +232,7 @@ export default function AdminDashboard() {
             <div>
               <h1 className="text-2xl md:text-3xl font-display font-bold">Admin Dashboard</h1>
               <p className="text-sm md:text-base text-muted-foreground">
-                Full control over users, rewards, webshop & server
+                Full control over users, rewards, shop & server
               </p>
             </div>
           </div>
@@ -384,10 +382,10 @@ export default function AdminDashboard() {
                   <Button 
                     variant="outline" 
                     className="h-auto py-4 flex flex-col gap-2"
-                    onClick={() => setActiveTab("webshop")}
+                    onClick={() => setActiveTab("orders")}
                   >
                     <ShoppingBag className="h-6 w-6 text-amber-500" />
-                    <span className="text-sm">Webshop</span>
+                    <span className="text-sm">Orders</span>
                   </Button>
                 </CardContent>
               </Card>

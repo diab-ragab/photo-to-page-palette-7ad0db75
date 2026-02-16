@@ -17,55 +17,27 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
-interface Order {
+interface ShopOrder {
   id: number;
-  product_id: number | null;
-  product_name: string | null;
-  item_id: number;
-  quantity: number;
-  total_real: number;
-  status: "pending" | "completed" | "failed" | "refunded";
-  delivered_at: string | null;
+  rid: string;
+  character_name: string;
+  total_cents: number;
+  currency: string;
+  status: "pending" | "processing" | "completed" | "failed";
   created_at: string;
-  order_type: "product" | "bundle" | "gamepass";
-  bundle_id: number | null;
+  product_names: string | null;
+  total_qty: number;
 }
-
-interface OrdersResponse {
-  success: boolean;
-  orders: Order[];
-  total: number;
-  page: number;
-  pages: number;
-}
-
-// Uses centralized API_BASE and getAuthHeaders from apiFetch
 
 const statusConfig = {
-  pending: {
-    label: "Pending",
-    icon: Clock,
-    className: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-  },
-  completed: {
-    label: "Completed",
-    icon: CheckCircle2,
-    className: "bg-green-500/10 text-green-500 border-green-500/20",
-  },
-  failed: {
-    label: "Failed",
-    icon: XCircle,
-    className: "bg-destructive/10 text-destructive border-destructive/20",
-  },
-  refunded: {
-    label: "Refunded",
-    icon: RefreshCcw,
-    className: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  },
+  pending: { label: "Pending", icon: Clock, className: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" },
+  processing: { label: "Processing", icon: RefreshCcw, className: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+  completed: { label: "Completed", icon: CheckCircle2, className: "bg-green-500/10 text-green-500 border-green-500/20" },
+  failed: { label: "Failed", icon: XCircle, className: "bg-destructive/10 text-destructive border-destructive/20" },
 };
 
 export function OrderHistory() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -76,12 +48,9 @@ export function OrderHistory() {
     try {
       const res = await fetch(
         `${API_BASE}/user_orders.php?action=list&page=${pageNum}&limit=10`,
-        {
-          credentials: "include",
-          headers: getAuthHeaders(),
-        }
+        { credentials: "include", headers: getAuthHeaders() }
       );
-      const data: OrdersResponse = await res.json();
+      const data = await res.json();
       if (data.success) {
         setOrders(data.orders);
         setTotalPages(data.pages);
@@ -95,23 +64,12 @@ export function OrderHistory() {
     }
   };
 
-  useEffect(() => {
-    fetchOrders(1);
-  }, []);
+  useEffect(() => { fetchOrders(1); }, []);
 
-  const formatPrice = (order: Order): string => {
-    const totalReal = Number(order.total_real) || 0;
-    if (totalReal > 0) {
-      return `€${totalReal.toFixed(2)}`;
-    }
-    return "Free";
-  };
-
-  const getRewardLabel = (itemId: number): string => {
-    if (itemId === -1) return "💎 Zen";
-    if (itemId === -2) return "🪙 Coins";
-    if (itemId === -3) return "⚡ EXP";
-    return "🎁 Item";
+  const formatPrice = (cents: number, currency: string): string => {
+    if (cents <= 0) return "Free";
+    const sym = currency === "EUR" ? "€" : currency;
+    return `${sym}${(cents / 100).toFixed(2)}`;
   };
 
   if (loading && orders.length === 0) {
@@ -119,14 +77,11 @@ export function OrderHistory() {
       <Card className="bg-card border-primary/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <ShoppingBag className="h-5 w-5 text-primary" />
-            Order History
+            <ShoppingBag className="h-5 w-5 text-primary" /> Order History
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-20 w-full rounded-lg" />
-          ))}
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
         </CardContent>
       </Card>
     );
@@ -136,12 +91,9 @@ export function OrderHistory() {
     <Card className="bg-card border-primary/20">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-lg">
-          <ShoppingBag className="h-5 w-5 text-primary" />
-          Order History
+          <ShoppingBag className="h-5 w-5 text-primary" /> Order History
         </CardTitle>
-        {total > 0 && (
-          <span className="text-sm text-muted-foreground">{total} orders</span>
-        )}
+        {total > 0 && <span className="text-sm text-muted-foreground">{total} orders</span>}
       </CardHeader>
       <CardContent>
         {orders.length === 0 ? (
@@ -155,55 +107,26 @@ export function OrderHistory() {
             <ScrollArea className="h-[320px] pr-4">
               <div className="space-y-3">
                 {orders.map((order) => {
-                  const status = statusConfig[order.status];
-                  const StatusIcon = status.icon;
-                  const isBundle = order.order_type === "bundle";
-                  const isGamePass = order.order_type === "gamepass";
-
+                  const st = statusConfig[order.status] || statusConfig.pending;
+                  const StatusIcon = st.icon;
                   return (
-                    <div
-                      key={`${order.order_type}-${order.id}`}
-                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                    >
-                    {/* Product/Bundle/GamePass Icon */}
-                      <div className="h-14 w-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0 text-2xl">
-                        {isGamePass ? "🎫" :
-                         isBundle ? "🎉" :
-                         order.item_id === -1 ? "💎" : 
-                         order.item_id === -2 ? "🪙" : 
-                         order.item_id === -3 ? "⚡" : "🎁"}
-                      </div>
-
-                      {/* Order Details */}
+                    <div key={order.id} className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                      <div className="h-14 w-14 rounded-lg bg-muted flex items-center justify-center text-2xl shrink-0">🛒</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium truncate">
-                                {order.product_name || `Order #${order.id}`}
-                              </p>
-                              {isBundle && (
-                                <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
-                                  Bundle
-                                </Badge>
-                              )}
-                              {isGamePass && (
-                                <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-500 border-amber-500/20">
-                                  Game Pass
-                                </Badge>
-                              )}
-                            </div>
+                            <p className="font-medium truncate">{order.product_names || `Order #${order.id}`}</p>
                             <p className="text-sm text-muted-foreground">
-                              {isGamePass || isBundle ? formatPrice(order) : `Qty: ${order.quantity} • ${formatPrice(order)}`}
+                              Qty: {order.total_qty} &bull; {formatPrice(Number(order.total_cents), order.currency)}
                             </p>
                           </div>
-                          <Badge variant="outline" className={status.className}>
+                          <Badge variant="outline" className={st.className}>
                             <StatusIcon className="h-3 w-3 mr-1" />
-                            {status.label}
+                            {st.label}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {format(new Date(order.created_at), "MMM d, yyyy 'at' HH:mm")}
+                          {format(new Date(order.created_at), "MMM d, yyyy 'at' HH:mm")} &bull; {order.character_name}
                         </p>
                       </div>
                     </div>
@@ -211,30 +134,14 @@ export function OrderHistory() {
                 })}
               </div>
             </ScrollArea>
-
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fetchOrders(page - 1)}
-                  disabled={page <= 1 || loading}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
+                <Button variant="outline" size="sm" onClick={() => fetchOrders(page - 1)} disabled={page <= 1 || loading}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
                 </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fetchOrders(page + 1)}
-                  disabled={page >= totalPages || loading}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+                <Button variant="outline" size="sm" onClick={() => fetchOrders(page + 1)} disabled={page >= totalPages || loading}>
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
             )}

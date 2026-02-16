@@ -1,68 +1,51 @@
 <?php
-// api/recent_purchases.php
-// Get recent webshop purchases for display
-
+/**
+ * GET /api/recent_purchases.php
+ * Returns recent completed shop purchases for social proof display.
+ * Uses new shop_orders + shop_order_items + shop_products tables.
+ * PHP 5.3+ compatible.
+ */
 require_once __DIR__ . '/bootstrap.php';
 
+handleCors(array('GET','OPTIONS'));
 header('Content-Type: application/json; charset=utf-8');
 
-$rid = substr(bin2hex(random_bytes(6)), 0, 12);
+$RID = generateRID();
 
 try {
     $pdo = getDB();
+    $purchases = array();
 
-    $purchases = [];
-    
     try {
-        // Combined: webshop + bundle + gamepass orders
         $stmt = $pdo->query("
-            SELECT * FROM (
-                SELECT 
-                    u.login as username,
-                    wp.name as item_name,
-                    wp.icon as item_icon,
-                    wo.created_at,
-                    wo.total_price as price
-                FROM webshop_orders wo
-                JOIN users u ON wo.user_id = u.ID
-                JOIN webshop_products wp ON wo.product_id = wp.id
-                WHERE wo.status = 'completed'
-                
-                UNION ALL
-                
-                SELECT 
-                    u2.login as username,
-                    fb.name as item_name,
-                    '🎉' as item_icon,
-                    bo.created_at,
-                    bo.total_real as price
-                FROM bundle_orders bo
-                JOIN users u2 ON bo.user_id = u2.ID
-                LEFT JOIN flash_bundles fb ON fb.id = bo.bundle_id
-                WHERE bo.status = 'completed'
-                
-                UNION ALL
-                
-                SELECT 
-                    u3.login as username,
-                    CONCAT('Game Pass - ', UPPER(gp.tier)) as item_name,
-                    '🎫' as item_icon,
-                    gp.created_at,
-                    gp.price as price
-                FROM gamepass_purchases gp
-                JOIN users u3 ON gp.user_id = u3.ID
-                WHERE gp.status = 'completed'
-            ) combined
-            ORDER BY created_at DESC
+            SELECT
+                o.account_name,
+                p.name AS item_name,
+                p.type AS item_type,
+                o.total_cents,
+                o.currency,
+                o.created_at
+            FROM shop_orders o
+            JOIN shop_order_items oi ON oi.order_id = o.id
+            JOIN shop_products p ON p.id = oi.product_id
+            WHERE o.status = 'completed'
+            ORDER BY o.created_at DESC
             LIMIT 20
         ");
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
+        $iconMap = array(
+            'zen'    => '💎',
+            'coins'  => '🪙',
+            'exp'    => '⚡',
+            'item'   => '🎁',
+            'bundle' => '🎉',
+        );
+
         foreach ($rows as $row) {
             $createdAt = strtotime($row['created_at']);
             $diff = time() - $createdAt;
-            
-            // Format time ago
+
             if ($diff < 60) {
                 $timeAgo = 'just now';
             } elseif ($diff < 3600) {
@@ -75,32 +58,33 @@ try {
                 $days = floor($diff / 86400);
                 $timeAgo = $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
             }
-            
-            $purchases[] = [
-                'playerName' => $row['username'],
-                'itemName' => $row['item_name'],
-                'itemIcon' => $row['item_icon'] ?: '🎁',
-                'timeAgo' => $timeAgo,
-                'price' => (float)$row['price']
-            ];
+
+            $icon = isset($iconMap[$row['item_type']]) ? $iconMap[$row['item_type']] : '🎁';
+
+            $purchases[] = array(
+                'playerName' => $row['account_name'],
+                'itemName'   => $row['item_name'],
+                'itemIcon'   => $icon,
+                'timeAgo'    => $timeAgo,
+                'price'      => intval($row['total_cents']) / 100,
+            );
         }
     } catch (Exception $e) {
-        // Tables might not exist - return empty
-        error_log("recent_purchases: " . $e->getMessage());
+        error_log("RID={$RID} recent_purchases query error: " . $e->getMessage());
     }
 
-    echo json_encode([
-        'success' => true,
+    echo json_encode(array(
+        'success'   => true,
         'purchases' => $purchases,
-        'rid' => $rid
-    ]);
+        'rid'       => $RID,
+    ));
 
-} catch (PDOException $e) {
-    error_log("recent_purchases error: " . $e->getMessage());
+} catch (Exception $e) {
+    error_log("RID={$RID} recent_purchases fatal: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'purchases' => [],
-        'rid' => $rid
-    ]);
+    echo json_encode(array(
+        'success'   => false,
+        'purchases' => array(),
+        'rid'       => $RID,
+    ));
 }
