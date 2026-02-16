@@ -6,6 +6,7 @@
  * PHP 5.3+ compatible — NO closures, NO short arrays, NO ??
  */
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/session_helper.php';
 handleCors(array('GET','POST','OPTIONS'));
 
 header('Content-Type: application/json; charset=utf-8');
@@ -16,39 +17,11 @@ function jsonOut($arr, $code = 200) {
     exit;
 }
 
-/* ── Auth ── */
-function validateSession($pdo) {
-    $sessionToken = '';
-    if (!empty($_SERVER['HTTP_X_SESSION_TOKEN'])) {
-        $sessionToken = $_SERVER['HTTP_X_SESSION_TOKEN'];
-    } elseif (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
-        $auth = $_SERVER['HTTP_AUTHORIZATION'];
-        if (strpos($auth, 'Bearer ') === 0) $sessionToken = substr($auth, 7);
-    }
-    if (isset($_GET['sessionToken']) && $sessionToken === '') {
-        $sessionToken = $_GET['sessionToken'];
-    }
-    if (!$sessionToken) return null;
-    $hash = hash('sha256', $sessionToken);
-    $stmt = $pdo->prepare("SELECT s.user_id, u.name AS username FROM user_sessions s JOIN users u ON s.user_id = u.ID WHERE s.session_hash = ? AND s.expires_at > NOW() LIMIT 1");
-    $stmt->execute(array($hash));
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) return null;
-    return array('account_id' => (int)$row['user_id'], 'username' => $row['username']);
-}
-
-function isAdmin($pdo, $accountId) {
-    $stmt = $pdo->prepare("SELECT role FROM user_roles WHERE user_id = ? AND role IN ('admin','gm') LIMIT 1");
-    $stmt->execute(array($accountId));
-    return (bool)$stmt->fetch();
-}
-
 $pdo    = getDB();
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
 
-$user = validateSession($pdo);
-if (!$user) jsonOut(array('success' => false, 'error' => 'Not authenticated'), 401);
-if (!isAdmin($pdo, $user['account_id'])) jsonOut(array('success' => false, 'error' => 'Admin required'), 403);
+$user = requireAdmin(false);
+if (!$user) jsonOut(array('success' => false, 'error' => 'Admin required'), 403);
 
 /* ── GET: list ALL products (active + inactive) ── */
 if ($method === 'GET') {
