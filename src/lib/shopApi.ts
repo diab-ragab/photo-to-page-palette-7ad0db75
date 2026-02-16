@@ -129,6 +129,14 @@ export async function createShopOrder(data: {
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    console.error('[ShopAPI] Non-JSON response:', res.status, text.substring(0, 300));
+    throw new Error(`Server error (${res.status}). Please try again or contact support.`);
+  }
+
   return res.json();
 }
 
