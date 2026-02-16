@@ -6,6 +6,7 @@ export interface SiteSettings {
   download_mega: string;
   download_gdrive: string;
   download_filefm: string;
+  flash_sale_end: string;
 }
 
 const defaultSettings: SiteSettings = {
@@ -14,6 +15,7 @@ const defaultSettings: SiteSettings = {
   download_mega: 'https://mega.nz/file/x3BCVb6B#2_nAOHbfXNzzAyEEpMg-Yn1wiPJRprs27jOm31_a9gA',
   download_gdrive: 'https://drive.google.com/file/d/1wYtPOZ5pWw4yVO4_R_wVlKxMvvkgJfJ3/view?usp=sharing',
   download_filefm: 'https://files.fm/u/czrengvywk',
+  flash_sale_end: '',
 };
 
 let cachedSettings: SiteSettings | null = null;

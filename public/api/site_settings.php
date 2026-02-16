@@ -81,6 +81,7 @@ $defaultSettings = array(
   'download_mega' => 'https://mega.nz/file/x3BCVb6B#2_nAOHbfXNzzAyEEpMg-Yn1wiPJRprs27jOm31_a9gA',
   'download_gdrive' => 'https://drive.google.com/file/d/1wYtPOZ5pWw4yVO4_R_wVlKxMvvkgJfJ3/view?usp=sharing',
   'download_filefm' => 'https://files.fm/u/czrengvywk',
+  'flash_sale_end' => '',
 );
 
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
