@@ -253,35 +253,32 @@ const Dashboard = () => {
 
         {/* Tab Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-7 h-auto p-1 mb-4 md:mb-6 bg-muted/50 sticky top-16 md:top-20 z-40 backdrop-blur-md">
-            <TabsTrigger value="rewards" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
-              <Gift className="h-4 w-4" />
-              <span className="hidden xs:inline">Rewards</span>
-            </TabsTrigger>
-            <TabsTrigger value="spin" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden xs:inline">Spin</span>
-            </TabsTrigger>
-            <TabsTrigger value="events" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
-              <Calendar className="h-4 w-4" />
-              <span className="hidden xs:inline">Events</span>
-            </TabsTrigger>
-            <TabsTrigger value="progress" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
-              <Trophy className="h-4 w-4" />
-              <span className="hidden xs:inline">Progress</span>
-            </TabsTrigger>
-            <TabsTrigger value="stats" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden xs:inline">Stats</span>
-            </TabsTrigger>
-            <TabsTrigger value="alerts" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
-              <Bell className="h-4 w-4" />
-              <span className="hidden xs:inline">Alerts</span>
-            </TabsTrigger>
-            <TabsTrigger value="shop" className="flex-col gap-0.5 py-2 text-[10px] md:text-xs data-[state=active]:bg-background">
-              <ShoppingBag className="h-4 w-4" />
-              <span className="hidden xs:inline">Shop</span>
-            </TabsTrigger>
+          <TabsList className="w-full flex items-center gap-1 h-auto p-1.5 mb-4 md:mb-6 bg-card/80 border border-border/50 rounded-2xl sticky top-16 md:top-20 z-40 backdrop-blur-xl shadow-lg shadow-black/5">
+            {[
+              { value: "rewards", icon: Gift, label: "Rewards" },
+              { value: "spin", icon: Sparkles, label: "Spin" },
+              { value: "events", icon: Calendar, label: "Events" },
+              { value: "progress", icon: Trophy, label: "Progress" },
+              { value: "stats", icon: BarChart3, label: "Stats" },
+              { value: "alerts", icon: Bell, label: "Alerts" },
+              { value: "shop", icon: ShoppingBag, label: "Shop" },
+            ].map(({ value, icon: Icon, label }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="relative flex-1 flex-col gap-0.5 py-2.5 text-[10px] md:text-xs rounded-xl transition-all duration-300 data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:shadow-primary/10 data-[state=active]:border-primary/20 data-[state=active]:border text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
+              >
+                <Icon className="h-4 w-4" />
+                <span className="hidden xs:inline font-medium">{label}</span>
+                {activeTab === value && (
+                  <motion.div
+                    layoutId="tab-glow"
+                    className="absolute inset-0 rounded-xl bg-primary/5 -z-10"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                  />
+                )}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           {/* Rewards Tab */}
