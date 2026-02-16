@@ -17,22 +17,39 @@ $RID = generateRID();
 $user = requireAuth();
 $userId = intval($user['user_id']);
 
+// --- Ensure rate limit table exists ---
+$pdo = getDB();
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS shop_rate_limit (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      ip VARCHAR(45) NOT NULL,
+      action_key VARCHAR(30) NOT NULL,
+      created_at DATETIME NOT NULL,
+      KEY idx_ip_action (ip, action_key, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+} catch (Exception $e) {
+    error_log("RID={$RID} RATE_TABLE_SETUP: " . $e->getMessage());
+}
+
 // --- Rate limit (10 orders / 5 min / IP) ---
 $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
-$pdo = getDB();
 
 // Clean old entries
 try {
     $pdo->exec("DELETE FROM shop_rate_limit WHERE created_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
 } catch (Exception $e) {}
 
-$rlStmt = $pdo->prepare("SELECT COUNT(*) FROM shop_rate_limit WHERE ip = ? AND action_key = 'create' AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
-$rlStmt->execute(array($ip));
-if (intval($rlStmt->fetchColumn()) >= 10) {
-    error_log("RID={$RID} RATE_LIMIT ip={$ip}");
-    jsonFail(429, 'Too many requests. Try again shortly.', $RID);
+try {
+    $rlStmt = $pdo->prepare("SELECT COUNT(*) FROM shop_rate_limit WHERE ip = ? AND action_key = 'create' AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
+    $rlStmt->execute(array($ip));
+    if (intval($rlStmt->fetchColumn()) >= 10) {
+        error_log("RID={$RID} RATE_LIMIT ip={$ip}");
+        jsonFail(429, 'Too many requests. Try again shortly.', $RID);
+    }
+    $pdo->prepare("INSERT INTO shop_rate_limit (ip, action_key, created_at) VALUES (?, 'create', NOW())")->execute(array($ip));
+} catch (Exception $e) {
+    error_log("RID={$RID} RATE_LIMIT_ERR: " . $e->getMessage());
 }
-$pdo->prepare("INSERT INTO shop_rate_limit (ip, action_key, created_at) VALUES (?, 'create', NOW())")->execute(array($ip));
 
 // --- Input ---
 $body = getJsonInput();
