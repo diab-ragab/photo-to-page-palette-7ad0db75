@@ -6,20 +6,63 @@ import { Label } from "@/components/ui/label";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { SEO } from "@/components/SEO";
-import { createShopOrder } from "@/lib/shopApi";
-import { useState } from "react";
+import { createShopOrder, fetchUserCharacters, type UserCharacter } from "@/lib/shopApi";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ChevronLeft, ShieldCheck, Lock, Loader2, AlertCircle } from "lucide-react";
+import { ChevronLeft, ShieldCheck, Lock, Loader2, AlertCircle, User, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Checkout = () => {
   const { items, totalPrice } = useCart();
   const { user, isLoggedIn } = useAuth();
   const [accountName, setAccountName] = useState(user?.username || "");
-  const [characterName, setCharacterName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Character state
+  const [characters, setCharacters] = useState<UserCharacter[]>([]);
+  const [selectedChar, setSelectedChar] = useState<UserCharacter | null>(null);
+  const [charsLoading, setCharsLoading] = useState(false);
+  const [charsError, setCharsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadCharacters();
+    }
+  }, [isLoggedIn]);
+
+  const loadCharacters = async () => {
+    setCharsLoading(true);
+    setCharsError(null);
+    try {
+      const chars = await fetchUserCharacters();
+      setCharacters(chars);
+      if (chars.length > 0) {
+        // Auto-select highest level character
+        const best = chars.reduce((a, b) => (b.level > a.level ? b : a), chars[0]);
+        setSelectedChar(best);
+      }
+    } catch (err: any) {
+      setCharsError(err.message || "Failed to load characters");
+    } finally {
+      setCharsLoading(false);
+    }
+  };
+
+  const handleCharSelect = (value: string) => {
+    const roleId = parseInt(value, 10);
+    const char = characters.find((c) => c.roleId === roleId);
+    if (char) setSelectedChar(char);
+  };
 
   if (items.length === 0) {
     return (
@@ -43,8 +86,8 @@ const Checkout = () => {
       setError("Account name is required");
       return;
     }
-    if (!characterName.trim()) {
-      setError("Character name is required");
+    if (!selectedChar) {
+      setError("Please select a character for delivery");
       return;
     }
 
@@ -55,7 +98,7 @@ const Checkout = () => {
       const res = await createShopOrder({
         cart: items.map((i) => ({ product_id: parseInt(i.id), qty: i.quantity })),
         account_name: accountName.trim(),
-        character_name: characterName.trim(),
+        character_name: selectedChar.name,
       });
 
       if (!res.success) {
@@ -63,7 +106,6 @@ const Checkout = () => {
         return;
       }
 
-      // Redirect to PayPal approval
       if (res.approveUrl) {
         window.location.href = res.approveUrl;
       } else {
@@ -106,16 +148,54 @@ const Checkout = () => {
                     maxLength={64}
                   />
                 </div>
+
+                {/* Character Selector */}
                 <div className="space-y-2">
-                  <Label htmlFor="character">Character Name</Label>
-                  <Input
-                    id="character"
-                    placeholder="Your character name"
-                    value={characterName}
-                    onChange={(e) => setCharacterName(e.target.value)}
-                    maxLength={64}
-                  />
-                  <p className="text-xs text-muted-foreground">Must match an active character in-game.</p>
+                  <Label className="flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Deliver to Character
+                  </Label>
+
+                  {charsLoading ? (
+                    <Skeleton className="h-10 w-full" />
+                  ) : charsError ? (
+                    <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                      <div className="flex items-center gap-2 text-destructive mb-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <p className="text-sm">{charsError}</p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={loadCharacters} className="w-full gap-2">
+                        <RefreshCw className="w-4 h-4" /> Retry
+                      </Button>
+                    </div>
+                  ) : characters.length === 0 ? (
+                    <div className="p-3 bg-muted rounded-lg flex items-center gap-2 text-muted-foreground">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <p className="text-sm">No characters found. Create a character in-game first.</p>
+                    </div>
+                  ) : (
+                    <Select
+                      value={selectedChar?.roleId.toString() || ""}
+                      onValueChange={handleCharSelect}
+                    >
+                      <SelectTrigger className="w-full bg-background">
+                        <SelectValue placeholder="Select a character..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border border-border z-50">
+                        {characters.map((char) => (
+                          <SelectItem key={char.roleId} value={char.roleId.toString()}>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{char.name}</span>
+                              <span className="text-muted-foreground text-xs">
+                                Lv {char.level} · {char.profession}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <p className="text-xs text-muted-foreground">Items will be mailed to this character.</p>
                 </div>
               </div>
 
@@ -145,7 +225,7 @@ const Checkout = () => {
 
               <Button
                 onClick={handleCheckout}
-                disabled={loading || !accountName.trim() || !characterName.trim()}
+                disabled={loading || !accountName.trim() || !selectedChar}
                 className="w-full gap-2"
                 size="lg"
               >
