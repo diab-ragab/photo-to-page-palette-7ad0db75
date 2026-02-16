@@ -1,22 +1,20 @@
 <?php
 /**
  * paypal_webhook.php - PayPal Webhook Handler
- * PHP 5.x compatible
+ * PHP 5.3+ compatible.
  *
- * Handles PayPal webhook events:
- * - PAYMENT.CAPTURE.COMPLETED: Mark order as paid, deliver items
- * - CHECKOUT.ORDER.APPROVED: Order approved (capture triggered by return URL)
- * - PAYMENT.CAPTURE.DENIED: Mark order as failed
+ * Handles:
+ * - PAYMENT.CAPTURE.COMPLETED: Mark shop_orders as completed
+ * - PAYMENT.CAPTURE.DENIED/REFUNDED: Mark as failed/refunded
+ * - CHECKOUT.ORDER.APPROVED: logged only (capture via return URL)
  *
- * Configure in PayPal Dashboard > Webhooks
- * Endpoint URL: https://woiendgame.online/api/paypal_webhook.php
+ * Endpoint: https://woiendgame.online/api/paypal_webhook.php
  */
 
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/paypal_helper.php';
-require_once __DIR__ . '/gamepass_helpers.php';
 
-$RID = substr(md5(uniqid(mt_rand(), true)), 0, 12);
+$RID = generateRID();
 
 function json_response_wh($data) {
   global $RID;
@@ -85,7 +83,6 @@ if (!$event) {
 
 error_log("RID={$RID} PAYPAL_WEBHOOK type={$eventType} event_id={$eventId}");
 
-// Handle events
 $resource = isset($event['resource']) ? $event['resource'] : array();
 
 switch ($eventType) {
@@ -93,20 +90,8 @@ switch ($eventType) {
     $captureId = isset($resource['id']) ? $resource['id'] : '';
     $amount = isset($resource['amount']['value']) ? $resource['amount']['value'] : '0';
     $currency = isset($resource['amount']['currency_code']) ? $resource['amount']['currency_code'] : '';
-    $customId = isset($resource['custom_id']) ? $resource['custom_id'] : '';
 
     error_log("RID={$RID} PP_CAPTURE_COMPLETED capture={$captureId} amount={$amount} currency={$currency}");
-
-    // Parse metadata
-    $metadata = array();
-    if ($customId !== '') {
-      $parsed = json_decode($customId, true);
-      if (is_array($parsed)) $metadata = $parsed;
-    }
-
-    $userId = isset($metadata['user_id']) ? (int)$metadata['user_id'] : 0;
-    $purchaseType = isset($metadata['type']) ? $metadata['type'] : '';
-    $purchaseTier = isset($metadata['tier']) ? $metadata['tier'] : '';
 
     // Get paypal order ID from supplementary_data
     $ppOrderId = '';
@@ -114,42 +99,13 @@ switch ($eventType) {
       $ppOrderId = $resource['supplementary_data']['related_ids']['order_id'];
     }
 
-    // ── Handle Game Pass (from metadata) ──
-    if ($purchaseType === 'gamepass' && in_array($purchaseTier, array('elite', 'gold')) && $userId > 0) {
-      ensureGamePassTables($pdo);
-      activatePaidGamePass($pdo, $userId, $purchaseTier, $ppOrderId, $captureId, $RID);
-      error_log("RID={$RID} GAMEPASS_WH_ACTIVATED_META user={$userId} tier={$purchaseTier}");
-      break;
-    }
-
-    // ── Fallback: detect gamepass from DB if metadata missing ──
-    if ($ppOrderId !== '' && $purchaseType !== 'gamepass') {
-      try {
-        $gpStmt = $pdo->prepare("SELECT user_id, tier, status FROM gamepass_purchases WHERE paypal_order_id = ? LIMIT 1");
-        $gpStmt->execute(array($ppOrderId));
-        $gpRow = $gpStmt->fetch(PDO::FETCH_ASSOC);
-        if ($gpRow && $gpRow['status'] !== 'completed') {
-          $gpUserId = (int)$gpRow['user_id'];
-          $gpTier = $gpRow['tier'];
-          if (in_array($gpTier, array('elite', 'gold')) && $gpUserId > 0) {
-            ensureGamePassTables($pdo);
-            activatePaidGamePass($pdo, $gpUserId, $gpTier, $ppOrderId, $captureId, $RID);
-            error_log("RID={$RID} GAMEPASS_WH_ACTIVATED_DB user={$gpUserId} tier={$gpTier}");
-            break;
-          }
-        }
-      } catch (Exception $e) {
-        error_log("RID={$RID} GAMEPASS_WH_FALLBACK_ERR: " . $e->getMessage());
-      }
-    }
-
-    // ── Handle webshop orders ──
+    // Update shop_orders
     if ($ppOrderId !== '') {
-      $stmt = $pdo->prepare("UPDATE webshop_orders SET status = 'completed', paypal_capture_id = ?, delivered_at = NOW() WHERE paypal_order_id = ? AND status = 'pending'");
+      $stmt = $pdo->prepare("UPDATE shop_orders SET status = 'completed', capture_id = ?, updated_at = NOW() WHERE paypal_order_id = ? AND status IN ('pending','processing')");
       $stmt->execute(array($captureId, $ppOrderId));
-      
+
       if ($stmt->rowCount() > 0) {
-        error_log("RID={$RID} PP_WH_ORDERS_COMPLETED paypal_order={$ppOrderId} count={$stmt->rowCount()}");
+        error_log("RID={$RID} PP_WH_SHOP_ORDER_COMPLETED paypal_order={$ppOrderId}");
       }
     }
     break;
@@ -157,18 +113,12 @@ switch ($eventType) {
   case 'PAYMENT.CAPTURE.DENIED':
   case 'PAYMENT.CAPTURE.REFUNDED':
     $captureId = isset($resource['id']) ? $resource['id'] : '';
-    $status = $eventType === 'PAYMENT.CAPTURE.DENIED' ? 'failed' : 'refunded';
-    
-    error_log("RID={$RID} PP_CAPTURE_{$status} capture={$captureId}");
-    
-    $stmt = $pdo->prepare("UPDATE webshop_orders SET status = ? WHERE paypal_capture_id = ? AND status IN ('pending', 'completed')");
-    $stmt->execute(array($status, $captureId));
+    $status = ($eventType === 'PAYMENT.CAPTURE.DENIED') ? 'failed' : 'failed';
 
-    // Also update gamepass_purchases if applicable
-    try {
-      $stmt = $pdo->prepare("UPDATE gamepass_purchases SET status = ? WHERE paypal_capture_id = ? AND status IN ('pending', 'completed')");
-      $stmt->execute(array($status, $captureId));
-    } catch (Exception $e) { /* table may not exist */ }
+    error_log("RID={$RID} PP_CAPTURE_{$eventType} capture={$captureId}");
+
+    $stmt = $pdo->prepare("UPDATE shop_orders SET status = ?, updated_at = NOW() WHERE capture_id = ? AND status IN ('pending','processing','completed')");
+    $stmt->execute(array($status, $captureId));
     break;
 
   default:
