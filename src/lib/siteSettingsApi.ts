@@ -7,6 +7,8 @@ export interface SiteSettings {
   download_gdrive: string;
   download_filefm: string;
   flash_sale_end: string;
+  gamepass_elite_price: string;
+  gamepass_gold_price: string;
 }
 
 const defaultSettings: SiteSettings = {
@@ -16,6 +18,8 @@ const defaultSettings: SiteSettings = {
   download_gdrive: 'https://drive.google.com/file/d/1wYtPOZ5pWw4yVO4_R_wVlKxMvvkgJfJ3/view?usp=sharing',
   download_filefm: 'https://files.fm/u/czrengvywk',
   flash_sale_end: '',
+  gamepass_elite_price: '999',
+  gamepass_gold_price: '1999',
 };
 
 let cachedSettings: SiteSettings | null = null;

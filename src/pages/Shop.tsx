@@ -28,19 +28,24 @@ const Shop = () => {
   const [goldEnabled, setGoldEnabled] = useState(true);
 
   useEffect(() => {
-    // Fetch flash sale products + game pass config in parallel
     const loadData = async () => {
       try {
-        const [shopRes, passRes] = await Promise.all([
+        const [shopRes, passRes, settingsRes] = await Promise.all([
           fetchShopProducts({ limit: 200 }),
           apiGet<any>(`/gamepass.php?action=rewards&rid=${Date.now()}`, false, { showErrorToast: false }).catch(() => null),
+          import("@/lib/siteSettingsApi").then(m => m.getSiteSettings()).catch(() => null),
         ]);
         if (shopRes.success) setProducts(shopRes.products);
         if (passRes?.success) {
-          if (passRes.elite_price_cents) setElitePriceCents(passRes.elite_price_cents);
-          if (passRes.gold_price_cents) setGoldPriceCents(passRes.gold_price_cents);
           if (passRes.elite_enabled !== undefined) setEliteEnabled(passRes.elite_enabled);
           if (passRes.gold_enabled !== undefined) setGoldEnabled(passRes.gold_enabled);
+        }
+        // Prices from site_settings take priority
+        if (settingsRes) {
+          const ep = parseInt(settingsRes.gamepass_elite_price);
+          const gp = parseInt(settingsRes.gamepass_gold_price);
+          if (!isNaN(ep) && ep > 0) setElitePriceCents(ep);
+          if (!isNaN(gp) && gp > 0) setGoldPriceCents(gp);
         }
       } catch {
         // silent

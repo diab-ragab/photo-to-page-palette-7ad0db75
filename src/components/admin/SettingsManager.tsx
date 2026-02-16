@@ -16,7 +16,9 @@ import {
   HardDrive,
   FileArchive,
   Users,
-  Timer
+  Timer,
+  Crown,
+  Sparkles,
 } from 'lucide-react';
 import { getSiteSettings, updateSiteSettings, clearSettingsCache, type SiteSettings } from '@/lib/siteSettingsApi';
 
@@ -30,6 +32,8 @@ export const SettingsManager = () => {
     download_gdrive: '',
     download_filefm: '',
     flash_sale_end: '',
+    gamepass_elite_price: '999',
+    gamepass_gold_price: '1999',
   });
 
   const fetchSettings = async () => {
@@ -218,6 +222,59 @@ export const SettingsManager = () => {
             <p className="text-xs text-muted-foreground">
               Format: YYYY-MM-DDTHH:MM — interpreted as UTC. When the timer expires, the countdown shows "Sale ended".
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Game Pass Pricing */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-purple-500/20">
+              <Crown className="h-5 w-5 text-purple-400" />
+            </div>
+            Game Pass Pricing
+          </CardTitle>
+          <CardDescription>
+            Set the prices (in Euro cents) for Elite and Gold Game Pass tiers shown in the shop.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="gamepass_elite_price" className="flex items-center gap-2">
+                <Crown className="h-4 w-4 text-purple-400" />
+                Elite Price (cents)
+              </Label>
+              <Input
+                id="gamepass_elite_price"
+                type="number"
+                min={0}
+                value={settings.gamepass_elite_price}
+                onChange={e => handleChange('gamepass_elite_price', e.target.value)}
+                placeholder="999"
+              />
+              <p className="text-xs text-muted-foreground">
+                = €{(parseInt(settings.gamepass_elite_price || '0') / 100).toFixed(2)}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gamepass_gold_price" className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-amber-400" />
+                Gold Price (cents)
+              </Label>
+              <Input
+                id="gamepass_gold_price"
+                type="number"
+                min={0}
+                value={settings.gamepass_gold_price}
+                onChange={e => handleChange('gamepass_gold_price', e.target.value)}
+                placeholder="1999"
+              />
+              <p className="text-xs text-muted-foreground">
+                = €{(parseInt(settings.gamepass_gold_price || '0') / 100).toFixed(2)}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
