@@ -82,11 +82,15 @@ export const GamePassExtendCards = ({ userTier, passExpiresAt }: GamePassExtendC
           {daysLeft > 0 ? (
             <>
               <Clock className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
-              {daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining — add more time to keep your perks!
+              {daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining (expires{" "}
+              {expiresDate ? expiresDate.toLocaleDateString() : "—"}) — add more time to keep your perks!
             </>
           ) : (
-            "Renew your pass to continue receiving daily rewards."
+            "Your pass has expired. Renew now to continue receiving daily rewards!"
           )}
+        </p>
+        <p className="text-xs text-muted-foreground/70 mt-1">
+          ✨ Extensions stack on your current expiry — your pass auto-continues into new cycles.
         </p>
       </div>
 
@@ -136,6 +140,15 @@ export const GamePassExtendCards = ({ userTier, passExpiresAt }: GamePassExtendC
                 </div>
                 <span className="text-2xl font-display font-bold">{opt.days}</span>
                 <span className="text-sm text-muted-foreground ml-1">days</span>
+                {(() => {
+                  const base = expiresDate && expiresDate.getTime() > Date.now() ? expiresDate : new Date();
+                  const newDate = new Date(base.getTime() + opt.days * 86400000);
+                  return (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      New expiry: {newDate.toLocaleDateString()}
+                    </p>
+                  );
+                })()}
               </div>
 
               <Button
