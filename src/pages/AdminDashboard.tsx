@@ -23,6 +23,7 @@ import { AchievementsManager } from "@/components/admin/AchievementsManager";
 import { SpinWheelManager } from "@/components/admin/SpinWheelManager";
 import { EventsManager } from "@/components/admin/EventsManager";
 import { ChangelogManager } from "@/components/admin/ChangelogManager";
+import { ShopProductsManager } from "@/components/admin/ShopProductsManager";
 import {
   Shield,
   Users, 
@@ -311,6 +312,10 @@ export default function AdminDashboard() {
               <Receipt className="h-4 w-4" />
               <span className="hidden sm:inline">Orders</span>
             </TabsTrigger>
+            <TabsTrigger value="products" className="gap-2 py-2">
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">Products</span>
+            </TabsTrigger>
             <TabsTrigger value="votes" className="gap-2 py-2">
               <Vote className="h-4 w-4" />
               <span className="hidden sm:inline">Votes</span>
@@ -531,6 +536,11 @@ export default function AdminDashboard() {
           {/* Orders Tab */}
           <TabsContent value="orders">
             <OrdersManager />
+          </TabsContent>
+
+          {/* Products Tab */}
+          <TabsContent value="products">
+            <ShopProductsManager />
           </TabsContent>
 
           {/* Votes Tab */}
