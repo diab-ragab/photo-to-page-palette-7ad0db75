@@ -102,7 +102,7 @@ const ProductForm = ({ product, onChange, onSave, onCancel, saving, isNew }: Pro
           <Textarea value={product.description} onChange={(e) => set("description", e.target.value)} placeholder="Short description…" rows={2} />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
             <Label>Type</Label>
             <Select value={product.type} onValueChange={(v) => set("type", v)}>
@@ -115,25 +115,28 @@ const ProductForm = ({ product, onChange, onSave, onCancel, saving, isNew }: Pro
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Price (cents)</Label>
-            <Input type="number" min={0} value={product.price_cents} onChange={(e) => set("price_cents", parseInt(e.target.value) || 0)} />
-            <p className="text-xs text-muted-foreground">= €{(product.price_cents / 100).toFixed(2)}</p>
+            <Label>Price (€)</Label>
+            <Input type="number" min={0} step="0.01" value={(product.price_cents / 100).toFixed(2)} onChange={(e) => set("price_cents", Math.round(parseFloat(e.target.value || "0") * 100))} />
           </div>
           <div className="space-y-2">
-            <Label>Sort Order</Label>
-            <Input type="number" value={product.sort_order} onChange={(e) => set("sort_order", parseInt(e.target.value) || 0)} />
+            <Label>Item ID</Label>
+            <Input type="number" min={0} value={(() => { try { const p = JSON.parse(product.payload_json); return p.item_id || 0; } catch { return 0; } })()} onChange={(e) => { try { const p = JSON.parse(product.payload_json || "{}"); p.item_id = parseInt(e.target.value) || 0; set("payload_json", JSON.stringify(p)); } catch { set("payload_json", JSON.stringify({ item_id: parseInt(e.target.value) || 0, quality: 0 })); } }} placeholder="e.g. 6159" />
+          </div>
+          <div className="space-y-2">
+            <Label>Quality</Label>
+            <Input type="number" min={0} value={(() => { try { const p = JSON.parse(product.payload_json); return p.quality || 0; } catch { return 0; } })()} onChange={(e) => { try { const p = JSON.parse(product.payload_json || "{}"); p.quality = parseInt(e.target.value) || 0; set("payload_json", JSON.stringify(p)); } catch { set("payload_json", JSON.stringify({ item_id: 0, quality: parseInt(e.target.value) || 0 })); } }} placeholder="e.g. 3" />
           </div>
         </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label className="flex items-center gap-2"><Image className="h-4 w-4 text-muted-foreground" /> Image / Video URL</Label>
             <Input value={product.image_url} onChange={(e) => set("image_url", e.target.value)} placeholder="https://… (.jpg, .png, .mp4, .webm)" />
             <p className="text-xs text-muted-foreground">Supports images and video URLs. Users can click to preview in the shop.</p>
           </div>
           <div className="space-y-2">
-            <Label>Payload JSON</Label>
-            <Input value={product.payload_json} onChange={(e) => set("payload_json", e.target.value)} placeholder='{"zen":500000}' />
+            <Label>Sort Order</Label>
+            <Input type="number" value={product.sort_order} onChange={(e) => set("sort_order", parseInt(e.target.value) || 0)} />
           </div>
         </div>
 
@@ -302,7 +305,7 @@ export const ShopProductsManager = () => {
                     {!p.is_active && <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                    <span>€{(p.price_cents / 100).toFixed(2)}</span>
+                    <span className="font-semibold">€{(p.price_cents / 100).toFixed(2)}</span>
                     {p.sku && <span>SKU: {p.sku}</span>}
                     <span>#{p.id}</span>
                   </div>
