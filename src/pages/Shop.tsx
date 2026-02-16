@@ -13,21 +13,28 @@ import { GamePassComparisonTable } from "@/components/shop/GamePassComparisonTab
 import { FlashSaleCountdown } from "@/components/shop/FlashSaleCountdown";
 import { GamePassParticles } from "@/components/shop/GamePassParticles";
 import { LiveActivityFeed } from "@/components/shop/LiveActivityFeed";
+import { GamePassExtendCards } from "@/components/shop/GamePassExtendCards";
 import { ShoppingCart, ArrowRight, Zap, Crown, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Shop = () => {
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToCart, totalItems } = useCart();
+  const { user } = useAuth();
 
   // Game pass pricing from API
   const [elitePriceCents, setElitePriceCents] = useState(999);
   const [goldPriceCents, setGoldPriceCents] = useState(1999);
   const [eliteEnabled, setEliteEnabled] = useState(true);
   const [goldEnabled, setGoldEnabled] = useState(true);
+
+  // User's current pass info for extension
+  const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
+  const [passExpiresAt, setPassExpiresAt] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -57,6 +64,24 @@ const Shop = () => {
     };
     loadData();
   }, []);
+
+  // Fetch user's current pass tier for extension cards
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken");
+    if (!token) return;
+    apiGet<any>(
+      `/gamepass.php?action=status&rid=${Date.now()}&sessionToken=${encodeURIComponent(token)}`,
+      true,
+      { showErrorToast: false, silentStatuses: [401, 403] }
+    ).then(data => {
+      if (data?.success) {
+        const tier = data.user_tier || (data.is_premium ? "elite" : "free");
+        setUserTier(tier as "free" | "elite" | "gold");
+        if (data.expires_at) setPassExpiresAt(data.expires_at);
+      }
+    }).catch(() => {});
+  }, [user]);
 
   const handleAdd = (product: ShopProduct, qty = 1) => {
     addToCart({
@@ -208,6 +233,16 @@ const Shop = () => {
               goldPriceCents={goldPriceCents}
             />
           </div>
+
+          {/* Extension Cards — shown only for users with active pass */}
+          {userTier !== "free" && (
+            <div className="mt-16">
+              <GamePassExtendCards
+                userTier={userTier}
+                passExpiresAt={passExpiresAt}
+              />
+            </div>
+          )}
         </section>
 
         {/* ─── LIVE ACTIVITY ─── */}
