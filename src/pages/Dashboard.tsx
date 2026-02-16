@@ -6,7 +6,7 @@ import { SEO } from "@/components/SEO";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVoteSystem } from "@/hooks/useVoteSystem";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { fetchJsonOrThrow, API_BASE } from "@/lib/apiFetch";
+import { fetchJsonOrThrow, API_BASE, apiGet } from "@/lib/apiFetch";
 import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
 import { VoteSiteCard } from "@/components/VoteSiteCard";
@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { UserWallet } from "@/components/UserWallet";
 import { VoteRewardsCard } from "@/components/VoteRewardsCard";
 import { useNotificationScheduler } from "@/hooks/useNotificationScheduler";
@@ -54,6 +55,7 @@ const Dashboard = () => {
   const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites, streakData } = useVoteSystem();
   const [userZen, setUserZen] = useState(0);
   const [activeTab, setActiveTab] = useState("rewards");
+  const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
 
   // Pull to refresh
   const { containerProps, PullIndicator } = usePullToRefresh({
@@ -98,6 +100,23 @@ const Dashboard = () => {
 
     fetchUserCurrency();
   }, [user?.username]);
+
+  // Fetch user's game pass tier
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken");
+    if (!token) return;
+    apiGet<any>(
+      `/gamepass.php?action=status&rid=${Date.now()}&sessionToken=${encodeURIComponent(token)}`,
+      true,
+      { showErrorToast: false, silentStatuses: [401, 403] }
+    ).then(data => {
+      if (data?.success) {
+        const tier = data.user_tier || (data.is_premium ? "elite" : "free");
+        setUserTier(tier as "free" | "elite" | "gold");
+      }
+    }).catch(() => {});
+  }, [user]);
 
   // Calculate VIP progress
   const getVipLevel = (points: number) => {
@@ -171,11 +190,32 @@ const Dashboard = () => {
               </span>
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg md:text-2xl font-display text-foreground truncate">
-                {user?.username}
-              </h1>
-              <div className={`text-xs md:text-sm font-medium ${vipInfo.color}`}>
-                {vipInfo.name}
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg md:text-2xl font-display text-foreground truncate">
+                  {user?.username}
+                </h1>
+                {userTier === "gold" && (
+                  <Badge className="bg-gradient-to-r from-amber-500 to-yellow-400 text-white border-0 text-[10px] md:text-xs px-2 py-0.5 font-display shadow-md shadow-amber-500/20 animate-pulse">
+                    <Crown className="h-3 w-3 mr-1" />
+                    GOLD
+                  </Badge>
+                )}
+                {userTier === "elite" && (
+                  <Badge className="bg-gradient-to-r from-purple-600 to-indigo-500 text-white border-0 text-[10px] md:text-xs px-2 py-0.5 font-display shadow-md shadow-purple-500/20">
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    ELITE
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <Badge variant="outline" className={`text-[10px] md:text-xs px-1.5 py-0 border-current ${vipInfo.color}`}>
+                  {vipInfo.name}
+                </Badge>
+                {vipInfo.level > 0 && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Lv.{vipInfo.level}
+                  </span>
+                )}
               </div>
             </div>
           </div>
