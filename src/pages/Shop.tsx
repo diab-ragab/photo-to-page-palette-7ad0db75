@@ -9,8 +9,10 @@ import { fetchShopProducts, ShopProduct } from "@/lib/shopApi";
 import { apiGet } from "@/lib/apiFetch";
 import { FlashSaleCard } from "@/components/shop/FlashSaleCard";
 import { GamePassCards } from "@/components/shop/GamePassCards";
+import { GamePassComparisonTable } from "@/components/shop/GamePassComparisonTable";
 import { FlashSaleCountdown } from "@/components/shop/FlashSaleCountdown";
 import { GamePassParticles } from "@/components/shop/GamePassParticles";
+import { LiveActivityFeed } from "@/components/shop/LiveActivityFeed";
 import { ShoppingCart, ArrowRight, Zap, Crown, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -198,7 +200,18 @@ const Shop = () => {
             eliteEnabled={eliteEnabled}
             goldEnabled={goldEnabled}
           />
+
+          {/* Comparison Table */}
+          <div className="mt-16">
+            <GamePassComparisonTable
+              elitePriceCents={elitePriceCents}
+              goldPriceCents={goldPriceCents}
+            />
+          </div>
         </section>
+
+        {/* ─── LIVE ACTIVITY ─── */}
+        <LiveActivityFeed />
       </main>
 
       <Footer />
