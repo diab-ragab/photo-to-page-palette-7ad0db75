@@ -58,7 +58,7 @@ const Shop = () => {
     loadData();
   }, []);
 
-  const handleAdd = (product: ShopProduct) => {
+  const handleAdd = (product: ShopProduct, qty = 1) => {
     addToCart({
       id: String(product.id),
       name: product.name,
@@ -66,8 +66,8 @@ const Shop = () => {
       price: product.price_cents / 100,
       image: product.image_url || "📦",
       rarity: product.type,
-    });
-    toast.success(`${product.name} added to cart`);
+    }, qty);
+    toast.success(`${qty}× ${product.name} added to cart`);
   };
 
   return (

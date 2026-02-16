@@ -20,11 +20,12 @@ function isVideoUrl(url: string): boolean {
 interface FlashSaleCardProps {
   product: ShopProduct;
   index: number;
-  onAdd: (product: ShopProduct) => void;
+  onAdd: (product: ShopProduct, qty?: number) => void;
 }
 
 export const FlashSaleCard = ({ product, index, onAdd }: FlashSaleCardProps) => {
   const [showMedia, setShowMedia] = useState(false);
+  const [qty, setQty] = useState(1);
   const hasMedia = !!product.image_url;
   const isVideo = hasMedia && isVideoUrl(product.image_url);
 
@@ -111,14 +112,32 @@ export const FlashSaleCard = ({ product, index, onAdd }: FlashSaleCardProps) => 
             <span className="font-display font-bold text-lg text-primary">
               €{(product.price_cents / 100).toFixed(2)}
             </span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-9 w-9 p-0 rounded-lg hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
-              onClick={() => onAdd(product)}
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 w-8 p-0 rounded-lg"
+                onClick={() => setQty(q => Math.max(1, q - 1))}
+              >
+                <span className="text-base leading-none">−</span>
+              </Button>
+              <span className="w-7 text-center text-sm font-display font-bold">{qty}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 w-8 p-0 rounded-lg"
+                onClick={() => setQty(q => Math.min(99, q + 1))}
+              >
+                <span className="text-base leading-none">+</span>
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 px-2.5 rounded-lg ml-1"
+                onClick={() => { onAdd(product, qty); setQty(1); }}
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -185,7 +204,8 @@ export const FlashSaleCard = ({ product, index, onAdd }: FlashSaleCardProps) => 
                     className="gap-2 rounded-lg"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onAdd(product);
+                      onAdd(product, qty);
+                      setQty(1);
                       setShowMedia(false);
                     }}
                   >
