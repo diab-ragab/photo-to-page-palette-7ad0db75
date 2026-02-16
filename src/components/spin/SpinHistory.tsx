@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { History, Coins, Crown, Zap, Gift, X, Calendar, TrendingUp, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { fetchSpinHistory, type SpinHistory as SpinHistoryType } from '@/lib/spinWheelApi';
+import { fetchSpinHistory, fetchSpinStatus, type SpinHistory as SpinHistoryType } from '@/lib/spinWheelApi';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   coins: <Coins className="h-3.5 w-3.5" />,
@@ -28,12 +28,19 @@ export function SpinHistoryList() {
   const [history, setHistory] = useState<SpinHistoryType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [realTotalSpins, setRealTotalSpins] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await fetchSpinHistory(50);
+        const [data, status] = await Promise.all([
+          fetchSpinHistory(50),
+          fetchSpinStatus().catch(() => null),
+        ]);
         setHistory(data || []);
+        if (status?.spins_used != null) {
+          setRealTotalSpins(status.spins_used);
+        }
       } catch (err) {
         console.error('Failed to load spin history:', err);
         setError(true);
@@ -45,7 +52,7 @@ export function SpinHistoryList() {
   }, []);
 
   const lifetimeRewards = useMemo<LifetimeRewards>(() => {
-    const totals = { coins: 0, zen: 0, vip: 0, totalSpins: history.length, winRate: 0 };
+    const totals = { coins: 0, zen: 0, vip: 0, totalSpins: realTotalSpins ?? history.length, winRate: 0 };
     let wins = 0;
     
     history.forEach((entry) => {
@@ -60,7 +67,7 @@ export function SpinHistoryList() {
     
     totals.winRate = history.length > 0 ? Math.round((wins / history.length) * 100) : 0;
     return totals;
-  }, [history]);
+  }, [history, realTotalSpins]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
