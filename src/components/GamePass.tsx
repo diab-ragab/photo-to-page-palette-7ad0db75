@@ -6,7 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-// CharacterSelector and ElitePassUpsell removed (old webshop)
+import { fetchUserCharacters, type UserCharacter } from "@/lib/shopApi";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Crown,
   Lock,
@@ -24,6 +32,8 @@ import {
   Unlock,
   Zap,
   Trophy,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -268,6 +278,125 @@ const iconMap: Record<string, string> = {
 };
 
 const getIconDisplay = (icon: string): string => iconMap[icon] || icon;
+
+// Character selector for Game Pass delivery
+const GamePassCharacterSelector = ({
+  onSelect,
+  selectedRoleId,
+  selectedCharacterName,
+}: {
+  onSelect: (roleId: number | null, name: string | null) => void;
+  selectedRoleId: number | null;
+  selectedCharacterName: string | null;
+}) => {
+  const [characters, setCharacters] = useState<UserCharacter[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadCharacters = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const chars = await fetchUserCharacters();
+      setCharacters(chars);
+      if (chars.length > 0) {
+        const stored = localStorage.getItem("gamepass_role_id");
+        const storedId = stored ? parseInt(stored, 10) : null;
+        const storedChar = storedId ? chars.find((c) => c.roleId === storedId) : null;
+        if (storedChar) {
+          onSelect(storedChar.roleId, storedChar.name);
+        } else {
+          const best = chars.reduce((a, b) => (b.level > a.level ? b : a), chars[0]);
+          onSelect(best.roleId, best.name);
+          localStorage.setItem("gamepass_role_id", String(best.roleId));
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to load characters");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCharacters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSelect = (value: string) => {
+    const roleId = parseInt(value, 10);
+    const char = characters.find((c) => c.roleId === roleId);
+    if (char) {
+      onSelect(roleId, char.name);
+      localStorage.setItem("gamepass_role_id", value);
+    }
+  };
+
+  return (
+    <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border/50 backdrop-blur-sm space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-primary" />
+          <span className="text-sm font-bold">Deliver Rewards To</span>
+        </div>
+        {selectedCharacterName && (
+          <Badge variant="outline" className="text-xs border-primary/40 text-primary bg-primary/10">
+            <Zap className="h-3 w-3 mr-1" />
+            {selectedCharacterName}
+          </Badge>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <User className="w-3 h-3" /> Deliver to Character
+          </span>
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : error ? (
+        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <div className="flex items-center gap-2 text-destructive mb-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <p className="text-sm">{error}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={loadCharacters} className="w-full gap-2">
+            <RefreshCw className="w-4 h-4" /> Retry
+          </Button>
+        </div>
+      ) : characters.length === 0 ? (
+        <div className="p-3 bg-muted rounded-lg flex items-center gap-2 text-muted-foreground">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <p className="text-sm">No characters found. Create a character in-game first.</p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <User className="w-3 h-3" /> Deliver to Character
+          </span>
+          <Select value={selectedRoleId?.toString() || ""} onValueChange={handleSelect}>
+            <SelectTrigger className="w-full bg-background border-primary/30 focus:border-primary">
+              <SelectValue placeholder="Select a character..." />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border border-border z-50">
+              {characters.map((char) => (
+                <SelectItem key={char.roleId} value={char.roleId.toString()}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{char.name}</span>
+                    <span className="text-muted-foreground text-xs">
+                      Lv.{char.level} {char.profession}
+                    </span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Items will be delivered to this character's in-game mailbox.</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const GamePass = () => {
   const { user, logout } = useAuth();
@@ -638,18 +767,13 @@ export const GamePass = () => {
           </div>
         </div>
 
-        {/* Character selection - users select from dropdown built inline */}
-        {user && selectedCharacterName && (
-          <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border/50 backdrop-blur-sm">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">Delivering to:</span>
-              <Badge variant="outline" className="text-xs border-primary/40 text-primary bg-primary/10">
-                <Zap className="h-3 w-3 mr-1" />
-                {selectedCharacterName}
-              </Badge>
-            </div>
-          </div>
+        {/* Character Selection - Deliver Rewards To */}
+        {user && (
+          <GamePassCharacterSelector
+            onSelect={handleCharacterSelect}
+            selectedRoleId={selectedRoleId}
+            selectedCharacterName={selectedCharacterName}
+          />
         )}
       </div>
 
