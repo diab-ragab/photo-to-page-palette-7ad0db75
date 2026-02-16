@@ -9,6 +9,8 @@ import { fetchShopProducts, ShopProduct } from "@/lib/shopApi";
 import { apiGet } from "@/lib/apiFetch";
 import { FlashSaleCard } from "@/components/shop/FlashSaleCard";
 import { GamePassCards } from "@/components/shop/GamePassCards";
+import { FlashSaleCountdown } from "@/components/shop/FlashSaleCountdown";
+import { GamePassParticles } from "@/components/shop/GamePassParticles";
 import { ShoppingCart, ArrowRight, Zap, Crown, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -118,10 +120,11 @@ const Shop = () => {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-hdr-orange to-hdr-magenta flex items-center justify-center shadow-lg">
               <Zap className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="flex-1">
               <h2 className="text-2xl md:text-3xl font-display font-bold">Flash Sales</h2>
               <p className="text-sm text-muted-foreground">Limited time offers — grab them while you can!</p>
             </div>
+            <FlashSaleCountdown />
           </motion.div>
 
           {loading ? (
@@ -168,11 +171,12 @@ const Shop = () => {
         </div>
 
         {/* ─── GAME PASS ─── */}
-        <section>
+        <section className="relative">
+          <GamePassParticles />
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-10"
+            className="text-center mb-10 relative z-10"
           >
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/20">
               <Crown className="w-7 h-7 text-white" />
