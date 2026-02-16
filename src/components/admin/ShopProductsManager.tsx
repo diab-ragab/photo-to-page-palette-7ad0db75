@@ -125,10 +125,11 @@ const ProductForm = ({ product, onChange, onSave, onCancel, saving, isNew }: Pro
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label className="flex items-center gap-2"><Image className="h-4 w-4 text-muted-foreground" /> Image URL</Label>
-            <Input value={product.image_url} onChange={(e) => set("image_url", e.target.value)} placeholder="https://…" />
+            <Label className="flex items-center gap-2"><Image className="h-4 w-4 text-muted-foreground" /> Image / Video URL</Label>
+            <Input value={product.image_url} onChange={(e) => set("image_url", e.target.value)} placeholder="https://… (.jpg, .png, .mp4, .webm)" />
+            <p className="text-xs text-muted-foreground">Supports images and video URLs. Users can click to preview in the shop.</p>
           </div>
           <div className="space-y-2">
             <Label>Payload JSON</Label>

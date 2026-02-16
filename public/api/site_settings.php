@@ -82,6 +82,8 @@ $defaultSettings = array(
   'download_gdrive' => 'https://drive.google.com/file/d/1wYtPOZ5pWw4yVO4_R_wVlKxMvvkgJfJ3/view?usp=sharing',
   'download_filefm' => 'https://files.fm/u/czrengvywk',
   'flash_sale_end' => '',
+  'gamepass_elite_price' => '999',
+  'gamepass_gold_price' => '1999',
 );
 
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
