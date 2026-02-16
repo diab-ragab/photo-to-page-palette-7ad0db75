@@ -14,10 +14,12 @@ CREATE TABLE IF NOT EXISTS shop_products (
   payload_json  TEXT,
   image_url     VARCHAR(512) DEFAULT '',
   is_active     TINYINT(1)   NOT NULL DEFAULT 1,
+  sort_order    INT UNSIGNED NOT NULL DEFAULT 0,
   created_at    DATETIME     NOT NULL,
   PRIMARY KEY (id),
   KEY idx_active (is_active),
-  KEY idx_type   (type)
+  KEY idx_type   (type),
+  KEY idx_sort   (sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS shop_orders (
