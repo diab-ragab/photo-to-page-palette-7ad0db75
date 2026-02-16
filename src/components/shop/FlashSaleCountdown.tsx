@@ -1,16 +1,39 @@
 import { useState, useEffect } from "react";
 import { Timer } from "lucide-react";
+import { getSiteSettings } from "@/lib/siteSettingsApi";
 
-/** Countdown that resets daily at midnight UTC */
+/** Countdown that uses admin-configured end time, or falls back to midnight UTC */
 export const FlashSaleCountdown = () => {
   const [timeLeft, setTimeLeft] = useState({ h: 0, m: 0, s: 0 });
+  const [ended, setEnded] = useState(false);
+  const [endMs, setEndMs] = useState<number | null>(null);
 
+  // Fetch configured end time once
   useEffect(() => {
-    const calc = () => {
+    getSiteSettings().then((s) => {
+      if (s.flash_sale_end) {
+        // Value is "YYYY-MM-DDTHH:MM" treated as UTC
+        const parsed = new Date(s.flash_sale_end + "Z").getTime();
+        if (!isNaN(parsed)) {
+          setEndMs(parsed);
+          return;
+        }
+      }
+      // Fallback: next midnight UTC
       const now = new Date();
       const midnight = new Date(now);
       midnight.setUTCHours(24, 0, 0, 0);
-      const diff = Math.max(0, midnight.getTime() - now.getTime());
+      setEndMs(midnight.getTime());
+    });
+  }, []);
+
+  useEffect(() => {
+    if (endMs === null) return;
+
+    const calc = () => {
+      const diff = Math.max(0, endMs - Date.now());
+      if (diff === 0) { setEnded(true); return { h: 0, m: 0, s: 0 }; }
+      setEnded(false);
       return {
         h: Math.floor(diff / 3600000),
         m: Math.floor((diff % 3600000) / 60000),
@@ -20,9 +43,20 @@ export const FlashSaleCountdown = () => {
     setTimeLeft(calc());
     const id = setInterval(() => setTimeLeft(calc()), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [endMs]);
 
   const pad = (n: number) => String(n).padStart(2, "0");
+
+  if (endMs === null) return null; // loading
+
+  if (ended) {
+    return (
+      <div className="flex items-center gap-2 text-sm font-display text-muted-foreground">
+        <Timer className="w-4 h-4" />
+        <span>Sale ended</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2 text-sm font-display">

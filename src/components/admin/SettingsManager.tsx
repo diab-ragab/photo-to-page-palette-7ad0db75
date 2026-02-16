@@ -15,7 +15,8 @@ import {
   Cloud,
   HardDrive,
   FileArchive,
-  Users
+  Users,
+  Timer
 } from 'lucide-react';
 import { getSiteSettings, updateSiteSettings, clearSettingsCache, type SiteSettings } from '@/lib/siteSettingsApi';
 
@@ -28,6 +29,7 @@ export const SettingsManager = () => {
     download_mega: '',
     download_gdrive: '',
     download_filefm: '',
+    flash_sale_end: '',
   });
 
   const fetchSettings = async () => {
@@ -184,6 +186,38 @@ export const SettingsManager = () => {
               onChange={e => handleChange('download_filefm', e.target.value)}
               placeholder="https://files.fm/..."
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Flash Sale Timer */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-hdr-orange/20">
+              <Timer className="h-5 w-5 text-hdr-orange" />
+            </div>
+            Flash Sale Timer
+          </CardTitle>
+          <CardDescription>
+            Set the end date/time for the current flash sale countdown. Leave empty for a daily midnight-UTC reset.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="flash_sale_end" className="flex items-center gap-2">
+              <Timer className="h-4 w-4 text-muted-foreground" />
+              Sale End (UTC)
+            </Label>
+            <Input
+              id="flash_sale_end"
+              type="datetime-local"
+              value={settings.flash_sale_end}
+              onChange={e => handleChange('flash_sale_end', e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Format: YYYY-MM-DDTHH:MM — interpreted as UTC. When the timer expires, the countdown shows "Sale ended".
+            </p>
           </div>
         </CardContent>
       </Card>
