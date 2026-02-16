@@ -83,6 +83,26 @@ export interface OrderStatusResponse {
   rid: string;
 }
 
+export interface UserCharacter {
+  roleId: number;
+  name: string;
+  level: number;
+  profession: string;
+  professionId: number;
+  sex: number;
+}
+
+/** Fetch user's in-game characters */
+export async function fetchUserCharacters(): Promise<UserCharacter[]> {
+  const res = await fetch(`${API_BASE}/user_characters.php`, {
+    credentials: 'include',
+    headers: { ...getAuthHeaders() },
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Failed to load characters');
+  return data.characters || [];
+}
+
 /** Fetch active products (public, no auth) */
 export async function fetchShopProducts(opts?: { search?: string; page?: number; limit?: number }): Promise<ShopProductsResponse> {
   const params = new URLSearchParams();
