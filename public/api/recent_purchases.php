@@ -6,6 +6,7 @@
  * PHP 5.3+ compatible.
  */
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/session_helper.php';
 
 handleCors(array('GET','OPTIONS'));
 header('Content-Type: application/json; charset=utf-8');
