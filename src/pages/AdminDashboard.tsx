@@ -24,6 +24,7 @@ import { SpinWheelManager } from "@/components/admin/SpinWheelManager";
 import { EventsManager } from "@/components/admin/EventsManager";
 import { ChangelogManager } from "@/components/admin/ChangelogManager";
 import { ShopProductsManager } from "@/components/admin/ShopProductsManager";
+import { LotteryManager } from "@/components/admin/LotteryManager";
 import {
   Shield,
   Users, 
@@ -47,6 +48,7 @@ import {
   ScrollText,
   Package,
   Banknote,
+  Ticket,
 } from "lucide-react";
 
 interface LastOrder {
@@ -299,7 +301,7 @@ export default function AdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6 md:grid-cols-13 mb-6 h-auto gap-1">
+          <TabsList className="grid w-full grid-cols-7 md:grid-cols-14 mb-6 h-auto gap-1">
             <TabsTrigger value="overview" className="gap-2 py-2">
               <Server className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -347,6 +349,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="settings" className="gap-2 py-2">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Settings</span>
+            </TabsTrigger>
+            <TabsTrigger value="lottery" className="gap-2 py-2">
+              <Ticket className="h-4 w-4" />
+              <span className="hidden sm:inline">Lottery</span>
             </TabsTrigger>
           </TabsList>
 
@@ -583,6 +589,11 @@ export default function AdminDashboard() {
           {/* Settings Tab */}
           <TabsContent value="settings">
             <SettingsManager />
+          </TabsContent>
+
+          {/* Lottery Tab */}
+          <TabsContent value="lottery">
+            <LotteryManager />
           </TabsContent>
         </Tabs>
       </main>

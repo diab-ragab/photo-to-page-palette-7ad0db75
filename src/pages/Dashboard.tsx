@@ -18,6 +18,7 @@ import { PlayerStatsCard } from "@/components/PlayerStatsCard";
 import { LuckyWheel } from "@/components/LuckyWheel";
 import { UpcomingEvents, EventsCalendar } from "@/components/EventsCalendar";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { DailyLottery } from "@/components/DailyLottery";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -46,7 +47,8 @@ import {
   LogOut,
   ChevronRight,
   Calendar,
-  Bell
+  Bell,
+  Ticket,
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -296,6 +298,7 @@ const Dashboard = () => {
           <TabsList className="w-full flex items-center gap-1 h-auto p-1.5 mb-4 md:mb-6 bg-card/80 border border-border/50 rounded-2xl sticky top-16 md:top-20 z-40 backdrop-blur-xl shadow-lg shadow-black/5">
             {[
               { value: "rewards", icon: Gift, label: "Rewards" },
+              { value: "lottery", icon: Ticket, label: "Lottery" },
               { value: "spin", icon: Sparkles, label: "Spin" },
               { value: "events", icon: Calendar, label: "Events" },
               { value: "progress", icon: Trophy, label: "Progress" },
@@ -393,6 +396,11 @@ const Dashboard = () => {
 
             {/* Vote Rewards Summary */}
             <VoteRewardsCard sites={voteSites} loading={sitesLoading} />
+          </TabsContent>
+
+          {/* Lottery Tab */}
+          <TabsContent value="lottery" className="mt-0 space-y-4 md:space-y-6">
+            <DailyLottery />
           </TabsContent>
 
           {/* Spin Tab */}
