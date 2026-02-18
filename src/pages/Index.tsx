@@ -10,6 +10,7 @@ import { Footer } from "@/components/Footer";
 import { ConsentPopup } from "@/components/ConsentPopup";
 import { SEO } from "@/components/SEO";
 import { FeaturedEventsBanner } from "@/components/FeaturedEventsBanner";
+import { LotteryWinnersShowcase } from "@/components/LotteryWinnersShowcase";
 
 const Index = () => {
   const structuredData = {
@@ -40,6 +41,7 @@ const Index = () => {
       <HeroSection />
       <ClassSelection />
       <Features />
+      <LotteryWinnersShowcase />
       <AboutSection />
       <FAQ />
       <CTA />
