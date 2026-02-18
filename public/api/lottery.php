@@ -42,6 +42,29 @@ function getIpSubnetLottery($ip) {
     return $ip;
 }
 
+// ── Discord webhooks ──────────────────────────────────────────────────
+
+// Set your Discord webhook URLs here (leave empty to disable)
+define('LOTTERY_DISCORD_WEBHOOK_PUBLIC',  '');   // public channel - winner announcements
+define('LOTTERY_DISCORD_WEBHOOK_ADMIN',   '');   // admin channel - draw logs & abuse alerts
+define('LOTTERY_DISCORD_ENABLED', (LOTTERY_DISCORD_WEBHOOK_PUBLIC !== '' || LOTTERY_DISCORD_WEBHOOK_ADMIN !== ''));
+
+function lotteryDiscordPost($webhookUrl, $title, $lines) {
+    if (!LOTTERY_DISCORD_ENABLED || !$webhookUrl || $webhookUrl === '') return;
+    $content = "**" . $title . "**\n" . implode("\n", $lines);
+    $payload = json_encode(array('content' => $content));
+    if (!$payload) return;
+    $ctx = stream_context_create(array(
+        'http' => array(
+            'method'  => 'POST',
+            'header'  => "Content-Type: application/json\r\n",
+            'content' => $payload,
+            'timeout' => 3,
+        ),
+    ));
+    @file_get_contents($webhookUrl, false, $ctx);
+}
+
 function lotteryLog($pdo, $userId, $ip, $action, $details) {
     $stmt = $pdo->prepare("INSERT INTO lottery_security_log (user_id, ip_address, action_type, details, created_at) VALUES (?,?,?,?,NOW())");
     $stmt->execute(array((int)$userId, (string)$ip, (string)$action, (string)$details));
@@ -779,6 +802,22 @@ if ($method === 'POST' && $action === 'draw') {
 
     lotteryLog($pdo, $adminId, $ip, 'manual_draw', 'draw_id=' . $drawId . ' winners=' . count($winners));
 
+    // Discord: announce winners
+    if (count($winners) > 0) {
+        $pubLines = array('🎰 **Daily Lottery Draw - ' . date('Y-m-d') . '**', '');
+        $adminLines = array('Draw ID: ' . $drawId . ' | Pool: ' . number_format((int)$draw['total_pool']) . ' Zen | Entries: ' . (int)$draw['total_entries'], '');
+        foreach ($winners as $w) {
+            $emoji = '';
+            if ($w['rank'] === 1) $emoji = '🥇';
+            else if ($w['rank'] === 2) $emoji = '🥈';
+            else if ($w['rank'] === 3) $emoji = '🥉';
+            $pubLines[] = $emoji . ' **' . $w['username'] . '** won **' . number_format($w['zen_won']) . ' Zen**';
+            $adminLines[] = $emoji . ' ' . $w['username'] . ' | entered: ' . number_format($w['zen_entered']) . ' | won: ' . number_format($w['zen_won']) . ' | delivered: ' . ($w['delivered'] ? 'yes' : 'FAILED');
+        }
+        lotteryDiscordPost(LOTTERY_DISCORD_WEBHOOK_PUBLIC, '🎉 Lottery Winners!', $pubLines);
+        lotteryDiscordPost(LOTTERY_DISCORD_WEBHOOK_ADMIN, '🎰 Lottery Draw Complete', $adminLines);
+    }
+
     lotteryJson(array(
         'success' => true,
         'message' => 'Draw completed! ' . count($winners) . ' winner(s) selected.',
@@ -908,6 +947,158 @@ if ($method === 'GET' && $action === 'admin_logs') {
     $stmt->execute(array($limit));
     $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
     lotteryJson(array('success' => true, 'logs' => $logs, 'rid' => $RID));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  CRON: Auto-draw (call via cron job or scheduled task)
+//  GET /lottery.php?action=cron_draw&cron_key=YOUR_SECRET_KEY
+// ══════════════════════════════════════════════════════════════════════
+
+if ($method === 'GET' && $action === 'cron_draw') {
+    // Simple cron key protection - set this to a random secret
+    $cronKey = isset($_GET['cron_key']) ? (string)$_GET['cron_key'] : '';
+    $expectedKey = 'lottery_cron_2024_secret'; // CHANGE THIS to your own secret
+
+    if ($cronKey !== $expectedKey) {
+        lotteryJson(array('success' => false, 'message' => 'Invalid cron key.'), 403);
+    }
+
+    if ($settings['enabled'] !== '1') {
+        lotteryJson(array('success' => false, 'message' => 'Lottery disabled.'));
+    }
+
+    $draw = getTodayDraw($pdo);
+    $drawId = (int)$draw['id'];
+
+    if ($draw['status'] === 'completed') {
+        lotteryJson(array('success' => true, 'message' => 'Today\'s draw already completed.', 'draw_id' => $drawId));
+    }
+
+    // Check if it's draw time
+    $drawHour   = (int)$settings['draw_hour'];
+    $drawMinute = (int)$settings['draw_minute'];
+    $nowHour    = (int)date('G');
+    $nowMinute  = (int)date('i');
+
+    if ($nowHour < $drawHour || ($nowHour === $drawHour && $nowMinute < $drawMinute)) {
+        lotteryJson(array('success' => true, 'message' => 'Not yet draw time. Current: ' . $nowHour . ':' . $nowMinute . ', Draw: ' . $drawHour . ':' . $drawMinute));
+    }
+
+    // Mark as drawing
+    $stmt = $pdo->prepare("UPDATE lottery_draws SET status = 'drawing' WHERE id = ?");
+    $stmt->execute(array($drawId));
+
+    // Get all valid entries
+    $stmt = $pdo->prepare("SELECT * FROM lottery_entries WHERE draw_id = ? AND is_flagged = 0 ORDER BY zen_amount DESC, created_at ASC");
+    $stmt->execute(array($drawId));
+    $allEntries = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $winnersCount = (int)$settings['winners_per_draw'];
+    $multiplier = (int)$settings['reward_multiplier'];
+    $minZen = (int)$settings['min_entry_zen'];
+    $cronWinners = array();
+
+    if (count($allEntries) > 0) {
+        $weightedPool = array();
+        foreach ($allEntries as $entry) {
+            $weight = (int)$entry['zen_amount'];
+            if ($weight <= 0) $weight = max(1, (int)($minZen / 2));
+            $weightedPool[] = array('entry' => $entry, 'weight' => $weight);
+        }
+
+        $selectedUserIds = array();
+        for ($i = 0; $i < $winnersCount && count($weightedPool) > 0; $i++) {
+            $totalWeight = 0;
+            foreach ($weightedPool as $wp) {
+                $totalWeight += $wp['weight'];
+            }
+            if ($totalWeight <= 0) break;
+
+            $rand = mt_rand(1, $totalWeight);
+            $cumulative = 0;
+            $winnerIdx = 0;
+            foreach ($weightedPool as $idx => $wp) {
+                $cumulative += $wp['weight'];
+                if ($rand <= $cumulative) {
+                    $winnerIdx = $idx;
+                    break;
+                }
+            }
+
+            $winnerEntry = $weightedPool[$winnerIdx]['entry'];
+            $winUserId = (int)$winnerEntry['user_id'];
+
+            if (in_array($winUserId, $selectedUserIds)) {
+                array_splice($weightedPool, $winnerIdx, 1);
+                $i--;
+                continue;
+            }
+
+            $selectedUserIds[] = $winUserId;
+            $zenEntered = (int)$winnerEntry['zen_amount'];
+            $zenWon = $zenEntered > 0 ? $zenEntered * $multiplier : $minZen;
+
+            $delivered = addLotteryZen($pdo, $winUserId, $zenWon);
+
+            $rank = $i + 1;
+            $stmt = $pdo->prepare("
+                INSERT INTO lottery_winners (draw_id, entry_id, user_id, username, zen_entered, zen_won, rank_position, delivered, delivered_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute(array(
+                $drawId,
+                (int)$winnerEntry['id'],
+                $winUserId,
+                (string)$winnerEntry['username'],
+                $zenEntered,
+                $zenWon,
+                $rank,
+                $delivered ? 1 : 0,
+                $delivered ? date('Y-m-d H:i:s') : null,
+            ));
+
+            $cronWinners[] = array(
+                'rank' => $rank,
+                'username' => $winnerEntry['username'],
+                'zen_entered' => $zenEntered,
+                'zen_won' => $zenWon,
+                'delivered' => $delivered,
+            );
+
+            array_splice($weightedPool, $winnerIdx, 1);
+        }
+    }
+
+    // Mark completed
+    $stmt = $pdo->prepare("UPDATE lottery_draws SET status = 'completed', drawn_at = NOW() WHERE id = ?");
+    $stmt->execute(array($drawId));
+
+    lotteryLog($pdo, 0, '0.0.0.0', 'cron_draw', 'draw_id=' . $drawId . ' winners=' . count($cronWinners));
+
+    // Discord notifications
+    if (count($cronWinners) > 0) {
+        $pubLines = array('🎰 **Daily Lottery Draw - ' . date('Y-m-d') . '**', '');
+        $adminLines = array('Auto-draw | Draw ID: ' . $drawId . ' | Pool: ' . number_format((int)$draw['total_pool']) . ' Zen', '');
+        foreach ($cronWinners as $w) {
+            $emoji = '';
+            if ($w['rank'] === 1) $emoji = '🥇';
+            else if ($w['rank'] === 2) $emoji = '🥈';
+            else if ($w['rank'] === 3) $emoji = '🥉';
+            $pubLines[] = $emoji . ' **' . $w['username'] . '** won **' . number_format($w['zen_won']) . ' Zen**';
+            $adminLines[] = $emoji . ' ' . $w['username'] . ' | entered: ' . number_format($w['zen_entered']) . ' | won: ' . number_format($w['zen_won']) . ' | delivered: ' . ($w['delivered'] ? 'yes' : 'FAILED');
+        }
+        lotteryDiscordPost(LOTTERY_DISCORD_WEBHOOK_PUBLIC, '🎉 Lottery Winners!', $pubLines);
+        lotteryDiscordPost(LOTTERY_DISCORD_WEBHOOK_ADMIN, '🎰 Auto Lottery Draw Complete', $adminLines);
+    } else {
+        lotteryDiscordPost(LOTTERY_DISCORD_WEBHOOK_ADMIN, '🎰 Auto Lottery Draw', array('Draw ID: ' . $drawId, 'No entries today — no winners selected.'));
+    }
+
+    lotteryJson(array(
+        'success' => true,
+        'message' => 'Cron draw completed. ' . count($cronWinners) . ' winner(s).',
+        'winners' => $cronWinners,
+        'draw_id' => $drawId,
+    ));
 }
 
 // ── Fallback ──────────────────────────────────────────────────────────
