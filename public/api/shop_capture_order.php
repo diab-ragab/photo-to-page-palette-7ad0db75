@@ -2,8 +2,7 @@
 /**
  * POST /api/shop_capture_order.php
  * Captures PayPal order, verifies amount/currency/merchant, fulfills items.
- * Idempotent: re-calling for a completed order returns success without re-delivery.
- * PHP 5.3+ compatible.
+ * Requires auth. Idempotent. PHP 5.3+ compatible.
  */
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/session_helper.php';
@@ -14,6 +13,13 @@ handleCors(array('POST','OPTIONS'));
 header('Content-Type: application/json; charset=utf-8');
 
 $RID = generateRID();
+
+// --- Auth ---
+$user = requireAuth();
+$userId = isset($user['user_id']) ? intval($user['user_id']) : 0;
+$accountName = isset($user['name']) ? trim((string)$user['name']) : '';
+if ($userId <= 0) jsonFail(401, 'Unauthorized', $RID);
+if ($accountName === '') jsonFail(400, 'Account name not resolved', $RID);
 
 // --- Rate limit (20 captures / 5 min / IP) ---
 $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
@@ -31,7 +37,6 @@ $pdo->prepare("INSERT INTO shop_rate_limit (ip, action_key, created_at) VALUES (
 $body = getJsonInput();
 $ppOrderId = isset($body['paypalOrderId']) ? trim((string)$body['paypalOrderId']) : '';
 if ($ppOrderId === '') {
-    // Also try query param (for GET-style redirect)
     $ppOrderId = isset($_GET['token']) ? trim((string)$_GET['token']) : '';
 }
 if ($ppOrderId === '') jsonFail(400, 'paypalOrderId required', $RID);
@@ -45,21 +50,26 @@ if (!$order) jsonFail(404, 'Order not found', $RID);
 
 $orderId = intval($order['id']);
 
-// --- Idempotency: already completed ---
+// --- Ownership check (by account_name) ---
+if ((string)$order['account_name'] !== $accountName) {
+    error_log("RID={$RID} ORDER_OWNERSHIP_DENY order_id={$orderId} account={$accountName} expected={$order['account_name']}");
+    jsonFail(403, 'Not allowed', $RID);
+}
+
+// Idempotent: if already completed, return success with delivery log
 if ($order['status'] === 'completed') {
-    error_log("RID={$RID} CAPTURE_IDEMPOTENT order_id={$orderId} already completed");
-    // Fetch delivery log
     $dlStmt = $pdo->prepare("SELECT item_type, item_ref, qty, result, message FROM shop_delivery_log WHERE order_id = ?");
     $dlStmt->execute(array($orderId));
     $deliveries = $dlStmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode(array(
-        'success'         => true,
-        'status'          => 'completed',
-        'order_id'        => $orderId,
-        'already_captured'=> true,
-        'deliveries'      => $deliveries,
-        'rid'             => $RID,
+        'success'          => true,
+        'status'           => 'completed',
+        'order_id'         => $orderId,
+        'already_captured' => true,
+        'processed_count'  => count($deliveries),
+        'deliveries'       => $deliveries,
+        'rid'              => $RID,
     ));
     exit;
 }
@@ -80,40 +90,22 @@ if ($tokenRes['error'] !== '') {
     jsonFail(502, 'Payment gateway error', $RID);
 }
 
-$capResult = paypalCaptureOrder($tokenRes['token'], $ppOrderId, $ppCfg['sandbox']);
-
-// Log raw txn
-$pdo->prepare("INSERT INTO shop_paypal_txn (order_id, paypal_order_id, capture_id, status, raw_json, created_at) VALUES (?, ?, ?, ?, ?, NOW())")
-    ->execute(array($orderId, $ppOrderId, $capResult['capture_id'], $capResult['status'], json_encode($capResult['data'])));
-
-if ($capResult['error'] !== '') {
-    error_log("RID={$RID} CAPTURE_FAIL order_id={$orderId}: " . $capResult['error']);
-    // Check if already captured (COMPLETED status from PayPal but our capture call returned error)
-    if ($capResult['status'] === 'COMPLETED') {
-        // Fall through to verification
-    } else {
-        $pdo->prepare("UPDATE shop_orders SET status='failed', updated_at=NOW() WHERE id=?")->execute(array($orderId));
-        jsonFail(400, 'Payment capture failed: ' . $capResult['error'], $RID);
-    }
+// Get order details first to verify amount/currency/merchant
+$ppOrderData = paypalGetOrder($tokenRes['token'], $ppOrderId, $ppCfg['sandbox']);
+if ($ppOrderData['error'] !== '') {
+    error_log("RID={$RID} PP_GET_ORDER_FAIL: " . $ppOrderData['error']);
+    $pdo->prepare("UPDATE shop_orders SET status='pending', updated_at=NOW() WHERE id=?")->execute(array($orderId));
+    jsonFail(502, 'Could not verify PayPal order', $RID);
 }
 
-if ($capResult['status'] !== 'COMPLETED') {
-    error_log("RID={$RID} CAPTURE_NOT_COMPLETED order_id={$orderId} status={$capResult['status']}");
-    $pdo->prepare("UPDATE shop_orders SET status='failed', updated_at=NOW() WHERE id=?")->execute(array($orderId));
-    jsonFail(400, 'Payment not completed (status: ' . $capResult['status'] . ')', $RID);
-}
-
-// --- Verify amount, currency, merchant ---
-$ppData = $capResult['data'];
+// Verify from order details
+$ppData = $ppOrderData['data'];
 $puArr = isset($ppData['purchase_units'][0]) ? $ppData['purchase_units'][0] : array();
-$captures = isset($puArr['payments']['captures'][0]) ? $puArr['payments']['captures'][0] : array();
-
-$ppAmountStr = isset($captures['amount']['value']) ? $captures['amount']['value'] : '0.00';
-$ppCurrency  = isset($captures['amount']['currency_code']) ? strtoupper($captures['amount']['currency_code']) : '';
+$ppAmountVal = isset($puArr['amount']['value']) ? $puArr['amount']['value'] : '0.00';
+$ppCurrency  = isset($puArr['amount']['currency_code']) ? strtoupper($puArr['amount']['currency_code']) : '';
 $ppPayeeId   = isset($puArr['payee']['merchant_id']) ? $puArr['payee']['merchant_id'] : '';
 
-// Integer cents comparison
-$ppCents    = intval(round(floatval($ppAmountStr) * 100));
+$ppCents    = intval(round(floatval($ppAmountVal) * 100));
 $orderCents = intval($order['total_cents']);
 
 if ($ppCurrency !== strtoupper($ppCfg['currency'])) {
@@ -134,11 +126,32 @@ if ($ppCfg['merchant_id'] !== '' && $ppPayeeId !== '' && $ppPayeeId !== $ppCfg['
     jsonFail(400, 'Merchant verification failed', $RID);
 }
 
+// Now capture
+$capResult = paypalCaptureOrder($tokenRes['token'], $ppOrderId, $ppCfg['sandbox']);
+
+// Log raw txn
+$pdo->prepare("INSERT INTO shop_paypal_txn (order_id, paypal_order_id, capture_id, status, raw_json, created_at) VALUES (?, ?, ?, ?, ?, NOW())")
+    ->execute(array($orderId, $ppOrderId, $capResult['capture_id'], $capResult['status'], json_encode($capResult['data'])));
+
+if ($capResult['error'] !== '') {
+    error_log("RID={$RID} CAPTURE_FAIL order_id={$orderId}: " . $capResult['error']);
+    if ($capResult['status'] !== 'COMPLETED') {
+        $pdo->prepare("UPDATE shop_orders SET status='failed', updated_at=NOW() WHERE id=?")->execute(array($orderId));
+        jsonFail(400, 'Payment capture failed: ' . $capResult['error'], $RID);
+    }
+}
+
+if ($capResult['status'] !== 'COMPLETED') {
+    error_log("RID={$RID} CAPTURE_NOT_COMPLETED order_id={$orderId} status={$capResult['status']}");
+    $pdo->prepare("UPDATE shop_orders SET status='failed', updated_at=NOW() WHERE id=?")->execute(array($orderId));
+    jsonFail(400, 'Payment not completed (status: ' . $capResult['status'] . ')', $RID);
+}
+
 // Extract payer email
 $payerEmail = '';
-if (isset($ppData['payer']['email_address'])) $payerEmail = $ppData['payer']['email_address'];
+$capData = $capResult['data'];
+if (isset($capData['payer']['email_address'])) $payerEmail = $capData['payer']['email_address'];
 
-// Update order
 $pdo->prepare("UPDATE shop_orders SET capture_id=?, payer_email=?, updated_at=NOW() WHERE id=?")
     ->execute(array($capResult['capture_id'], $payerEmail, $orderId));
 
@@ -166,7 +179,7 @@ $failedCount = 0;
 $dlInsert = $pdo->prepare("INSERT INTO shop_delivery_log (order_id, item_type, item_ref, qty, result, message, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
 
 foreach ($orderItems as $oi) {
-    // Check if already delivered (idempotency)
+    // Idempotency: skip already delivered
     $checkDl = $pdo->prepare("SELECT id FROM shop_delivery_log WHERE order_id = ? AND item_ref = ? AND result = 'ok' LIMIT 1");
     $checkDl->execute(array($orderId, 'oi_' . $oi['oi_id']));
     if ($checkDl->fetch()) {
@@ -194,7 +207,7 @@ foreach ($orderItems as $oi) {
 
     $result = $mailer->sendOrderReward($roleId, $oi['name'], $itemId, ($itemId > 0 ? $itemQty : 0), $coins, $zen, $exp);
 
-    if ($result['success']) {
+    if (isset($result['success']) && $result['success']) {
         $dlInsert->execute(array($orderId, $oi['type'], 'oi_' . $oi['oi_id'], $oi['qty'], 'ok', 'Delivered'));
         $processedCount++;
     } else {
@@ -211,17 +224,12 @@ $pdo->prepare("UPDATE shop_orders SET status=?, updated_at=NOW() WHERE id=?")->e
 
 error_log("RID={$RID} FULFILLMENT_DONE order_id={$orderId} processed={$processedCount} failed={$failedCount} status={$finalStatus}");
 
-// Fetch delivery log for response
-$dlStmt = $pdo->prepare("SELECT item_type, item_ref, qty, result, message FROM shop_delivery_log WHERE order_id = ?");
-$dlStmt->execute(array($orderId));
-$deliveries = $dlStmt->fetchAll(PDO::FETCH_ASSOC);
-
 echo json_encode(array(
-    'success'         => true,
+    'success'         => ($finalStatus === 'completed'),
     'status'          => $finalStatus,
     'order_id'        => $orderId,
     'processed_count' => $processedCount,
     'failed_count'    => $failedCount,
-    'deliveries'      => $deliveries,
     'rid'             => $RID,
 ));
+exit;
