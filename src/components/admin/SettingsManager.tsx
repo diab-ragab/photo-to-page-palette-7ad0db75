@@ -20,6 +20,7 @@ import {
   Crown,
   Sparkles,
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { getSiteSettings, updateSiteSettings, clearSettingsCache, type SiteSettings } from '@/lib/siteSettingsApi';
 
 export const SettingsManager = () => {
@@ -36,6 +37,7 @@ export const SettingsManager = () => {
     gamepass_gold_price: '1999',
     elite_extend_per_day_cents: '0',
     gold_extend_per_day_cents: '0',
+    extensions_enabled: '1',
   });
 
   const fetchSettings = async () => {
@@ -280,9 +282,19 @@ export const SettingsManager = () => {
           </div>
 
           <div className="border-t pt-4 mt-4">
-            <p className="text-sm font-medium mb-3 text-muted-foreground">Extension Per-Day Pricing</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium text-muted-foreground">Extension Per-Day Pricing</p>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="extensions_enabled" className="text-xs text-muted-foreground">Extensions Enabled</Label>
+                <Switch
+                  id="extensions_enabled"
+                  checked={settings.extensions_enabled === '1'}
+                  onCheckedChange={(checked) => handleChange('extensions_enabled', checked ? '1' : '0')}
+                />
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground mb-4">
-              Set the cost per day when extending a Game Pass. Leave at 0 to auto-calculate (base price ÷ 30).
+              Set the cost per day when extending a Game Pass. Leave at 0 to auto-calculate (base price ÷ 30). Toggle off to hide extension cards from the shop.
             </p>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">

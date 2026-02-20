@@ -86,6 +86,7 @@ $defaultSettings = array(
   'gamepass_gold_price' => '1999',
   'elite_extend_per_day_cents' => '0',
   'gold_extend_per_day_cents' => '0',
+  'extensions_enabled' => '1',
 );
 
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
