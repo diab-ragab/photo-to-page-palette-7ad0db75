@@ -2,9 +2,10 @@ import { useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Sparkles, Check, Star, ArrowRight } from "lucide-react";
-import { useCart } from "@/contexts/CartContext";
+import { Crown, Sparkles, Check, Star, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 
 interface GamePassCardsProps {
   elitePriceCents: number;
@@ -76,11 +77,12 @@ interface HoloCardProps {
   tier: "elite" | "gold";
   perks: string[];
   priceCents: number;
-  onAdd: () => void;
+  onBuy: () => void;
+  buying: boolean;
   delay: number;
 }
 
-const HoloCard = ({ tier, perks, priceCents, onAdd, delay }: HoloCardProps) => {
+const HoloCard = ({ tier, perks, priceCents, onBuy, buying, delay }: HoloCardProps) => {
   const { ref, style, onMove, onLeave } = useTilt();
   const isGold = tier === "gold";
 
@@ -149,13 +151,10 @@ const HoloCard = ({ tier, perks, priceCents, onAdd, delay }: HoloCardProps) => {
           }}
         />
 
-        {/* Rainbow foil overlay (moves with cursor) */}
+        {/* Rainbow foil overlay */}
         <div
           className="absolute inset-0 rounded-2xl pointer-events-none z-20 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-          style={{
-            background: rainbowFoil,
-            backgroundSize: "200% 200%",
-          }}
+          style={{ background: rainbowFoil, backgroundSize: "200% 200%" }}
         />
 
         {/* Glare highlight */}
@@ -281,7 +280,8 @@ const HoloCard = ({ tier, perks, priceCents, onAdd, delay }: HoloCardProps) => {
           <div className="p-6 pt-4">
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
               <Button
-                onClick={onAdd}
+                onClick={onBuy}
+                disabled={buying}
                 className="w-full gap-2 text-white border-0 shadow-lg transition-all duration-300"
                 size="lg"
                 style={{
@@ -289,9 +289,15 @@ const HoloCard = ({ tier, perks, priceCents, onAdd, delay }: HoloCardProps) => {
                   boxShadow: `0 8px 24px -4px hsla(${accent}, 0.35)`,
                 }}
               >
-                {isGold ? <Sparkles className="w-4 h-4" /> : <Crown className="w-4 h-4" />}
-                Get {isGold ? "Gold" : "Elite"} Pass
-                <ArrowRight className="w-4 h-4" />
+                {buying ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isGold ? (
+                  <Sparkles className="w-4 h-4" />
+                ) : (
+                  <Crown className="w-4 h-4" />
+                )}
+                {buying ? "Redirecting..." : `Buy ${isGold ? "Gold" : "Elite"} Pass`}
+                {!buying && <ArrowRight className="w-4 h-4" />}
               </Button>
             </motion.div>
           </div>
@@ -303,19 +309,49 @@ const HoloCard = ({ tier, perks, priceCents, onAdd, delay }: HoloCardProps) => {
 
 /* ── Main export ── */
 export const GamePassCards = ({ elitePriceCents, goldPriceCents, eliteEnabled, goldEnabled }: GamePassCardsProps) => {
-  const { addToCart } = useCart();
+  const { user } = useAuth();
+  const [buying, setBuying] = useState<"elite" | "gold" | null>(null);
 
-  const handleAddPass = (tier: "elite" | "gold") => {
-    const isElite = tier === "elite";
-    addToCart({
-      id: isElite ? "gamepass-elite" : "gamepass-gold",
-      name: isElite ? "Elite Game Pass" : "Gold Game Pass",
-      description: isElite ? "30 days of Elite rewards" : "30 days of Gold rewards",
-      price: isElite ? elitePriceCents / 100 : goldPriceCents / 100,
-      image: isElite ? "👑" : "💎",
-      rarity: tier,
-    });
-    toast.success(`${isElite ? "Elite" : "Gold"} Game Pass added to cart`);
+  const handleBuyPass = async (tier: "elite" | "gold") => {
+    if (!user) {
+      toast.error("Please log in to purchase a Game Pass");
+      return;
+    }
+
+    // Get selected character from localStorage (set by GamePass component)
+    const characterName = localStorage.getItem("gamepass_character_name") || "";
+    if (!characterName) {
+      toast.error("Please select a character first in the Game Pass section");
+      return;
+    }
+
+    setBuying(tier);
+    try {
+      const token = localStorage.getItem("woi_session_token") || "";
+      const res = await fetch(`${API_BASE}/gamepass_purchase.php`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ tier, character_name: characterName }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.url) {
+        // Redirect to PayPal
+        window.location.href = data.url;
+      } else {
+        toast.error(data.message || data.error || "Failed to create payment");
+      }
+    } catch (err) {
+      toast.error("Payment error. Please try again.");
+      console.error("GamePass purchase error:", err);
+    } finally {
+      setBuying(null);
+    }
   };
 
   return (
@@ -327,7 +363,8 @@ export const GamePassCards = ({ elitePriceCents, goldPriceCents, eliteEnabled, g
             tier="elite"
             perks={elitePerks}
             priceCents={elitePriceCents}
-            onAdd={() => handleAddPass("elite")}
+            onBuy={() => handleBuyPass("elite")}
+            buying={buying === "elite"}
             delay={0.1}
           />
         )}
@@ -336,7 +373,8 @@ export const GamePassCards = ({ elitePriceCents, goldPriceCents, eliteEnabled, g
             tier="gold"
             perks={goldPerks}
             priceCents={goldPriceCents}
-            onAdd={() => handleAddPass("gold")}
+            onBuy={() => handleBuyPass("gold")}
+            buying={buying === "gold"}
             delay={0.2}
           />
         )}

@@ -4,31 +4,6 @@
  * Captures PayPal order, verifies amount/currency/merchant, fulfills items.
  * Requires auth. Idempotent. PHP 5.3+ compatible.
  */
-ob_start();
-
-$_CAPTURE_RID = '';
-
-function _capture_shutdown_handler() {
-    global $_CAPTURE_RID;
-    $err = error_get_last();
-    if ($err && in_array($err['type'], array(E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR))) {
-        while (ob_get_level()) { @ob_end_clean(); }
-        if (function_exists('http_response_code')) http_response_code(500);
-        header('Content-Type: application/json; charset=utf-8');
-        $msg = isset($err['message']) ? $err['message'] : 'Unknown fatal error';
-        $file = isset($err['file']) ? basename($err['file']) : '';
-        $line = isset($err['line']) ? $err['line'] : 0;
-        error_log("CAPTURE_FATAL rid={$_CAPTURE_RID} {$msg} in {$file}:{$line}");
-        echo json_encode(array(
-            'success' => false,
-            'error' => 'Server error: ' . $msg,
-            '_debug' => $file . ':' . $line,
-            'rid' => $_CAPTURE_RID
-        ));
-    }
-}
-register_shutdown_function('_capture_shutdown_handler');
-
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/session_helper.php';
 require_once __DIR__ . '/paypal_helper.php';
@@ -38,7 +13,6 @@ handleCors(array('POST','OPTIONS'));
 header('Content-Type: application/json; charset=utf-8');
 
 $RID = generateRID();
-$_CAPTURE_RID = $RID;
 
 // --- Auth ---
 $user = requireAuth();

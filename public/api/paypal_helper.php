@@ -1,260 +1,213 @@
 <?php
 /**
  * paypal_helper.php - PayPal REST API v2 helpers (PHP 5.x compatible)
- * 
- * Respects config.php paypal.sandbox flag:
- *   sandbox=true  -> https://api-m.sandbox.paypal.com
- *   sandbox=false -> https://api-m.paypal.com
+ * Works on PHP 5.3+ and PHP 8.x
  *
  * Uses file_get_contents (no cURL, no SDK).
- * Provides: getPayPalConfig(), getPayPalBaseUrl(), getPayPalAccessToken(),
- *           paypalCreateOrder(), paypalCaptureOrder(), paypalGetOrder()
+ * Respects config.php paypal.sandbox flag.
+ *
+ * Provides:
+ *   getPayPalConfig()
+ *   getPayPalBaseUrl()
+ *   getPayPalAccessToken()
+ *   paypalCreateOrder()
+ *   paypalGetOrder()
+ *   paypalCaptureOrder()
  */
 
-if (!function_exists('getPayPalAccessToken')) {
+function getPayPalConfig() {
+  $cfg = array(
+    'client_id'  => '',
+    'secret'     => '',
+    'sandbox'    => true,
+    'currency'   => 'EUR',
+    'merchant_id'=> '',
+    'success_url'=> '',
+    'cancel_url' => '',
+    'webhook_id' => ''
+  );
 
-  /**
-   * Get PayPal API base URL based on sandbox flag
-   * @param bool $sandbox
-   * @return string
-   */
-  function getPayPalBaseUrl($sandbox) {
-    if ($sandbox) {
-      return 'https://api-m.sandbox.paypal.com';
+  // Try config.php
+  $file = __DIR__ . '/config.php';
+  if (file_exists($file)) {
+    $c = include $file;
+    if (is_array($c) && isset($c['paypal']) && is_array($c['paypal'])) {
+      $p = $c['paypal'];
+      if (isset($p['client_id'])) $cfg['client_id'] = (string)$p['client_id'];
+      if (isset($p['secret'])) $cfg['secret'] = (string)$p['secret'];
+      if (isset($p['sandbox'])) $cfg['sandbox'] = (bool)$p['sandbox'];
+      if (isset($p['currency'])) $cfg['currency'] = (string)$p['currency'];
+      if (isset($p['merchant_id'])) $cfg['merchant_id'] = (string)$p['merchant_id'];
+      if (isset($p['success_url'])) $cfg['success_url'] = (string)$p['success_url'];
+      if (isset($p['cancel_url'])) $cfg['cancel_url'] = (string)$p['cancel_url'];
+      if (isset($p['webhook_id'])) $cfg['webhook_id'] = (string)$p['webhook_id'];
     }
-    return 'https://api-m.paypal.com';
   }
 
-  /**
-   * Get PayPal OAuth2 access token
-   * @param string $clientId
-   * @param string $secret
-   * @param bool   $sandbox
-   * @return array  array('token' => string, 'error' => string)
-   */
-  function getPayPalAccessToken($clientId, $secret, $sandbox) {
-    $baseUrl = getPayPalBaseUrl($sandbox);
-    $url = $baseUrl . '/v1/oauth2/token';
-    $auth = base64_encode($clientId . ':' . $secret);
+  return $cfg;
+}
 
-    $headers = array(
-      'Authorization: Basic ' . $auth,
-      'Content-Type: application/x-www-form-urlencoded',
-      'Accept: application/json',
-    );
+function getPayPalBaseUrl($sandbox) {
+  return $sandbox ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
+}
 
-    $opts = array(
-      'http' => array(
-        'method' => 'POST',
-        'header' => implode("\r\n", $headers),
-        'content' => 'grant_type=client_credentials',
-        'ignore_errors' => true,
-        'timeout' => 30,
-      ),
-      'ssl' => array(
-        'verify_peer' => false,
-        'verify_peer_name' => false,
-      ),
-    );
+function httpJson($method, $url, $headers, $bodyJson) {
+  $opts = array(
+    'http' => array(
+      'method'  => $method,
+      'header'  => $headers,
+      'content' => $bodyJson,
+      'ignore_errors' => true,
+      'timeout' => 30
+    )
+  );
+  $ctx = stream_context_create($opts);
+  $raw = @file_get_contents($url, false, $ctx);
 
-    $context = stream_context_create($opts);
-    $resp = @file_get_contents($url, false, $context);
+  $status = 0;
+  if (isset($http_response_header) && is_array($http_response_header)) {
+    foreach ($http_response_header as $h) {
+      if (preg_match('#^HTTP/\d\.\d\s+(\d+)#', $h, $m)) { $status = intval($m[1]); break; }
+    }
+  }
 
-    $code = 0;
-    if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
-      if (preg_match('/HTTP\/\d+\.?\d*\s+(\d+)/', $http_response_header[0], $m)) {
-        $code = (int)$m[1];
+  $data = null;
+  if ($raw !== false && $raw !== '') {
+    $data = json_decode($raw, true);
+  }
+
+  return array('status' => $status, 'raw' => $raw, 'data' => $data);
+}
+
+function getPayPalAccessToken($clientId, $secret, $sandbox) {
+  $base = getPayPalBaseUrl($sandbox);
+  $url = $base . '/v1/oauth2/token';
+
+  $auth = base64_encode($clientId . ':' . $secret);
+  $headers = "Authorization: Basic {$auth}\r\n" .
+             "Content-Type: application/x-www-form-urlencoded\r\n";
+
+  $body = "grant_type=client_credentials";
+
+  $opts = array(
+    'http' => array(
+      'method' => 'POST',
+      'header' => $headers,
+      'content' => $body,
+      'ignore_errors' => true,
+      'timeout' => 30
+    )
+  );
+  $ctx = stream_context_create($opts);
+  $raw = @file_get_contents($url, false, $ctx);
+
+  $status = 0;
+  if (isset($http_response_header) && is_array($http_response_header)) {
+    foreach ($http_response_header as $h) {
+      if (preg_match('#^HTTP/\d\.\d\s+(\d+)#', $h, $m)) { $status = intval($m[1]); break; }
+    }
+  }
+
+  if ($raw === false || $raw === '') {
+    return array('token' => '', 'error' => 'No response from PayPal', 'status' => $status);
+  }
+
+  $j = json_decode($raw, true);
+  if (!is_array($j) || !isset($j['access_token'])) {
+    return array('token' => '', 'error' => 'Invalid token response', 'status' => $status);
+  }
+
+  return array('token' => $j['access_token'], 'error' => '', 'status' => $status);
+}
+
+function paypalCreateOrder($accessToken, $purchaseUnits, $returnUrl, $cancelUrl, $meta, $sandbox) {
+  $base = getPayPalBaseUrl($sandbox);
+  $url = $base . '/v2/checkout/orders';
+
+  $payload = array(
+    'intent' => 'CAPTURE',
+    'purchase_units' => $purchaseUnits,
+    'application_context' => array(
+      'return_url' => $returnUrl,
+      'cancel_url' => $cancelUrl,
+      'brand_name' => 'WOI ENDGAME',
+      'landing_page' => 'LOGIN',
+      'user_action' => 'PAY_NOW'
+    )
+  );
+
+  if (is_array($meta) && count($meta) > 0) {
+    $payload['custom_id'] = json_encode($meta);
+  }
+
+  $bodyJson = json_encode($payload);
+  $headers = "Authorization: Bearer {$accessToken}\r\n" .
+             "Content-Type: application/json\r\n";
+
+  $res = httpJson('POST', $url, $headers, $bodyJson);
+
+  if ($res['status'] < 200 || $res['status'] >= 300 || !is_array($res['data'])) {
+    $err = 'HTTP ' . $res['status'];
+    if (is_array($res['data']) && isset($res['data']['message'])) $err .= ' ' . $res['data']['message'];
+    return array('id' => '', 'approve_url' => '', 'error' => $err, 'raw' => $res['raw']);
+  }
+
+  $id = isset($res['data']['id']) ? (string)$res['data']['id'] : '';
+  $approveUrl = '';
+  if (isset($res['data']['links']) && is_array($res['data']['links'])) {
+    foreach ($res['data']['links'] as $lnk) {
+      if (isset($lnk['rel']) && $lnk['rel'] === 'approve' && isset($lnk['href'])) {
+        $approveUrl = (string)$lnk['href'];
+        break;
       }
     }
-
-    if ($resp === false || $code < 200 || $code >= 300) {
-      $env = $sandbox ? 'SANDBOX' : 'LIVE';
-      return array('token' => '', 'error' => "Failed to get PayPal access token ({$env}, HTTP {$code})");
-    }
-
-    $data = json_decode($resp, true);
-    if (!is_array($data) || !isset($data['access_token'])) {
-      return array('token' => '', 'error' => 'Invalid PayPal token response');
-    }
-
-    return array('token' => $data['access_token'], 'error' => '');
   }
 
-  /**
-   * Make a PayPal API request (JSON body)
-   * @param string $method   HTTP method (GET, POST, etc.)
-   * @param string $url      Full API URL
-   * @param string $token    Bearer access token
-   * @param mixed  $body     Array to JSON-encode, or null for GET
-   * @return array  array($httpCode, $responseArray, $errorString)
-   */
-  function paypalRequest($method, $url, $token, $body = null) {
-    $headers = array(
-      'Authorization: Bearer ' . $token,
-      'Content-Type: application/json',
-      'Accept: application/json',
-    );
+  return array('id' => $id, 'approve_url' => $approveUrl, 'error' => '', 'raw' => $res['raw']);
+}
 
-    $opts = array(
-      'http' => array(
-        'method' => $method,
-        'header' => implode("\r\n", $headers),
-        'ignore_errors' => true,
-        'timeout' => 30,
-      ),
-      'ssl' => array(
-        'verify_peer' => false,
-        'verify_peer_name' => false,
-      ),
-    );
+function paypalGetOrder($accessToken, $paypalOrderId, $sandbox) {
+  $base = getPayPalBaseUrl($sandbox);
+  $url = $base . '/v2/checkout/orders/' . rawurlencode($paypalOrderId);
 
-    if ($body !== null) {
-      $opts['http']['content'] = json_encode($body);
-    }
+  $headers = "Authorization: Bearer {$accessToken}\r\n" .
+             "Content-Type: application/json\r\n";
 
-    $context = stream_context_create($opts);
-    $resp = @file_get_contents($url, false, $context);
+  $res = httpJson('GET', $url, $headers, '');
 
-    $code = 0;
-    if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
-      if (preg_match('/HTTP\/\d+\.?\d*\s+(\d+)/', $http_response_header[0], $m)) {
-        $code = (int)$m[1];
-      }
-    }
-
-    if ($resp === false) {
-      return array($code, array(), 'file_get_contents failed');
-    }
-
-    $data = json_decode($resp, true);
-    if (!is_array($data)) {
-      return array($code, array(), 'Invalid JSON response');
-    }
-
-    return array($code, $data, '');
+  if ($res['status'] < 200 || $res['status'] >= 300 || !is_array($res['data'])) {
+    $err = 'HTTP ' . $res['status'];
+    if (is_array($res['data']) && isset($res['data']['message'])) $err .= ' ' . $res['data']['message'];
+    return array('data' => null, 'error' => $err, 'raw' => $res['raw']);
   }
 
-  /**
-   * Create a PayPal order (checkout)
-   * @param string $accessToken
-   * @param array  $purchaseUnits
-   * @param string $returnUrl
-   * @param string $cancelUrl
-   * @param array  $metadata       Saved in custom_id as JSON (max 127 chars)
-   * @param bool   $sandbox
-   * @return array  array('id' => string, 'approve_url' => string, 'error' => string)
-   */
-  function paypalCreateOrder($accessToken, $purchaseUnits, $returnUrl, $cancelUrl, $metadata, $sandbox) {
-    $baseUrl = getPayPalBaseUrl($sandbox);
-    $url = $baseUrl . '/v2/checkout/orders';
+  return array('data' => $res['data'], 'error' => '', 'raw' => $res['raw']);
+}
 
-    // Encode metadata into custom_id of first purchase unit
-    if (!empty($metadata) && isset($purchaseUnits[0])) {
-      $purchaseUnits[0]['custom_id'] = substr(json_encode($metadata), 0, 127);
-    }
+function paypalCaptureOrder($accessToken, $paypalOrderId, $sandbox) {
+  $base = getPayPalBaseUrl($sandbox);
+  $url = $base . '/v2/checkout/orders/' . rawurlencode($paypalOrderId) . '/capture';
 
-    $orderData = array(
-      'intent' => 'CAPTURE',
-      'purchase_units' => $purchaseUnits,
-      'application_context' => array(
-        'return_url' => $returnUrl,
-        'cancel_url' => $cancelUrl,
-        'brand_name' => 'WOI Endgame',
-        'landing_page' => 'NO_PREFERENCE',
-        'user_action' => 'PAY_NOW',
-      ),
-    );
+  $headers = "Authorization: Bearer {$accessToken}\r\n" .
+             "Content-Type: application/json\r\n";
 
-    list($code, $data, $err) = paypalRequest('POST', $url, $accessToken, $orderData);
+  $res = httpJson('POST', $url, $headers, '{}');
 
-    if ($err !== '' || $code < 200 || $code >= 300) {
-      $errMsg = $err;
-      if (isset($data['message'])) $errMsg = $data['message'];
-      if (isset($data['details']) && is_array($data['details'])) {
-        foreach ($data['details'] as $d) {
-          if (isset($d['description'])) $errMsg .= ' ' . $d['description'];
-        }
-      }
-      return array('id' => '', 'approve_url' => '', 'error' => 'PayPal create order failed: ' . $errMsg);
-    }
-
-    // Find approve URL
-    $approveUrl = '';
-    if (isset($data['links']) && is_array($data['links'])) {
-      foreach ($data['links'] as $link) {
-        if (isset($link['rel']) && $link['rel'] === 'approve') {
-          $approveUrl = $link['href'];
-          break;
-        }
-      }
-    }
-
-    $orderId = isset($data['id']) ? $data['id'] : '';
-
-    if ($orderId === '' || $approveUrl === '') {
-      return array('id' => '', 'approve_url' => '', 'error' => 'PayPal order missing ID or approve URL');
-    }
-
-    return array('id' => $orderId, 'approve_url' => $approveUrl, 'error' => '');
+  if (!is_array($res['data'])) {
+    return array('status' => '', 'capture_id' => '', 'data' => null, 'error' => 'Invalid response', 'raw' => $res['raw']);
   }
 
-  /**
-   * Capture a PayPal order after payer approval
-   * @param string $accessToken
-   * @param string $orderId   PayPal order ID
-   * @param bool   $sandbox
-   * @return array  array('status' => string, 'capture_id' => string, 'data' => array, 'error' => string)
-   */
-  function paypalCaptureOrder($accessToken, $orderId, $sandbox) {
-    $baseUrl = getPayPalBaseUrl($sandbox);
-    $url = $baseUrl . '/v2/checkout/orders/' . urlencode($orderId) . '/capture';
-
-    list($code, $data, $err) = paypalRequest('POST', $url, $accessToken, new stdClass());
-
-    if ($err !== '' || $code < 200 || $code >= 300) {
-      $errMsg = $err;
-      if (isset($data['message'])) $errMsg = $data['message'];
-      return array('status' => '', 'capture_id' => '', 'data' => $data, 'error' => 'PayPal capture failed: ' . $errMsg);
-    }
-
-    $status = isset($data['status']) ? $data['status'] : '';
-    $captureId = '';
-
-    if (isset($data['purchase_units'][0]['payments']['captures'][0]['id'])) {
-      $captureId = $data['purchase_units'][0]['payments']['captures'][0]['id'];
-    }
-
-    return array('status' => $status, 'capture_id' => $captureId, 'data' => $data, 'error' => '');
+  $status = isset($res['data']['status']) ? (string)$res['data']['status'] : '';
+  $captureId = '';
+  if (isset($res['data']['purchase_units'][0]['payments']['captures'][0]['id'])) {
+    $captureId = (string)$res['data']['purchase_units'][0]['payments']['captures'][0]['id'];
   }
 
-  /**
-   * Get PayPal order details
-   * @param string $accessToken
-   * @param string $orderId
-   * @param bool   $sandbox
-   * @return array  array($httpCode, $data, $error)
-   */
-  function paypalGetOrder($accessToken, $orderId, $sandbox) {
-    $baseUrl = getPayPalBaseUrl($sandbox);
-    $url = $baseUrl . '/v2/checkout/orders/' . urlencode($orderId);
-    return paypalRequest('GET', $url, $accessToken);
+  if ($res['status'] < 200 || $res['status'] >= 300) {
+    $err = 'HTTP ' . $res['status'];
+    if (isset($res['data']['message'])) $err .= ' ' . $res['data']['message'];
+    return array('status' => $status, 'capture_id' => $captureId, 'data' => $res['data'], 'error' => $err, 'raw' => $res['raw']);
   }
 
-  /**
-   * Get PayPal config from app config
-   * @return array
-   */
-  function getPayPalConfig() {
-    $cfg = getConfig();
-    $pp = isset($cfg['paypal']) ? $cfg['paypal'] : array();
-    return array(
-      'client_id'    => isset($pp['client_id'])   ? $pp['client_id']   : '',
-      'secret'       => isset($pp['secret'])      ? $pp['secret']      : '',
-      'sandbox'      => isset($pp['sandbox'])     ? (bool)$pp['sandbox'] : false,
-      'currency'     => isset($pp['currency'])    ? strtoupper($pp['currency']) : 'EUR',
-      'merchant_id'  => isset($pp['merchant_id']) ? $pp['merchant_id'] : '',
-      'success_url'  => isset($pp['success_url']) ? $pp['success_url'] : '',
-      'cancel_url'   => isset($pp['cancel_url'])  ? $pp['cancel_url']  : '',
-    );
-  }
+  return array('status' => $status, 'capture_id' => $captureId, 'data' => $res['data'], 'error' => '', 'raw' => $res['raw']);
 }

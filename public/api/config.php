@@ -33,11 +33,11 @@ $APP_CONFIG = array(
   ),
 
   'paypal' => array(
-    'client_id'   => 'AWEFJy_edKvt3xKcWnEgeB-lQBtz2VqYGb9eSWnDJB1f7cSyBeZ8R2xoyHF5r_vrnYOxkfkHHrm6EzHs',
-    'secret'      => 'EIgcYoXHk2fmkniJeYBmQRi77sTiBgJPgLg5D5mLO5ndIDN_KK7QW4kXF-aB8IrSlFlvOd_RRw9UlVfr',
+    'client_id'   => 'AdOJBG93gQ82tIgh5NQpSWu02cjjDF0FGjCP9REfrLDZ4m28TFvPt6KVJwCpZZCsE0J8Rc7A7Km2d3oQ',
+    'secret'      => 'EDEoRdNYFM5tTfH6xMOsupYWwH2c4nfLo5wNI6rFLvjmzMasG_EP1dfJDNc1MP7ReLxwI5mgziQOW5K2',
     'sandbox'     => false,  // LIVE ONLY — never set to true
-    'webhook_id'  => '8SG55611X6955945V',
-    'merchant_id' => 'GNY2CWYMNG7K4',
+    'webhook_id'  => '3W4074240A126903X',
+    'merchant_id' => 'Y3SS84QPDW7EC',
     'success_url' => 'https://woiendgame.online/shop/success',
     'cancel_url'  => 'https://woiendgame.online/shop',
     'currency'    => 'EUR',
