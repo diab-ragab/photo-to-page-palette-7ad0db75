@@ -42,7 +42,7 @@ const Shop = () => {
         const [shopRes, passRes, settingsRes] = await Promise.all([
           fetchShopProducts({ limit: 200 }),
           apiGet<any>(`/gamepass.php?action=rewards&rid=${Date.now()}`, false, { showErrorToast: false }).catch(() => null),
-          import("@/lib/siteSettingsApi").then(m => m.getSiteSettings()).catch(() => null),
+          import("@/lib/siteSettingsApi").then(m => m.getSiteSettings(true)).catch(() => null),
         ]);
         if (shopRes.success) setProducts(shopRes.products);
         if (passRes?.success) {

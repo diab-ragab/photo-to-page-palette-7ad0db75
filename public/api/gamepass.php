@@ -215,17 +215,34 @@ try {
       $rewards = fetchRewards();
 
       // Fetch prices and enabled status
+      // Priority: site_settings (admin-editable) > gamepass_settings > defaults
       $elitePriceCents = 999;
       $goldPriceCents = 1999;
       $gamepassEnabled = true;
       $eliteEnabled = true;
       $goldEnabled = true;
+
+      // First read from site_settings (admin Settings tab)
       try {
-        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('elite_price_cents','gold_price_cents','gamepass_enabled','elite_enabled','gold_enabled')");
+        $ssStmt = $pdo->query("SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ('gamepass_elite_price','gamepass_gold_price')");
+        if ($ssStmt) {
+          $ssRows = $ssStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+          if (isset($ssRows['gamepass_elite_price'])) {
+            $v = (int)$ssRows['gamepass_elite_price'];
+            if ($v > 0) $elitePriceCents = $v;
+          }
+          if (isset($ssRows['gamepass_gold_price'])) {
+            $v = (int)$ssRows['gamepass_gold_price'];
+            if ($v > 0) $goldPriceCents = $v;
+          }
+        }
+      } catch (Exception $e) {}
+
+      // Then read enabled flags from gamepass_settings
+      try {
+        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('gamepass_enabled','elite_enabled','gold_enabled')");
         if ($stmtS) {
           $settings = $stmtS->fetchAll(PDO::FETCH_KEY_PAIR);
-          if (isset($settings['elite_price_cents'])) $elitePriceCents = (int)$settings['elite_price_cents'];
-          if (isset($settings['gold_price_cents'])) $goldPriceCents = (int)$settings['gold_price_cents'];
           if (isset($settings['gamepass_enabled'])) $gamepassEnabled = ($settings['gamepass_enabled'] === '1' || $settings['gamepass_enabled'] === 1);
           if (isset($settings['elite_enabled'])) $eliteEnabled = ($settings['elite_enabled'] === '1' || $settings['elite_enabled'] === 1);
           if (isset($settings['gold_enabled'])) $goldEnabled = ($settings['gold_enabled'] === '1' || $settings['gold_enabled'] === 1);
@@ -301,18 +318,24 @@ try {
       // Rewards
       $rewards = fetchRewards();
 
-      // Fetch prices and enabled status
+      // Fetch prices and enabled status (site_settings > gamepass_settings > defaults)
       $elitePriceCents = 999;
       $goldPriceCents = 1999;
       $gamepassEnabled = true;
       $eliteEnabled = true;
       $goldEnabled = true;
       try {
-        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('elite_price_cents','gold_price_cents','gamepass_enabled','elite_enabled','gold_enabled')");
+        $ssStmt = $pdo->query("SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ('gamepass_elite_price','gamepass_gold_price')");
+        if ($ssStmt) {
+          $ssRows = $ssStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+          if (isset($ssRows['gamepass_elite_price'])) { $v = (int)$ssRows['gamepass_elite_price']; if ($v > 0) $elitePriceCents = $v; }
+          if (isset($ssRows['gamepass_gold_price'])) { $v = (int)$ssRows['gamepass_gold_price']; if ($v > 0) $goldPriceCents = $v; }
+        }
+      } catch (Exception $e) {}
+      try {
+        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('gamepass_enabled','elite_enabled','gold_enabled')");
         if ($stmtS) {
           $settings = $stmtS->fetchAll(PDO::FETCH_KEY_PAIR);
-          if (isset($settings['elite_price_cents'])) $elitePriceCents = (int)$settings['elite_price_cents'];
-          if (isset($settings['gold_price_cents'])) $goldPriceCents = (int)$settings['gold_price_cents'];
           if (isset($settings['gamepass_enabled'])) $gamepassEnabled = ($settings['gamepass_enabled'] === '1' || $settings['gamepass_enabled'] === 1);
           if (isset($settings['elite_enabled'])) $eliteEnabled = ($settings['elite_enabled'] === '1' || $settings['elite_enabled'] === 1);
           if (isset($settings['gold_enabled'])) $goldEnabled = ($settings['gold_enabled'] === '1' || $settings['gold_enabled'] === 1);
