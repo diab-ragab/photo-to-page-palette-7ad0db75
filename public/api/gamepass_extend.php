@@ -159,8 +159,8 @@ $metadata = array(
   'rid' => $RID,
 );
 
-$successUrl = 'https://woiendgame.online/dashboard?gamepass_extended=' . $days . '&paypal=1';
-$cancelUrl  = 'https://woiendgame.online/dashboard';
+$successUrl = 'https://woiendgame.online/dashboard?gamepass_extended=' . $days . '&paypal=1&token=' . urlencode($orderResult['id']);
+$cancelUrl  = 'https://woiendgame.online/shop';
 
 $orderResult = paypalCreateOrder(
   $tokenResult['token'],

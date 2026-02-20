@@ -52,6 +52,9 @@ export const GamePassExtendCards = ({ userTier, passExpiresAt }: GamePassExtendC
 
       if (data?.success && data.url) {
         toast.success(`Redirecting to payment for ${days}-day extension...`);
+        if (data.paypal_order_id) {
+          localStorage.setItem("gamepass_extend_paypal_order_id", data.paypal_order_id);
+        }
         window.location.href = data.url;
       } else {
         toast.error(data?.error || "Failed to create extension order");
