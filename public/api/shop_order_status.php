@@ -1,9 +1,10 @@
 <?php
 /**
- * GET /api/shop_order_status.php?order_id=N
- * Returns order status + items delivered.
- * PHP 5.3+ compatible.
+ * shop_order_status.php - get order status by PayPal token or order id
+ * Sync with NEW SHOP SCHEMA (no user_id in shop_orders)
+ * PHP 5.x compatible
  */
+
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/session_helper.php';
 
@@ -12,45 +13,51 @@ header('Content-Type: application/json; charset=utf-8');
 
 $RID = generateRID();
 
-$orderId = isset($_GET['order_id']) ? intval($_GET['order_id']) : 0;
-if ($orderId <= 0) jsonFail(400, 'order_id required', $RID);
+$user = requireAuth();
+$userId = isset($user['user_id']) ? intval($user['user_id']) : 0;
+$accountName = isset($user['name']) ? trim((string)$user['name']) : '';
+
+if ($userId <= 0 || $accountName === '') {
+  http_response_code(401);
+  echo json_encode(array('success'=>false,'message'=>'Unauthorized','rid'=>$RID));
+  exit;
+}
 
 $pdo = getDB();
+$token = isset($_GET['token']) ? trim((string)$_GET['token']) : '';
+$orderId = isset($_GET['order_id']) ? intval($_GET['order_id']) : 0;
 
-$stmt = $pdo->prepare("SELECT id, rid, account_name, character_name, total_cents, currency, status, paypal_order_id, capture_id, payer_email, created_at, updated_at FROM shop_orders WHERE id = ? LIMIT 1");
-$stmt->execute(array($orderId));
-$order = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($token === '' && $orderId <= 0) {
+  http_response_code(400);
+  echo json_encode(array('success'=>false,'message'=>'token or order_id required','rid'=>$RID));
+  exit;
+}
 
-if (!$order) jsonFail(404, 'Order not found', $RID);
+if ($token !== '') {
+  $st = $pdo->prepare("SELECT id, status, total_cents, currency, paypal_order_id, capture_id, payer_email, updated_at
+                       FROM shop_orders
+                       WHERE paypal_order_id = ? AND account_name = ?
+                       LIMIT 1");
+  $st->execute(array($token, $accountName));
+  $row = $st->fetch(PDO::FETCH_ASSOC);
+} else {
+  $st = $pdo->prepare("SELECT id, status, total_cents, currency, paypal_order_id, capture_id, payer_email, updated_at
+                       FROM shop_orders
+                       WHERE id = ? AND account_name = ?
+                       LIMIT 1");
+  $st->execute(array($orderId, $accountName));
+  $row = $st->fetch(PDO::FETCH_ASSOC);
+}
 
-// Items
-$iStmt = $pdo->prepare("
-    SELECT oi.product_id, p.name, p.type, oi.qty, oi.unit_price_cents, oi.line_total_cents
-    FROM shop_order_items oi
-    JOIN shop_products p ON p.id = oi.product_id
-    WHERE oi.order_id = ?
-");
-$iStmt->execute(array($orderId));
-$items = $iStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Delivery log
-$dlStmt = $pdo->prepare("SELECT item_type, item_ref, qty, result, message, created_at FROM shop_delivery_log WHERE order_id = ? ORDER BY id ASC");
-$dlStmt->execute(array($orderId));
-$deliveries = $dlStmt->fetchAll(PDO::FETCH_ASSOC);
+if (!$row) {
+  http_response_code(404);
+  echo json_encode(array('success'=>false,'message'=>'Order not found','rid'=>$RID));
+  exit;
+}
 
 echo json_encode(array(
-    'success'    => true,
-    'order'      => array(
-        'id'              => intval($order['id']),
-        'status'          => $order['status'],
-        'account_name'    => $order['account_name'],
-        'character_name'  => $order['character_name'],
-        'total_cents'     => intval($order['total_cents']),
-        'currency'        => $order['currency'],
-        'paypal_order_id' => $order['paypal_order_id'],
-        'created_at'      => $order['created_at'],
-    ),
-    'items'      => $items,
-    'deliveries' => $deliveries,
-    'rid'        => $RID,
+  'success' => true,
+  'order' => $row,
+  'rid' => $RID
 ));
+exit;
