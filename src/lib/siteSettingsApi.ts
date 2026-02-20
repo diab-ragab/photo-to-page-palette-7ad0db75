@@ -9,6 +9,8 @@ export interface SiteSettings {
   flash_sale_end: string;
   gamepass_elite_price: string;
   gamepass_gold_price: string;
+  elite_extend_per_day_cents: string;
+  gold_extend_per_day_cents: string;
 }
 
 const defaultSettings: SiteSettings = {
@@ -20,6 +22,8 @@ const defaultSettings: SiteSettings = {
   flash_sale_end: '',
   gamepass_elite_price: '999',
   gamepass_gold_price: '1999',
+  elite_extend_per_day_cents: '0',
+  gold_extend_per_day_cents: '0',
 };
 
 let cachedSettings: SiteSettings | null = null;
