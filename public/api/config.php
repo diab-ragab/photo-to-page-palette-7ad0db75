@@ -38,7 +38,7 @@ $APP_CONFIG = array(
     'sandbox'     => false,  // LIVE ONLY — never set to true
     'webhook_id'  => '8SG55611X6955945V',
     'merchant_id' => 'GNY2CWYMNG7K4',
-    'success_url' => 'https://woiendgame.online/checkout/success',
+    'success_url' => 'https://woiendgame.online/shop/success',
     'cancel_url'  => 'https://woiendgame.online/shop',
     'currency'    => 'EUR',
   ),
