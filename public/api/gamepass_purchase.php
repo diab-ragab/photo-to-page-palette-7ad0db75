@@ -154,7 +154,7 @@ $purchaseUnits = array(
   ),
 );
 
-$successUrl = 'https://woiendgame.online/dashboard?gamepass_purchased=' . $tierInput . '&paypal=1&token=' . urlencode($orderResult['id']);
+$successUrl = 'https://woiendgame.online/dashboard?gamepass_purchased=' . $tierInput . '&paypal=1&purchase_id=' . $purchaseId;
 $cancelUrl  = 'https://woiendgame.online/shop';
 
 $orderResult = paypalCreateOrder(
