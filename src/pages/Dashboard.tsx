@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVoteSystem } from "@/hooks/useVoteSystem";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { fetchJsonOrThrow, API_BASE, apiGet } from "@/lib/apiFetch";
+import { fetchJsonOrThrow, API_BASE, apiGet, getAuthHeaders } from "@/lib/apiFetch";
 import { Leaderboards } from "@/components/Leaderboards";
 import { GamePass } from "@/components/GamePass";
 import { VoteSiteCard } from "@/components/VoteSiteCard";
@@ -53,11 +53,15 @@ import {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isLoggedIn, isAdmin, logout } = useAuth();
   const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites, streakData } = useVoteSystem();
   const [userZen, setUserZen] = useState(0);
   const [activeTab, setActiveTab] = useState("rewards");
   const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
+  const [gamepassCaptureStatus, setGamepassCaptureStatus] = useState<"idle" | "capturing" | "success" | "error">("idle");
+  const [capturedTier, setCapturedTier] = useState("");
+  const gamepassCaptureRef = useRef(false);
 
   // Pull to refresh
   const { containerProps, PullIndicator } = usePullToRefresh({
@@ -120,6 +124,73 @@ const Dashboard = () => {
     }).catch(() => {});
   }, [user]);
 
+  // Handle ?gamepass_purchased= query param — capture PayPal order
+  useEffect(() => {
+    const gpTier = searchParams.get("gamepass_purchased");
+    const paypalFlag = searchParams.get("paypal");
+    const token = searchParams.get("token") || "";
+    if (!gpTier || !paypalFlag || gamepassCaptureRef.current) return;
+    if (!user) return;
+    gamepassCaptureRef.current = true;
+
+    // Clean URL
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("gamepass_purchased");
+    newParams.delete("paypal");
+    newParams.delete("token");
+    setSearchParams(newParams, { replace: true });
+
+    // We need to find the PayPal order ID from the pending purchase
+    setGamepassCaptureStatus("capturing");
+
+    const doCapture = async () => {
+      try {
+        // Find the latest pending purchase for this user/tier
+        const sessionToken = localStorage.getItem("woi_session_token") || "";
+        // The token from PayPal redirect is the PayPal order ID
+        let paypalOrderId = token;
+        
+        // If no token in URL, try to find from recent purchase
+        if (!paypalOrderId) {
+          // Fallback: check localStorage for the last purchase
+          paypalOrderId = localStorage.getItem("gamepass_paypal_order_id") || "";
+        }
+        
+        if (!paypalOrderId) {
+          setGamepassCaptureStatus("error");
+          return;
+        }
+
+        const res = await fetch(`${API_BASE}/gamepass_capture.php`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({ paypal_order_id: paypalOrderId }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          setGamepassCaptureStatus("success");
+          setCapturedTier(data.tier || gpTier);
+          setUserTier((data.tier || gpTier) as "free" | "elite" | "gold");
+          localStorage.removeItem("gamepass_paypal_order_id");
+        } else {
+          console.error("[GamePass Capture]", data.message);
+          setGamepassCaptureStatus("error");
+        }
+      } catch (err) {
+        console.error("[GamePass Capture] Error:", err);
+        setGamepassCaptureStatus("error");
+      }
+    };
+
+    doCapture();
+  }, [user, searchParams, setSearchParams]);
+
   // Calculate VIP progress
   const getVipLevel = (points: number) => {
     if (points >= 10000) return { level: 3, name: "VIP III", color: "text-yellow-400" };
@@ -179,6 +250,51 @@ const Dashboard = () => {
       
       <main className="container mx-auto px-3 md:px-4 py-4 pt-20 md:pt-24 pb-24 md:pb-8">
         <PullIndicator />
+
+        {/* Game Pass capture status banner */}
+        {gamepassCaptureStatus === "capturing" && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 p-4 rounded-xl bg-primary/10 border border-primary/30 flex items-center gap-3"
+          >
+            <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm font-medium">Activating your Game Pass...</span>
+          </motion.div>
+        )}
+        {gamepassCaptureStatus === "success" && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="mb-4 p-4 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center gap-3"
+          >
+            <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-green-500">
+                🎉 {capturedTier.charAt(0).toUpperCase() + capturedTier.slice(1)} Game Pass Activated!
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your premium rewards are now available. Check the Progress tab!
+              </p>
+            </div>
+          </motion.div>
+        )}
+        {gamepassCaptureStatus === "error" && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 p-4 rounded-xl bg-destructive/10 border border-destructive/30 flex items-center gap-3"
+          >
+            <ShieldAlert className="h-5 w-5 text-destructive flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-destructive">Payment capture issue</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your payment was received but activation failed. Please contact support.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {/* Compact Header */}
         <motion.div 
           initial={{ opacity: 0, y: -10 }}

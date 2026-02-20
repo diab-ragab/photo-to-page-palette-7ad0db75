@@ -341,6 +341,12 @@ export const GamePassCards = ({ elitePriceCents, goldPriceCents, eliteEnabled, g
 
       const data = await res.json();
       if (data.success && data.url) {
+        // Store PayPal order ID for capture on return
+        if (data.paypal_order_id) {
+          localStorage.setItem("gamepass_paypal_order_id", data.paypal_order_id);
+        }
+        // Also store character name for the purchase flow
+        localStorage.setItem("gamepass_character_name", characterName);
         // Redirect to PayPal
         window.location.href = data.url;
       } else {
