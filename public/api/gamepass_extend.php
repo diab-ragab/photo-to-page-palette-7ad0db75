@@ -158,8 +158,9 @@ $metadata = array(
   'rid' => $RID,
 );
 
-$successUrl = 'https://woiendgame.online/dashboard?gamepass_extended=' . $days . '&paypal=1&token=' . urlencode($orderResult['id']);
 $cancelUrl  = 'https://woiendgame.online/shop';
+// Build a temporary success URL; we'll use the extension_id for identification
+$successUrl = 'https://woiendgame.online/dashboard?gamepass_extended=' . $days . '&paypal=1&ext_id=' . $extensionId;
 
 $orderResult = paypalCreateOrder(
   $tokenResult['token'],
