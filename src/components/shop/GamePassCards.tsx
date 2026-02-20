@@ -1,11 +1,11 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Sparkles, Check, Star, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
+import { API_BASE, getAuthHeaders, apiGet } from "@/lib/apiFetch";
 
 interface GamePassCardsProps {
   elitePriceCents: number;
@@ -312,16 +312,42 @@ export const GamePassCards = ({ elitePriceCents, goldPriceCents, eliteEnabled, g
   const { user } = useAuth();
   const [buying, setBuying] = useState<"elite" | "gold" | null>(null);
 
+  // Auto-fetch highest-level character if none selected yet
+  useEffect(() => {
+    if (!user) return;
+    const existing = localStorage.getItem("gamepass_character_name");
+    if (existing) return;
+    apiGet<any>(`/user_characters.php?rid=${Date.now()}`, true, { showErrorToast: false, silentStatuses: [401, 403] })
+      .then(data => {
+        if (data?.success && Array.isArray(data.characters) && data.characters.length > 0) {
+          // Pick highest level character
+          const sorted = [...data.characters].sort((a: any, b: any) => (b.level || 0) - (a.level || 0));
+          localStorage.setItem("gamepass_character_name", sorted[0].name || sorted[0].Name);
+        }
+      })
+      .catch(() => {});
+  }, [user]);
+
   const handleBuyPass = async (tier: "elite" | "gold") => {
     if (!user) {
       toast.error("Please log in to purchase a Game Pass");
       return;
     }
 
-    // Get selected character from localStorage (set by GamePass component)
-    const characterName = localStorage.getItem("gamepass_character_name") || "";
+    // Get selected character — try auto-fetching if missing
+    let characterName = localStorage.getItem("gamepass_character_name") || "";
     if (!characterName) {
-      toast.error("Please select a character first in the Game Pass section");
+      try {
+        const data = await apiGet<any>(`/user_characters.php?rid=${Date.now()}`, true, { showErrorToast: false });
+        if (data?.success && Array.isArray(data.characters) && data.characters.length > 0) {
+          const sorted = [...data.characters].sort((a: any, b: any) => (b.level || 0) - (a.level || 0));
+          characterName = sorted[0].name || sorted[0].Name;
+          localStorage.setItem("gamepass_character_name", characterName);
+        }
+      } catch {}
+    }
+    if (!characterName) {
+      toast.error("No characters found on your account. Please create a character in-game first.");
       return;
     }
 

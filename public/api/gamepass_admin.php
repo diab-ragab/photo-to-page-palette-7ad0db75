@@ -142,10 +142,26 @@ switch ($action) {
     if ($elitePrice !== null) {
       if ($elitePrice < 100) json_fail(400, 'Elite price must be at least 100 cents');
       $upsertStmt->execute(array('elite_price_cents', (string)$elitePrice));
+      // Also sync to site_settings so Shop page picks it up
+      $ssUpsert = $pdo->prepare("SELECT 1 FROM site_settings WHERE setting_key = 'gamepass_elite_price' LIMIT 1");
+      $ssUpsert->execute();
+      if ($ssUpsert->fetch()) {
+        $pdo->prepare("UPDATE site_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = 'gamepass_elite_price'")->execute(array((string)$elitePrice));
+      } else {
+        $pdo->prepare("INSERT INTO site_settings (setting_key, setting_value, updated_at) VALUES ('gamepass_elite_price', ?, NOW())")->execute(array((string)$elitePrice));
+      }
     }
     if ($goldPrice !== null) {
       if ($goldPrice < 100) json_fail(400, 'Gold price must be at least 100 cents');
       $upsertStmt->execute(array('gold_price_cents', (string)$goldPrice));
+      // Also sync to site_settings
+      $ssUpsert2 = $pdo->prepare("SELECT 1 FROM site_settings WHERE setting_key = 'gamepass_gold_price' LIMIT 1");
+      $ssUpsert2->execute();
+      if ($ssUpsert2->fetch()) {
+        $pdo->prepare("UPDATE site_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = 'gamepass_gold_price'")->execute(array((string)$goldPrice));
+      } else {
+        $pdo->prepare("INSERT INTO site_settings (setting_key, setting_value, updated_at) VALUES ('gamepass_gold_price', ?, NOW())")->execute(array((string)$goldPrice));
+      }
     }
 
     $gamepassEnabled = isset($input['gamepass_enabled']) ? $input['gamepass_enabled'] : null;
