@@ -87,18 +87,18 @@ if ($currentTier === 'gold' && $tierInput === 'elite') {
   json_fail_ext(400, 'You have a Gold Pass. Please extend your Gold Pass instead.');
 }
 
-// Read per-day price from settings
+// Read per-day price from site_settings (admin-managed)
 $elitePerDayCents = 0;
 $goldPerDayCents = 0;
+$eliteBaseCents = 999;
+$goldBaseCents = 1999;
 try {
-  $priceStmt = $pdo->prepare("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('elite_price_cents', 'gold_price_cents', 'elite_extend_per_day_cents', 'gold_extend_per_day_cents')");
+  $priceStmt = $pdo->prepare("SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ('gamepass_elite_price', 'gamepass_gold_price', 'elite_extend_per_day_cents', 'gold_extend_per_day_cents')");
   $priceStmt->execute();
   $priceRows = $priceStmt->fetchAll(PDO::FETCH_ASSOC);
-  $eliteBaseCents = 999;
-  $goldBaseCents = 1999;
   foreach ($priceRows as $pr) {
-    if ($pr['setting_key'] === 'elite_price_cents') $eliteBaseCents = (int)$pr['setting_value'];
-    if ($pr['setting_key'] === 'gold_price_cents') $goldBaseCents = (int)$pr['setting_value'];
+    if ($pr['setting_key'] === 'gamepass_elite_price') $eliteBaseCents = (int)$pr['setting_value'];
+    if ($pr['setting_key'] === 'gamepass_gold_price') $goldBaseCents = (int)$pr['setting_value'];
     if ($pr['setting_key'] === 'elite_extend_per_day_cents') $elitePerDayCents = (int)$pr['setting_value'];
     if ($pr['setting_key'] === 'gold_extend_per_day_cents') $goldPerDayCents = (int)$pr['setting_value'];
   }
@@ -107,9 +107,8 @@ try {
   if ($goldPerDayCents <= 0) $goldPerDayCents = (int)ceil($goldBaseCents / 30);
 } catch (Exception $e) {
   error_log("RID={$RID} EXTEND_PRICE_ERR: " . $e->getMessage());
-  // Fallback
-  $elitePerDayCents = 34; // ~999/30
-  $goldPerDayCents = 67;  // ~1999/30
+  $elitePerDayCents = 34;
+  $goldPerDayCents = 67;
 }
 
 $perDayCents = ($tierInput === 'gold') ? $goldPerDayCents : $elitePerDayCents;

@@ -84,6 +84,8 @@ $defaultSettings = array(
   'flash_sale_end' => '',
   'gamepass_elite_price' => '999',
   'gamepass_gold_price' => '1999',
+  'elite_extend_per_day_cents' => '0',
+  'gold_extend_per_day_cents' => '0',
 );
 
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';

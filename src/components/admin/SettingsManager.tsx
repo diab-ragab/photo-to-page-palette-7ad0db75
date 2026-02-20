@@ -34,6 +34,8 @@ export const SettingsManager = () => {
     flash_sale_end: '',
     gamepass_elite_price: '999',
     gamepass_gold_price: '1999',
+    elite_extend_per_day_cents: '0',
+    gold_extend_per_day_cents: '0',
   });
 
   const fetchSettings = async () => {
@@ -274,6 +276,55 @@ export const SettingsManager = () => {
               <p className="text-xs text-muted-foreground">
                 = €{(parseInt(settings.gamepass_gold_price || '0') / 100).toFixed(2)}
               </p>
+            </div>
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <p className="text-sm font-medium mb-3 text-muted-foreground">Extension Per-Day Pricing</p>
+            <p className="text-xs text-muted-foreground mb-4">
+              Set the cost per day when extending a Game Pass. Leave at 0 to auto-calculate (base price ÷ 30).
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="elite_extend_per_day_cents" className="flex items-center gap-2">
+                  <Crown className="h-4 w-4 text-purple-400" />
+                  Elite Per-Day (cents)
+                </Label>
+                <Input
+                  id="elite_extend_per_day_cents"
+                  type="number"
+                  min={0}
+                  value={settings.elite_extend_per_day_cents}
+                  onChange={e => handleChange('elite_extend_per_day_cents', e.target.value)}
+                  placeholder="0 = auto"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {parseInt(settings.elite_extend_per_day_cents || '0') > 0
+                    ? `= €${(parseInt(settings.elite_extend_per_day_cents) / 100).toFixed(2)}/day — 30 days = €${(parseInt(settings.elite_extend_per_day_cents) * 30 / 100).toFixed(2)}`
+                    : `Auto: €${(Math.ceil(parseInt(settings.gamepass_elite_price || '999') / 30) / 100).toFixed(2)}/day`
+                  }
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="gold_extend_per_day_cents" className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-400" />
+                  Gold Per-Day (cents)
+                </Label>
+                <Input
+                  id="gold_extend_per_day_cents"
+                  type="number"
+                  min={0}
+                  value={settings.gold_extend_per_day_cents}
+                  onChange={e => handleChange('gold_extend_per_day_cents', e.target.value)}
+                  placeholder="0 = auto"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {parseInt(settings.gold_extend_per_day_cents || '0') > 0
+                    ? `= €${(parseInt(settings.gold_extend_per_day_cents) / 100).toFixed(2)}/day — 30 days = €${(parseInt(settings.gold_extend_per_day_cents) * 30 / 100).toFixed(2)}`
+                    : `Auto: €${(Math.ceil(parseInt(settings.gamepass_gold_price || '1999') / 30) / 100).toFixed(2)}/day`
+                  }
+                </p>
+              </div>
             </div>
           </div>
         </CardContent>
