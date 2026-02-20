@@ -11,6 +11,7 @@ export interface SiteSettings {
   gamepass_gold_price: string;
   elite_extend_per_day_cents: string;
   gold_extend_per_day_cents: string;
+  extensions_enabled: string;
 }
 
 const defaultSettings: SiteSettings = {
@@ -24,6 +25,7 @@ const defaultSettings: SiteSettings = {
   gamepass_gold_price: '1999',
   elite_extend_per_day_cents: '0',
   gold_extend_per_day_cents: '0',
+  extensions_enabled: '1',
 };
 
 let cachedSettings: SiteSettings | null = null;

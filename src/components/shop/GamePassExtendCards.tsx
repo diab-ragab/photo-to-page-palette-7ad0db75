@@ -22,9 +22,11 @@ const extendOptions: ExtendOption[] = [
 interface GamePassExtendCardsProps {
   userTier: "free" | "elite" | "gold";
   passExpiresAt: string | null;
+  elitePerDayCents: number;
+  goldPerDayCents: number;
 }
 
-export const GamePassExtendCards = ({ userTier, passExpiresAt }: GamePassExtendCardsProps) => {
+export const GamePassExtendCards = ({ userTier, passExpiresAt, elitePerDayCents, goldPerDayCents }: GamePassExtendCardsProps) => {
   const { user } = useAuth();
   const [loadingDays, setLoadingDays] = useState<number | null>(null);
 
@@ -144,12 +146,22 @@ export const GamePassExtendCards = ({ userTier, passExpiresAt }: GamePassExtendC
                 <span className="text-2xl font-display font-bold">{opt.days}</span>
                 <span className="text-sm text-muted-foreground ml-1">days</span>
                 {(() => {
+                  const perDay = isGold ? goldPerDayCents : elitePerDayCents;
+                  const total = Math.max(50, perDay * opt.days);
                   const base = expiresDate && expiresDate.getTime() > Date.now() ? expiresDate : new Date();
                   const newDate = new Date(base.getTime() + opt.days * 86400000);
                   return (
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      New expiry: {newDate.toLocaleDateString()}
-                    </p>
+                    <>
+                      <p className="text-lg font-display font-bold mt-1" style={{ color: `hsl(${accent})` }}>
+                        €{(total / 100).toFixed(2)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        €{(perDay / 100).toFixed(2)}/day
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        New expiry: {newDate.toLocaleDateString()}
+                      </p>
+                    </>
                   );
                 })()}
               </div>

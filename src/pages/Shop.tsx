@@ -32,6 +32,11 @@ const Shop = () => {
   const [eliteEnabled, setEliteEnabled] = useState(true);
   const [goldEnabled, setGoldEnabled] = useState(true);
 
+  // Extension settings
+  const [extensionsEnabled, setExtensionsEnabled] = useState(true);
+  const [eliteExtendPerDay, setEliteExtendPerDay] = useState(0);
+  const [goldExtendPerDay, setGoldExtendPerDay] = useState(0);
+
   // User's current pass info for extension
   const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
   const [passExpiresAt, setPassExpiresAt] = useState<string | null>(null);
@@ -55,6 +60,13 @@ const Shop = () => {
           const gp = parseInt(settingsRes.gamepass_gold_price);
           if (!isNaN(ep) && ep > 0) setElitePriceCents(ep);
           if (!isNaN(gp) && gp > 0) setGoldPriceCents(gp);
+          // Extension settings
+          setExtensionsEnabled(settingsRes.extensions_enabled !== '0');
+          const eed = parseInt(settingsRes.elite_extend_per_day_cents);
+          const ged = parseInt(settingsRes.gold_extend_per_day_cents);
+          // If 0 or unset, auto-calculate from base price / 30
+          setEliteExtendPerDay(eed > 0 ? eed : Math.ceil((ep > 0 ? ep : 999) / 30));
+          setGoldExtendPerDay(ged > 0 ? ged : Math.ceil((gp > 0 ? gp : 1999) / 30));
         }
       } catch {
         // silent
@@ -234,12 +246,14 @@ const Shop = () => {
             />
           </div>
 
-          {/* Extension Cards — shown only for users with active pass */}
-          {userTier !== "free" && (
+          {/* Extension Cards — shown only for users with active pass and if enabled */}
+          {extensionsEnabled && userTier !== "free" && (
             <div className="mt-16">
               <GamePassExtendCards
                 userTier={userTier}
                 passExpiresAt={passExpiresAt}
+                elitePerDayCents={eliteExtendPerDay}
+                goldPerDayCents={goldExtendPerDay}
               />
             </div>
           )}
