@@ -308,7 +308,16 @@ if (!function_exists('activatePaidGamePass')) {
             return false;
         }
 
-        $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
+        // Look up days from purchase record (default 30)
+        $days = 30;
+        $purchaseStmt = $pdo->prepare("SELECT days FROM gamepass_purchases WHERE paypal_order_id = ? LIMIT 1");
+        $purchaseStmt->execute(array($paypalOrderId));
+        $purchaseRow = $purchaseStmt->fetch(PDO::FETCH_ASSOC);
+        if ($purchaseRow && isset($purchaseRow['days']) && (int)$purchaseRow['days'] > 0) {
+            $days = (int)$purchaseRow['days'];
+        }
+
+        $expiresAt = date('Y-m-d H:i:s', time() + ($days * 86400));
 
         // Upsert user_gamepass
         $stmt = $pdo->prepare("SELECT id, expires_at FROM user_gamepass WHERE user_id = ?");
@@ -316,11 +325,11 @@ if (!function_exists('activatePaidGamePass')) {
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($existing) {
-            // If existing pass is still active, stack 30 days on top
+            // If existing pass is still active, stack days on top
             $now = time();
             $existExpiry = isset($existing['expires_at']) ? $existing['expires_at'] : null;
             if ($existExpiry !== null && strtotime($existExpiry) > $now) {
-                $expiresAt = date('Y-m-d H:i:s', strtotime($existExpiry) + (30 * 86400));
+                $expiresAt = date('Y-m-d H:i:s', strtotime($existExpiry) + ($days * 86400));
             }
 
             $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = ?, expires_at = ?, paypal_order_id = ?, updated_at = NOW() WHERE user_id = ?");
