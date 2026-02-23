@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Play, Sparkles } from 'lucide-react';
 import { getSiteSettings } from '@/lib/siteSettingsApi';
 
-const FALLBACK_VIDEO_ID = 'dQw4w9WgXcQ'; // Replace with your actual trailer ID
+const FALLBACK_VIDEO_ID = '8ewIKLCq0nA';
 
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
