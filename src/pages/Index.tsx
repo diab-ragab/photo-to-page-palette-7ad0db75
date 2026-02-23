@@ -11,6 +11,7 @@ import { ConsentPopup } from "@/components/ConsentPopup";
 import { SEO } from "@/components/SEO";
 import { FeaturedEventsBanner } from "@/components/FeaturedEventsBanner";
 import { LotteryWinnersShowcase } from "@/components/LotteryWinnersShowcase";
+import { GameTrailer } from "@/components/GameTrailer";
 
 const Index = () => {
   const structuredData = {
@@ -40,6 +41,7 @@ const Index = () => {
       <FeaturedEventsBanner />
       <HeroSection />
       <ClassSelection />
+      <GameTrailer />
       <Features />
       <LotteryWinnersShowcase />
       <AboutSection />

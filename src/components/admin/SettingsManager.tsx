@@ -19,6 +19,7 @@ import {
   Timer,
   Crown,
   Sparkles,
+  Video,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { getSiteSettings, updateSiteSettings, clearSettingsCache, type SiteSettings } from '@/lib/siteSettingsApi';
@@ -38,6 +39,7 @@ export const SettingsManager = () => {
     elite_extend_per_day_cents: '0',
     gold_extend_per_day_cents: '0',
     extensions_enabled: '1',
+    game_trailer_url: '',
   });
 
   const fetchSettings = async () => {
@@ -338,6 +340,35 @@ export const SettingsManager = () => {
                 </p>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Game Trailer */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-red-500/20">
+              <Video className="h-5 w-5 text-red-500" />
+            </div>
+            Game Trailer
+          </CardTitle>
+          <CardDescription>
+            Set the YouTube video URL displayed on the homepage. Paste a full YouTube link (e.g. https://www.youtube.com/watch?v=...).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="game_trailer_url" className="flex items-center gap-2">
+              <Video className="h-4 w-4 text-muted-foreground" />
+              YouTube Video URL
+            </Label>
+            <Input
+              id="game_trailer_url"
+              value={settings.game_trailer_url}
+              onChange={e => handleChange('game_trailer_url', e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=..."
+            />
           </div>
         </CardContent>
       </Card>
