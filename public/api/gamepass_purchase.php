@@ -124,9 +124,10 @@ if ($ppCfg['client_id'] === '' || $ppCfg['secret'] === '') {
   gp_fail(500, 'Payment not configured');
 }
 
-// Insert pending purchase
-$stmt = $pdo->prepare("INSERT INTO gamepass_purchases (user_id, tier, price_cents, character_name, status, rid, created_at) VALUES (?, ?, ?, ?, 'pending', ?, NOW())");
-$stmt->execute(array($userId, $tierInput, $totalCents, $characterName, $RID));
+// Insert pending purchase (always 30 days)
+$days = 30;
+$stmt = $pdo->prepare("INSERT INTO gamepass_purchases (user_id, tier, price_cents, price_eur, character_name, days, status, rid, created_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, NOW())");
+$stmt->execute(array($userId, $tierInput, $totalCents, number_format($totalCents / 100, 2, '.', ''), $characterName, $days, $RID));
 $purchaseId = $pdo->lastInsertId();
 
 // Get PayPal token
