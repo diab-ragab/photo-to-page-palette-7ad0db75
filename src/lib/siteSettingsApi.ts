@@ -12,6 +12,7 @@ export interface SiteSettings {
   elite_extend_per_day_cents: string;
   gold_extend_per_day_cents: string;
   extensions_enabled: string;
+  game_trailer_url: string;
 }
 
 const defaultSettings: SiteSettings = {
@@ -26,6 +27,7 @@ const defaultSettings: SiteSettings = {
   elite_extend_per_day_cents: '0',
   gold_extend_per_day_cents: '0',
   extensions_enabled: '1',
+  game_trailer_url: '',
 };
 
 let cachedSettings: SiteSettings | null = null;
