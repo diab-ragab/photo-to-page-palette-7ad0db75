@@ -59,7 +59,7 @@ ensureGamePassTables($pdo);
 ensureExtensionTable($pdo);
 
 // Must have an active pass of this tier (or gold covers elite)
-$stmt = $pdo->prepare("SELECT tier, expires_at, is_premium FROM user_gamepass WHERE user_id = ?");
+$stmt = $pdo->prepare("SELECT tier, activated_at, days_total, expires_at, is_premium FROM user_gamepass WHERE user_id = ?");
 $stmt->execute(array($userId));
 $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 

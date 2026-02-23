@@ -210,15 +210,19 @@ CREATE TABLE IF NOT EXISTS topup_orders (
 -- 6. GAME PASS (3-Tier: Free, Elite, Gold)
 -- ============================================================
 
--- User game pass status
+-- User game pass status (activated_at + days_total model)
 CREATE TABLE IF NOT EXISTS user_gamepass (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   is_premium TINYINT(1) DEFAULT 0,
   tier VARCHAR(10) DEFAULT 'free',
+  activated_at DATETIME DEFAULT NULL,
+  days_total INT DEFAULT NULL,
   expires_at DATETIME DEFAULT NULL,
   paypal_order_id VARCHAR(255) DEFAULT NULL,
   created_at DATETIME NOT NULL,
+  updated_at DATETIME DEFAULT NULL,
+  UNIQUE KEY idx_user_unique (user_id),
   KEY idx_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

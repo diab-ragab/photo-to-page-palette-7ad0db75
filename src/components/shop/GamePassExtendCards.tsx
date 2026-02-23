@@ -22,11 +22,12 @@ const extendOptions: ExtendOption[] = [
 interface GamePassExtendCardsProps {
   userTier: "free" | "elite" | "gold";
   passExpiresAt: string | null;
+  passRemainingDays?: number;
   elitePerDayCents: number;
   goldPerDayCents: number;
 }
 
-export const GamePassExtendCards = ({ userTier, passExpiresAt, elitePerDayCents, goldPerDayCents }: GamePassExtendCardsProps) => {
+export const GamePassExtendCards = ({ userTier, passExpiresAt, passRemainingDays, elitePerDayCents, goldPerDayCents }: GamePassExtendCardsProps) => {
   const { user } = useAuth();
   const [loadingDays, setLoadingDays] = useState<number | null>(null);
 
@@ -37,10 +38,12 @@ export const GamePassExtendCards = ({ userTier, passExpiresAt, elitePerDayCents,
   const accent = isGold ? "38 90% 55%" : "270 70% 60%";
   const accentAlt = isGold ? "25 95% 55%" : "280 80% 50%";
 
-  const expiresDate = passExpiresAt ? new Date(passExpiresAt) : null;
-  const daysLeft = expiresDate
-    ? Math.max(0, Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
+  // Use remaining_days from API if available, otherwise fallback to expires_at calculation
+  const daysLeft = passRemainingDays !== undefined
+    ? passRemainingDays
+    : (passExpiresAt
+      ? Math.max(0, Math.ceil((new Date(passExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : 0);
 
   const handleExtend = async (days: number) => {
     setLoadingDays(days);
@@ -87,8 +90,7 @@ export const GamePassExtendCards = ({ userTier, passExpiresAt, elitePerDayCents,
           {daysLeft > 0 ? (
             <>
               <Clock className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
-              {daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining (expires{" "}
-              {expiresDate ? expiresDate.toLocaleDateString() : "—"}) — add more time to keep your perks!
+              {daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining — add more time to keep your perks!
             </>
           ) : (
             "Your pass has expired. Renew now to continue receiving daily rewards!"
@@ -148,8 +150,8 @@ export const GamePassExtendCards = ({ userTier, passExpiresAt, elitePerDayCents,
                 {(() => {
                   const perDay = isGold ? goldPerDayCents : elitePerDayCents;
                   const total = Math.max(50, perDay * opt.days);
-                  const base = expiresDate && expiresDate.getTime() > Date.now() ? expiresDate : new Date();
-                  const newDate = new Date(base.getTime() + opt.days * 86400000);
+                  const base = new Date();
+                  const newDate = new Date(base.getTime() + (daysLeft + opt.days) * 86400000);
                   return (
                     <>
                       <p className="text-lg font-display font-bold mt-1" style={{ color: `hsl(${accent})` }}>
