@@ -69,12 +69,19 @@ if ((int)$purchase['user_id'] !== $userId) {
 // Idempotent: already completed
 if ($purchase['status'] === 'completed') {
   // Fetch current pass info
-  $gpStmt = $pdo->prepare("SELECT tier, expires_at FROM user_gamepass WHERE user_id = ?");
+  $gpStmt = $pdo->prepare("SELECT tier, activated_at, days_total, expires_at FROM user_gamepass WHERE user_id = ?");
   $gpStmt->execute(array($userId));
   $gpRow = $gpStmt->fetch(PDO::FETCH_ASSOC);
+  $remDays = 0;
+  if ($gpRow && isset($gpRow['activated_at']) && isset($gpRow['days_total'])) {
+    $remDays = getGamePassRemainingDays($gpRow['activated_at'], $gpRow['days_total']);
+  }
   gpc_ok(array(
     'tier' => $tier,
-    'expires_at' => $gpRow ? $gpRow['expires_at'] : '',
+    'activated_at' => $gpRow ? $gpRow['activated_at'] : '',
+    'days_total' => $gpRow ? (int)$gpRow['days_total'] : 0,
+    'remaining_days' => $remDays,
+    'expires_at' => $gpRow ? getGamePassExpiryDate($gpRow['activated_at'], $gpRow['days_total']) : '',
     'already_completed' => true,
   ));
 }
@@ -143,14 +150,21 @@ if ($characterName !== '') {
 }
 
 // Get updated pass info
-$gpStmt = $pdo->prepare("SELECT tier, expires_at FROM user_gamepass WHERE user_id = ?");
+$gpStmt = $pdo->prepare("SELECT tier, activated_at, days_total, expires_at FROM user_gamepass WHERE user_id = ?");
 $gpStmt->execute(array($userId));
 $gpRow = $gpStmt->fetch(PDO::FETCH_ASSOC);
+$remDays = 0;
+if ($gpRow && isset($gpRow['activated_at']) && isset($gpRow['days_total'])) {
+  $remDays = getGamePassRemainingDays($gpRow['activated_at'], $gpRow['days_total']);
+}
 
 error_log("RID={$RID} GP_CAPTURE_OK user={$userId} tier={$tier} purchase_id={$purchaseId}");
 
 gpc_ok(array(
   'tier' => $tier,
-  'expires_at' => $gpRow ? $gpRow['expires_at'] : '',
+  'activated_at' => $gpRow ? $gpRow['activated_at'] : '',
+  'days_total' => $gpRow ? (int)$gpRow['days_total'] : 0,
+  'remaining_days' => $remDays,
+  'expires_at' => $gpRow ? getGamePassExpiryDate($gpRow['activated_at'], $gpRow['days_total']) : '',
   'purchase_id' => $purchaseId,
 ));

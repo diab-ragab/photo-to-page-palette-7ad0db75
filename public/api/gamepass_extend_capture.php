@@ -68,13 +68,20 @@ if ((int)$ext['user_id'] !== $userId) {
 
 // Idempotent: already completed
 if ($ext['status'] === 'completed') {
-  $gpStmt = $pdo->prepare("SELECT tier, expires_at FROM user_gamepass WHERE user_id = ?");
+  $gpStmt = $pdo->prepare("SELECT tier, activated_at, days_total, expires_at FROM user_gamepass WHERE user_id = ?");
   $gpStmt->execute(array($userId));
   $gpRow = $gpStmt->fetch(PDO::FETCH_ASSOC);
+  $remDays = 0;
+  if ($gpRow && isset($gpRow['activated_at']) && isset($gpRow['days_total'])) {
+    $remDays = getGamePassRemainingDays($gpRow['activated_at'], $gpRow['days_total']);
+  }
   gec_ok(array(
     'tier' => $tier,
     'days_added' => $daysAdded,
-    'expires_at' => $gpRow ? $gpRow['expires_at'] : '',
+    'activated_at' => $gpRow ? $gpRow['activated_at'] : '',
+    'days_total' => $gpRow ? (int)$gpRow['days_total'] : 0,
+    'remaining_days' => $remDays,
+    'expires_at' => $gpRow ? getGamePassExpiryDate($gpRow['activated_at'], $gpRow['days_total']) : '',
     'already_completed' => true,
   ));
 }
@@ -120,7 +127,7 @@ if ($ppStatus === 'COMPLETED') {
 $result = extendGamePass($pdo, $userId, $tier, $ppOrderId, $captureId, $extId, $RID);
 
 if (!$result['success']) {
-  error_log("RID={$RID} EXT_ACTIVATE_FAIL: " . $result['error']);
+  error_log("RID={$RID} EXT_ACTIVATE_FAIL: " . (isset($result['message']) ? $result['message'] : 'unknown'));
   gec_fail(500, 'Extension activation failed');
 }
 
@@ -128,15 +135,22 @@ if (!$result['success']) {
 $pdo->prepare("UPDATE gamepass_extensions SET status = 'completed' WHERE id = ?")->execute(array($extId));
 
 // Get updated pass info
-$gpStmt = $pdo->prepare("SELECT tier, expires_at FROM user_gamepass WHERE user_id = ?");
+$gpStmt = $pdo->prepare("SELECT tier, activated_at, days_total, expires_at FROM user_gamepass WHERE user_id = ?");
 $gpStmt->execute(array($userId));
 $gpRow = $gpStmt->fetch(PDO::FETCH_ASSOC);
+$remDays = 0;
+if ($gpRow && isset($gpRow['activated_at']) && isset($gpRow['days_total'])) {
+  $remDays = getGamePassRemainingDays($gpRow['activated_at'], $gpRow['days_total']);
+}
 
 error_log("RID={$RID} EXT_CAPTURE_OK user={$userId} tier={$tier} days={$daysAdded} ext_id={$extId}");
 
 gec_ok(array(
   'tier' => $tier,
   'days_added' => $daysAdded,
-  'expires_at' => $gpRow ? $gpRow['expires_at'] : '',
+  'activated_at' => $gpRow ? $gpRow['activated_at'] : '',
+  'days_total' => $gpRow ? (int)$gpRow['days_total'] : 0,
+  'remaining_days' => $remDays,
+  'expires_at' => $gpRow ? getGamePassExpiryDate($gpRow['activated_at'], $gpRow['days_total']) : '',
   'extension_id' => $extId,
 ));

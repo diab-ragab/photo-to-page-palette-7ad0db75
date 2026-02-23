@@ -276,20 +276,37 @@ try {
       // Premium status & tier
       $isPremium = false;
       $userTier = 'free';
+      $activatedAt = null;
+      $daysTotal = null;
+      $remainingDays = 0;
       try {
-        $stmt = $pdo->prepare("SELECT is_premium, expires_at, tier FROM user_gamepass WHERE user_id = ?");
+        require_once __DIR__ . '/gamepass_helpers.php';
+        $stmt = $pdo->prepare("SELECT is_premium, tier, activated_at, days_total, expires_at FROM user_gamepass WHERE user_id = ?");
         $stmt->execute(array($userId));
         $gp = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($gp) {
-          $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
-          $isPremium = ((int)$gp['is_premium'] === 1) && ($expiresAt === null || strtotime($expiresAt) > time());
-          // Use tier column if it exists, otherwise derive from is_premium
+          $activatedAt = isset($gp['activated_at']) ? $gp['activated_at'] : null;
+          $daysTotal = isset($gp['days_total']) ? (int)$gp['days_total'] : null;
+
+          // Use activated_at + days_total model
           if (isset($gp['tier']) && in_array($gp['tier'], array('elite', 'gold'))) {
             $userTier = $gp['tier'];
-            $isPremium = true; // elite or gold = premium
-          } elseif ($isPremium) {
+            // Check if active using new model
+            if ($daysTotal !== null && $daysTotal > 0) {
+              $isPremium = isGamePassActive($activatedAt, $daysTotal);
+              $remainingDays = getGamePassRemainingDays($activatedAt, $daysTotal);
+            } else {
+              // Legacy: fall back to expires_at
+              $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
+              $isPremium = ($expiresAt === null || strtotime($expiresAt) > time());
+              $remainingDays = ($expiresAt !== null && strtotime($expiresAt) > time()) ? (int)ceil((strtotime($expiresAt) - time()) / 86400) : 0;
+            }
+          } elseif ((int)$gp['is_premium'] === 1) {
             $userTier = 'elite';
+            $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
+            $isPremium = ($expiresAt === null || strtotime($expiresAt) > time());
+            $remainingDays = ($expiresAt !== null && strtotime($expiresAt) > time()) ? (int)ceil((strtotime($expiresAt) - time()) / 86400) : 0;
           }
         }
       } catch (Exception $e) {
@@ -358,8 +375,10 @@ try {
         'elite_enabled' => $eliteEnabled,
         'gold_enabled' => $goldEnabled,
         'rewards' => formatRewards($rewards),
-        'expires_at' => isset($expiresAt) ? $expiresAt : null,
-        'remaining_days' => (isset($expiresAt) && $expiresAt !== null && strtotime($expiresAt) > time()) ? (int)ceil((strtotime($expiresAt) - time()) / 86400) : 0,
+        'activated_at' => $activatedAt,
+        'days_total' => $daysTotal,
+        'expires_at' => ($daysTotal !== null && $activatedAt !== null) ? getGamePassExpiryDate($activatedAt, $daysTotal) : (isset($expiresAt) ? $expiresAt : null),
+        'remaining_days' => $remainingDays,
         'pass_active' => $isPremium
       ));
       break;
@@ -444,14 +463,22 @@ try {
 
       // Tier eligibility check
       if ($tier === 'elite' || $tier === 'gold') {
-        $stmt = $pdo->prepare("SELECT is_premium, expires_at, tier FROM user_gamepass WHERE user_id = ?");
+        require_once __DIR__ . '/gamepass_helpers.php';
+        $stmt = $pdo->prepare("SELECT is_premium, tier, activated_at, days_total, expires_at FROM user_gamepass WHERE user_id = ?");
         $stmt->execute(array($userId));
         $gp = $stmt->fetch(PDO::FETCH_ASSOC);
 
         $userTier = 'free';
         if ($gp) {
-          $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
-          $isActive = ($expiresAt === null || strtotime($expiresAt) > time());
+          $gpActivatedAt = isset($gp['activated_at']) ? $gp['activated_at'] : null;
+          $gpDaysTotal = isset($gp['days_total']) ? (int)$gp['days_total'] : null;
+          $isActive = false;
+          if ($gpDaysTotal !== null && $gpDaysTotal > 0) {
+            $isActive = isGamePassActive($gpActivatedAt, $gpDaysTotal);
+          } else {
+            $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
+            $isActive = ($expiresAt === null || strtotime($expiresAt) > time());
+          }
           if (isset($gp['tier']) && in_array($gp['tier'], array('elite', 'gold')) && $isActive) {
             $userTier = $gp['tier'];
           } elseif ((int)$gp['is_premium'] === 1 && $isActive) {

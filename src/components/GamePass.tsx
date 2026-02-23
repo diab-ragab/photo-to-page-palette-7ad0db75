@@ -481,7 +481,8 @@ export const GamePass = () => {
           setHasElitePass(!!data.is_premium);
           const tier = data.user_tier || (data.is_premium ? 'elite' : 'free');
           setUserTier(tier as "free" | "elite" | "gold");
-          if (data.expires_at) setPassExpiresAt(data.expires_at);
+          if (data.remaining_days !== undefined) setPassExpiresAt(null); // Use remaining_days instead
+          if (data.expires_at && data.remaining_days === undefined) setPassExpiresAt(data.expires_at);
           setClaimedDays({ free: data.claimed_days?.free || [], elite: data.claimed_days?.elite || [], gold: data.claimed_days?.gold || [] });
           if (data.current_day) setCurrentDay(data.current_day);
           if (data.user_zen !== undefined) setUserZen(data.user_zen);

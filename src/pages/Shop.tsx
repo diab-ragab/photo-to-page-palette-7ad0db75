@@ -40,6 +40,7 @@ const Shop = () => {
   // User's current pass info for extension
   const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
   const [passExpiresAt, setPassExpiresAt] = useState<string | null>(null);
+  const [passRemainingDays, setPassRemainingDays] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     const loadData = async () => {
@@ -91,6 +92,7 @@ const Shop = () => {
         const tier = data.user_tier || (data.is_premium ? "elite" : "free");
         setUserTier(tier as "free" | "elite" | "gold");
         if (data.expires_at) setPassExpiresAt(data.expires_at);
+        if (data.remaining_days !== undefined) setPassRemainingDays(data.remaining_days);
       }
     }).catch(() => {});
   }, [user]);
@@ -252,6 +254,7 @@ const Shop = () => {
               <GamePassExtendCards
                 userTier={userTier}
                 passExpiresAt={passExpiresAt}
+                passRemainingDays={passRemainingDays}
                 elitePerDayCents={eliteExtendPerDay}
                 goldPerDayCents={goldExtendPerDay}
               />

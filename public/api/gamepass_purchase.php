@@ -65,7 +65,7 @@ $charRow = $charStmt->fetch(PDO::FETCH_ASSOC);
 if (!$charRow) gp_fail(400, 'Character not found');
 
 // Check if user already has a paid pass
-$stmt = $pdo->prepare("SELECT tier, expires_at, is_premium FROM user_gamepass WHERE user_id = ?");
+$stmt = $pdo->prepare("SELECT tier, activated_at, days_total, expires_at, is_premium FROM user_gamepass WHERE user_id = ?");
 $stmt->execute(array($userId));
 $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -73,9 +73,18 @@ $currentTier = 'free';
 if ($existing) {
   $ct = isset($existing['tier']) ? $existing['tier'] : 'free';
   if (in_array($ct, array('elite', 'gold'))) {
-    // Check if still active
-    $expiresAt = isset($existing['expires_at']) ? strtotime($existing['expires_at']) : 0;
-    if ($expiresAt > time()) {
+    // Check if still active using new model
+    $gpActivatedAt = isset($existing['activated_at']) ? $existing['activated_at'] : null;
+    $gpDaysTotal = isset($existing['days_total']) ? (int)$existing['days_total'] : null;
+    $isActive = false;
+    if ($gpDaysTotal !== null && $gpDaysTotal > 0) {
+      $isActive = isGamePassActive($gpActivatedAt, $gpDaysTotal);
+    } else {
+      // Legacy fallback
+      $expiresAt = isset($existing['expires_at']) ? strtotime($existing['expires_at']) : 0;
+      $isActive = ($expiresAt > time());
+    }
+    if ($isActive) {
       $currentTier = $ct;
     }
   }
