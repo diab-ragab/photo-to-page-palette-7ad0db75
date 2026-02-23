@@ -89,10 +89,14 @@ if (!function_exists('ensureGamePassTables')) {
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
             tier VARCHAR(10) NOT NULL,
+            price_cents INT DEFAULT 0,
             price_eur DECIMAL(10,2) DEFAULT 0.00,
+            character_name VARCHAR(100) DEFAULT NULL,
+            days INT DEFAULT 30,
             paypal_order_id VARCHAR(64) DEFAULT NULL,
             paypal_capture_id VARCHAR(64) DEFAULT NULL,
             status VARCHAR(20) DEFAULT 'pending',
+            rid VARCHAR(32) DEFAULT NULL,
             created_at DATETIME NOT NULL,
             completed_at DATETIME DEFAULT NULL,
             INDEX idx_user (user_id),
@@ -101,7 +105,11 @@ if (!function_exists('ensureGamePassTables')) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 
         // Safe column adds for gamepass_purchases
-        try { $pdo->exec("ALTER TABLE gamepass_purchases ADD COLUMN price_eur DECIMAL(10,2) DEFAULT 0.00 AFTER tier"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE gamepass_purchases ADD COLUMN price_cents INT DEFAULT 0 AFTER tier"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE gamepass_purchases ADD COLUMN price_eur DECIMAL(10,2) DEFAULT 0.00 AFTER price_cents"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE gamepass_purchases ADD COLUMN character_name VARCHAR(100) DEFAULT NULL AFTER price_eur"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE gamepass_purchases ADD COLUMN days INT DEFAULT 30 AFTER character_name"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE gamepass_purchases ADD COLUMN rid VARCHAR(32) DEFAULT NULL AFTER status"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE gamepass_purchases ADD COLUMN paypal_capture_id VARCHAR(64) DEFAULT NULL AFTER paypal_order_id"); } catch (Exception $e) {}
     }
 }
