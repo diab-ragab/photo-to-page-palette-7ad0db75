@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { Play, Sparkles } from 'lucide-react';
 import { getSiteSettings } from '@/lib/siteSettingsApi';
 
@@ -17,6 +17,16 @@ export const GameTrailer = () => {
   const [videoUrl, setVideoUrl] = useState('');
   const [playing, setPlaying] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ['start end', 'end start'],
+  });
+
+  const bgY = useTransform(scrollYProgress, [0, 1], ['0%', '20%']);
+  const textY = useTransform(scrollYProgress, [0, 1], ['0%', '10%']);
+  const glowOpacity = useTransform(scrollYProgress, [0, 0.5, 1], [0.3, 1, 0.3]);
 
   useEffect(() => {
     getSiteSettings()
@@ -32,14 +42,14 @@ export const GameTrailer = () => {
   if (!videoId) return null;
 
   return (
-    <section className="relative w-full overflow-hidden">
+    <section ref={sectionRef} className="relative w-full overflow-hidden">
       {/* Cinematic gradient overlays */}
       <div className="absolute inset-0 bg-gradient-to-b from-background via-transparent to-background z-10 pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/60 z-10 pointer-events-none" />
       
-      {/* HDR glow effects */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-32 bg-primary/10 blur-[100px] z-0 pointer-events-none" />
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[60%] h-24 bg-accent/10 blur-[80px] z-0 pointer-events-none" />
+      {/* HDR glow effects with parallax */}
+      <motion.div style={{ y: bgY, opacity: glowOpacity }} className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-32 bg-primary/10 blur-[100px] z-0 pointer-events-none" />
+      <motion.div style={{ y: bgY, opacity: glowOpacity }} className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[60%] h-24 bg-accent/10 blur-[80px] z-0 pointer-events-none" />
 
       <div className="relative z-20 py-16 md:py-24">
         <div className="container mx-auto px-4">
@@ -48,6 +58,7 @@ export const GameTrailer = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-80px' }}
             transition={{ duration: 0.6 }}
+            style={{ y: textY }}
             className="text-center mb-8 md:mb-12"
           >
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/5 mb-4">
