@@ -39,10 +39,8 @@ export const GameTrailer = () => {
 
   const videoId = useMemo(() => extractYouTubeId(videoUrl) || (loaded ? FALLBACK_VIDEO_ID : null), [videoUrl, loaded]);
 
-  if (!videoId) return null;
-
   return (
-    <section ref={sectionRef} className="relative w-full overflow-hidden">
+    <section ref={sectionRef} className={`relative w-full overflow-hidden ${!videoId ? 'hidden' : ''}`}>
       {/* Cinematic gradient overlays */}
       <div className="absolute inset-0 bg-gradient-to-b from-background via-transparent to-background z-10 pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/60 z-10 pointer-events-none" />
