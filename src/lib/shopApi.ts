@@ -122,8 +122,7 @@ export async function createShopOrder(data: {
   account_name: string;
   character_name: string;
 }): Promise<CreateOrderResponse> {
-  const token = localStorage.getItem('woi_session_token') || localStorage.getItem('sessionToken') || '';
-  const res = await fetch(`${API_BASE}/shop_create_order.php?sessionToken=${encodeURIComponent(token)}`, {
+  const res = await fetch(`${API_BASE}/shop_create_order.php`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
@@ -142,8 +141,7 @@ export async function createShopOrder(data: {
 
 /** Capture PayPal order after approval */
 export async function captureShopOrder(paypalOrderId: string): Promise<CaptureOrderResponse> {
-  const token = localStorage.getItem('woi_session_token') || localStorage.getItem('sessionToken') || '';
-  const res = await fetch(`${API_BASE}/shop_capture_order.php?sessionToken=${encodeURIComponent(token)}`, {
+  const res = await fetch(`${API_BASE}/shop_capture_order.php`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },

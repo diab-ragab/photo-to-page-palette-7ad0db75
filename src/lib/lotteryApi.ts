@@ -64,10 +64,8 @@ export interface EntryResult {
 // ── API Calls ─────────────────────────────────────────────────────────
 
 export async function getLotteryStatus(): Promise<LotteryStatus> {
-  const token = localStorage.getItem('woi_session_token') || '';
-  const params = token ? `&sessionToken=${encodeURIComponent(token)}` : '';
   return apiGet<LotteryStatus>(
-    `/lottery.php?action=status${params}&rid=${Date.now()}`,
+    `/lottery.php?action=status&rid=${Date.now()}`,
     true,
     { showErrorToast: false, silentStatuses: [401, 403] }
   );

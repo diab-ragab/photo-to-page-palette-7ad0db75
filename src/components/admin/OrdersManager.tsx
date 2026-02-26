@@ -150,8 +150,7 @@ export function OrdersManager() {
   const handleRetryDelivery = async (orderId: number) => {
     setRetryLoading(true);
     try {
-      const token = localStorage.getItem("woi_session_token") || "";
-      const res = await fetch(`${API_BASE}/admin_retry_delivery.php?sessionToken=${encodeURIComponent(token)}`, {
+      const res = await fetch(`${API_BASE}/admin_retry_delivery.php`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },

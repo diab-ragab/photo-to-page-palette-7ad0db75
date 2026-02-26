@@ -467,12 +467,9 @@ export const GamePass = () => {
     const fetchUserPassStatus = async () => {
       if (!user) return;
 
-      const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken");
-      if (!token) return;
-
       try {
         const data = await apiGet<any>(
-          `/gamepass.php?action=status&rid=${Date.now()}&sessionToken=${encodeURIComponent(token)}`,
+          `/gamepass.php?action=status&rid=${Date.now()}`,
           true,
           { showErrorToast: false, silentStatuses: [401, 403] },
         );
