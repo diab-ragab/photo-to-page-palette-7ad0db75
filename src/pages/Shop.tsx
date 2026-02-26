@@ -81,10 +81,8 @@ const Shop = () => {
   // Fetch user's current pass tier for extension cards
   useEffect(() => {
     if (!user) return;
-    const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken");
-    if (!token) return;
     apiGet<any>(
-      `/gamepass.php?action=status&rid=${Date.now()}&sessionToken=${encodeURIComponent(token)}`,
+      `/gamepass.php?action=status&rid=${Date.now()}`,
       true,
       { showErrorToast: false, silentStatuses: [401, 403] }
     ).then(data => {
