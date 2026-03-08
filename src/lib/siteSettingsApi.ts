@@ -29,6 +29,7 @@ const defaultSettings: SiteSettings = {
   gold_extend_per_day_cents: '0',
   extensions_enabled: '1',
   game_trailer_url: '',
+  gamepass_season_start: '',
 };
 
 let cachedSettings: SiteSettings | null = null;
