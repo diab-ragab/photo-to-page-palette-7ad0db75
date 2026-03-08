@@ -666,7 +666,7 @@ export const GamePass = () => {
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="outline" className="text-xs border-primary/30 bg-primary/10 text-primary">
                     <Calendar className="h-3 w-3 mr-1" />
-                    {getSeasonName()}
+                    {getSeasonName(seasonNumber)}
                   </Badge>
                   {userTier === "elite" && (
                     <Badge className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-bold text-xs animate-pulse">
