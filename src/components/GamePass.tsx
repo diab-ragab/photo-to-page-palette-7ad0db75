@@ -122,11 +122,17 @@ const SparkleEffect = ({ show }: { show: boolean }) => {
   );
 };
 
-// Calculate time until next month reset
-const getSeasonResetTime = () => {
-  const now = new Date();
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
-  const diff = nextMonth.getTime() - now.getTime();
+// Calculate time until season end (from API data)
+const getSeasonResetTime = (seasonEnd?: string) => {
+  let endDate: Date;
+  if (seasonEnd) {
+    endDate = new Date(seasonEnd);
+  } else {
+    // Fallback: next month (legacy)
+    const now = new Date();
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+  }
+  const diff = Math.max(0, endDate.getTime() - Date.now());
   
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -136,14 +142,15 @@ const getSeasonResetTime = () => {
   return { days, hours, minutes, seconds, totalMs: diff };
 };
 
-const getSeasonName = () => {
+const getSeasonName = (seasonNumber?: number) => {
   const month = new Date().getMonth();
   const monthNames = [
     "Winter Storm", "Frost Bite", "Spring Awakening", "Blossom Fury",
     "Sunfire", "Summer Blaze", "Harvest Moon", "Autumn Winds",
     "Shadow Fall", "Dark Harvest", "Frost Legion", "Winter's End"
   ];
-  return monthNames[month];
+  const base = monthNames[month];
+  return seasonNumber ? `${base} S${seasonNumber}` : base;
 };
 
 type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
