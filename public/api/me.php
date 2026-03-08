@@ -1,12 +1,7 @@
 <?php
 /**
  * me.php - Current user info + auto Free Pass activation
- * PHP 5.x compatible
- *
- * GET  - Returns user info + auto-activates free pass on first call
- * POST - Same behavior (for flexibility)
- *
- * Called by frontend after login to trigger one-time Free Pass activation
+ * PHP 5.x compatible - SEASON-BASED model
  */
 
 ini_set('display_errors', '0');
@@ -48,10 +43,10 @@ $pdo = getDB();
 // Auto-activate Free Pass (idempotent - only on first call)
 $freePassResult = autoActivateFreePass($pdo, $userId, $RID);
 
-// Get current gamepass info
+// Get current gamepass info - SEASON-BASED (use expires_at)
 $gamepass = array('tier' => 'free', 'is_premium' => false, 'expires_at' => null, 'remaining_days' => 0, 'is_active' => false);
 try {
-  $stmt = $pdo->prepare("SELECT tier, is_premium, expires_at FROM user_gamepass WHERE user_id = ? LIMIT 1");
+  $stmt = $pdo->prepare("SELECT tier, is_premium, expires_at, activated_at, days_total FROM user_gamepass WHERE user_id = ? LIMIT 1");
   $stmt->execute(array($userId));
   $gpRow = $stmt->fetch(PDO::FETCH_ASSOC);
   if ($gpRow) {
@@ -59,14 +54,19 @@ try {
     $gamepass['is_premium'] = (int)$gpRow['is_premium'] === 1;
     $gamepass['expires_at'] = isset($gpRow['expires_at']) ? $gpRow['expires_at'] : null;
     
-    $expiryTime = $gamepass['expires_at'] ? strtotime($gamepass['expires_at']) : 0;
-    $now = time();
-    if ($expiryTime > $now) {
-      $gamepass['remaining_days'] = (int)ceil(($expiryTime - $now) / 86400);
-      $gamepass['is_active'] = true;
-    } elseif ($gamepass['expires_at'] === null && $gamepass['tier'] === 'free') {
+    if ($gamepass['expires_at'] !== null) {
+      // Season-based: use expires_at directly
+      $gamepass['remaining_days'] = getGamePassRemainingDaysFromExpiry($gamepass['expires_at']);
+      $gamepass['is_active'] = isGamePassActiveByExpiry($gamepass['expires_at']);
+    } elseif ($gamepass['tier'] === 'free') {
       $gamepass['is_active'] = true; // free pass is always active
     }
+    
+    // Add season info
+    $season = getCurrentSeasonInfo($pdo);
+    $gamepass['season_end'] = $season['season_end'];
+    $gamepass['season_number'] = $season['season_number'];
+    $gamepass['season_days_remaining'] = $season['days_remaining'];
   }
 } catch (Exception $e) {
   error_log("RID={$RID} ME_GAMEPASS_ERR: " . $e->getMessage());

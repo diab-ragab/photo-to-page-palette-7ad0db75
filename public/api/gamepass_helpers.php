@@ -3,22 +3,91 @@
  * gamepass_helpers.php - Shared Game Pass helper functions
  * PHP 5.x compatible (no closures, no short arrays, no ??)
  *
- * Duration model: activated_at + days_total (static 30-day periods)
- * Instead of expires_at datetime, we store when the pass was activated
- * and how many total days it lasts. Remaining = days_total - DATEDIFF(NOW(), activated_at)
+ * SEASON-BASED MODEL:
+ * Instead of per-user activated_at + days_total, the system uses a global
+ * season anchor date (site_settings: gamepass_season_start). Every 30 days
+ * from that anchor is one "season". All users' passes expire at the season
+ * boundary. Extensions add 30-day seasons on top of expires_at.
  *
  * Include AFTER bootstrap.php and session_helper.php
  */
 
 /**
- * Calculate remaining days for a game pass
- * 
- * @param string|null $activatedAt - datetime string
- * @param int|null $daysTotal - total days purchased
- * @return int remaining days (0 if expired or null)
+ * Get the current season info from the global anchor date.
+ * Returns array with season_start, season_end, current_day, days_remaining, season_number
+ *
+ * @param PDO $pdo
+ * @return array
+ */
+if (!function_exists('getCurrentSeasonInfo')) {
+    function getCurrentSeasonInfo($pdo) {
+        $seasonLength = 30; // days per season
+
+        // Read anchor from site_settings
+        $anchorStr = null;
+        try {
+            $stmt = $pdo->prepare("SELECT setting_value FROM site_settings WHERE setting_key = 'gamepass_season_start' LIMIT 1");
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row && isset($row['setting_value']) && trim($row['setting_value']) !== '') {
+                $anchorStr = trim($row['setting_value']);
+            }
+        } catch (Exception $e) {
+            error_log("SEASON_ANCHOR_ERR: " . $e->getMessage());
+        }
+
+        // Fallback: first day of current month if no anchor set
+        if ($anchorStr === null || $anchorStr === '') {
+            $anchorStr = date('Y-m-01');
+        }
+
+        $anchorTs = strtotime($anchorStr);
+        if ($anchorTs === false) {
+            $anchorTs = strtotime(date('Y-m-01'));
+        }
+
+        // Normalize anchor to midnight
+        $anchorTs = strtotime(date('Y-m-d', $anchorTs));
+
+        $now = time();
+        $nowDay = strtotime(date('Y-m-d', $now)); // midnight today
+
+        // If anchor is in the future, treat it as current season start
+        if ($anchorTs > $now) {
+            $seasonStart = $anchorTs;
+            $seasonNumber = 0;
+        } else {
+            $elapsedDays = (int)floor(($nowDay - $anchorTs) / 86400);
+            $seasonNumber = (int)floor($elapsedDays / $seasonLength);
+            $seasonStart = $anchorTs + ($seasonNumber * $seasonLength * 86400);
+        }
+
+        $seasonEnd = $seasonStart + ($seasonLength * 86400);
+        $currentDay = (int)floor(($now - $seasonStart) / 86400) + 1; // 1-based
+        if ($currentDay < 1) $currentDay = 1;
+        if ($currentDay > $seasonLength) $currentDay = $seasonLength;
+
+        $daysRemaining = max(0, (int)ceil(($seasonEnd - $now) / 86400));
+
+        return array(
+            'season_start' => date('Y-m-d H:i:s', $seasonStart),
+            'season_end' => date('Y-m-d H:i:s', $seasonEnd),
+            'season_start_date' => date('Y-m-d', $seasonStart),
+            'season_end_date' => date('Y-m-d', $seasonEnd),
+            'current_day' => $currentDay,
+            'days_remaining' => $daysRemaining,
+            'season_number' => $seasonNumber + 1,
+            'season_length' => $seasonLength,
+        );
+    }
+}
+
+/**
+ * Calculate remaining days for a game pass using expires_at (season-based)
  */
 if (!function_exists('getGamePassRemainingDays')) {
     function getGamePassRemainingDays($activatedAt, $daysTotal) {
+        // Legacy compat: if called with old params, try expires_at approach
         if ($activatedAt === null || $daysTotal === null || (int)$daysTotal <= 0) {
             return 0;
         }
@@ -31,11 +100,20 @@ if (!function_exists('getGamePassRemainingDays')) {
 }
 
 /**
- * Check if a game pass is currently active
- * 
- * @param string|null $activatedAt
- * @param int|null $daysTotal
- * @return bool
+ * Calculate remaining days from expires_at datetime (primary method for season model)
+ */
+if (!function_exists('getGamePassRemainingDaysFromExpiry')) {
+    function getGamePassRemainingDaysFromExpiry($expiresAt) {
+        if ($expiresAt === null || trim($expiresAt) === '') return 0;
+        $expiryTs = strtotime($expiresAt);
+        if ($expiryTs === false) return 0;
+        if ($expiryTs <= time()) return 0;
+        return (int)ceil(($expiryTs - time()) / 86400);
+    }
+}
+
+/**
+ * Check if a game pass is currently active (season-based: use expires_at)
  */
 if (!function_exists('isGamePassActive')) {
     function isGamePassActive($activatedAt, $daysTotal) {
@@ -44,11 +122,18 @@ if (!function_exists('isGamePassActive')) {
 }
 
 /**
- * Calculate the expiry datetime from activated_at + days_total (for display/compat)
- * 
- * @param string|null $activatedAt
- * @param int|null $daysTotal
- * @return string|null datetime string or null
+ * Check if game pass is active using expires_at (primary for season model)
+ */
+if (!function_exists('isGamePassActiveByExpiry')) {
+    function isGamePassActiveByExpiry($expiresAt) {
+        if ($expiresAt === null || trim($expiresAt) === '') return false;
+        $expiryTs = strtotime($expiresAt);
+        return ($expiryTs !== false && $expiryTs > time());
+    }
+}
+
+/**
+ * Calculate the expiry datetime from activated_at + days_total (legacy compat)
  */
 if (!function_exists('getGamePassExpiryDate')) {
     function getGamePassExpiryDate($activatedAt, $daysTotal) {
@@ -164,7 +249,7 @@ if (!function_exists('ensureGamePassTables')) {
 
 /**
  * Auto-activate Free Pass for a user (one-time, idempotent)
- * Free pass has no expiry (activated_at=NULL, days_total=NULL)
+ * Free pass has no expiry (expires_at=NULL)
  */
 if (!function_exists('autoActivateFreePass')) {
     function autoActivateFreePass($pdo, $userId, $RID) {
@@ -183,7 +268,7 @@ if (!function_exists('autoActivateFreePass')) {
             return array('success' => true, 'message' => 'Pass already exists', 'tier' => $existing['tier'], 'new' => false);
         }
 
-        // Free pass: no expiry (activated_at and days_total are NULL)
+        // Free pass: no expiry
         $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, activated_at, days_total, expires_at, created_at, updated_at) VALUES (?, 0, 'free', NULL, NULL, NULL, NOW(), NOW())");
         $stmt->execute(array($userId));
 
@@ -236,8 +321,8 @@ if (!function_exists('ensureExtensionTable')) {
 }
 
 /**
- * Extend a Game Pass by adding days to days_total (stackable)
- * Idempotent by paypal_order_id
+ * Extend a Game Pass by adding days to expires_at (season-based stacking)
+ * Extensions add 30-day increments on top of current expiry
  */
 if (!function_exists('extendGamePass')) {
     function extendGamePass($pdo, $userId, $tier, $paypalOrderId, $captureId, $extensionId, $RID) {
@@ -264,69 +349,58 @@ if (!function_exists('extendGamePass')) {
         }
 
         // Get current pass info
-        $stmt = $pdo->prepare("SELECT activated_at, days_total, tier FROM user_gamepass WHERE user_id = ? LIMIT 1");
+        $stmt = $pdo->prepare("SELECT expires_at, tier FROM user_gamepass WHERE user_id = ? LIMIT 1");
         $stmt->execute(array($userId));
         $gp = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $oldDaysTotal = 0;
-        $oldActivatedAt = null;
-        $newDaysTotal = $days;
+        $oldExpiry = null;
+        $newExpiry = null;
+        $nowStr = date('Y-m-d H:i:s');
 
         if ($gp) {
-            $oldActivatedAt = isset($gp['activated_at']) ? $gp['activated_at'] : null;
-            $oldDaysTotal = isset($gp['days_total']) ? (int)$gp['days_total'] : 0;
+            $oldExpiry = isset($gp['expires_at']) ? $gp['expires_at'] : null;
 
-            // If pass is still active, stack days on top
-            if (isGamePassActive($oldActivatedAt, $oldDaysTotal)) {
-                $newDaysTotal = $oldDaysTotal + $days;
+            // If pass is still active, stack days on top of current expiry
+            if ($oldExpiry !== null && isGamePassActiveByExpiry($oldExpiry)) {
+                $newExpiryTs = strtotime($oldExpiry) + ($days * 86400);
             } else {
-                // Pass expired - start a fresh period
-                $oldActivatedAt = date('Y-m-d H:i:s');
-                $newDaysTotal = $days;
+                // Pass expired - get current season end and extend from there
+                $season = getCurrentSeasonInfo($pdo);
+                $newExpiryTs = strtotime($season['season_end']) + (($days - 30) * 86400);
+                if ($newExpiryTs < time()) {
+                    $newExpiryTs = time() + ($days * 86400);
+                }
             }
-        } else {
-            // No pass row - create fresh
-            $oldActivatedAt = date('Y-m-d H:i:s');
-            $newDaysTotal = $days;
-        }
+            $newExpiry = date('Y-m-d H:i:s', $newExpiryTs);
+            $newDaysTotal = (int)ceil(($newExpiryTs - time()) / 86400);
 
-        $oldExpiry = getGamePassExpiryDate($oldActivatedAt, $oldDaysTotal);
-        $newExpiry = getGamePassExpiryDate($gp ? $oldActivatedAt : date('Y-m-d H:i:s'), $newDaysTotal);
-
-        // Update user_gamepass
-        if ($gp) {
-            if (isGamePassActive($gp['activated_at'], $gp['days_total'])) {
-                // Active: just add days
-                $stmt = $pdo->prepare("UPDATE user_gamepass SET days_total = ?, is_premium = 1, tier = ?, expires_at = ?, updated_at = NOW() WHERE user_id = ?");
-                $stmt->execute(array($newDaysTotal, $tier, $newExpiry, $userId));
-            } else {
-                // Expired: reset activation
-                $nowStr = date('Y-m-d H:i:s');
-                $freshExpiry = getGamePassExpiryDate($nowStr, $days);
-                $stmt = $pdo->prepare("UPDATE user_gamepass SET activated_at = ?, days_total = ?, is_premium = 1, tier = ?, expires_at = ?, updated_at = NOW() WHERE user_id = ?");
-                $stmt->execute(array($nowStr, $days, $tier, $freshExpiry, $userId));
-            }
+            $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = ?, expires_at = ?, days_total = ?, updated_at = NOW() WHERE user_id = ?");
+            $stmt->execute(array($tier, $newExpiry, $newDaysTotal, $userId));
         } else {
-            $nowStr = date('Y-m-d H:i:s');
-            $freshExpiry = getGamePassExpiryDate($nowStr, $days);
+            // No pass row - get season end
+            $season = getCurrentSeasonInfo($pdo);
+            $newExpiryTs = strtotime($season['season_end']) + (max(0, $days - 30) * 86400);
+            $newExpiry = date('Y-m-d H:i:s', $newExpiryTs);
+            $newDaysTotal = (int)ceil(($newExpiryTs - time()) / 86400);
+
             $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, activated_at, days_total, expires_at, created_at, updated_at) VALUES (?, 1, ?, ?, ?, ?, NOW(), NOW())");
-            $stmt->execute(array($userId, $tier, $nowStr, $days, $freshExpiry));
+            $stmt->execute(array($userId, $tier, $nowStr, $newDaysTotal, $newExpiry));
         }
 
         // Update extension record
         $stmt = $pdo->prepare("UPDATE gamepass_extensions SET status = 'completed', old_until = ?, new_until = ?, paypal_capture_id = ?, completed_at = NOW() WHERE id = ?");
         $stmt->execute(array($oldExpiry, $newExpiry, $captureId, $extensionId));
 
-        error_log("RID={$RID} EXTEND_COMPLETED user={$userId} tier={$tier} days={$days} old_total={$oldDaysTotal} new_total={$newDaysTotal}");
+        error_log("RID={$RID} EXTEND_COMPLETED user={$userId} tier={$tier} days={$days} new_expiry={$newExpiry}");
 
         return array('success' => true, 'message' => 'Pass extended', 'days_added' => $days, 'days_total' => $newDaysTotal);
     }
 }
 
 /**
- * Activate a paid Game Pass (elite/gold) idempotently
- * Uses activated_at + days_total model (static 30 days from purchase record)
- * After expiry, buying again starts a fresh 30-day period
+ * Activate a paid Game Pass (elite/gold) - SEASON-BASED
+ * Sets expires_at to current season end (all users share same end date)
+ * If pass is still active from a previous season, stack on top
  */
 if (!function_exists('activatePaidGamePass')) {
     function activatePaidGamePass($pdo, $userId, $tier, $paypalOrderId, $captureId, $RID) {
@@ -354,42 +428,38 @@ if (!function_exists('activatePaidGamePass')) {
             return false;
         }
 
-        // Look up days from purchase record (default 30)
-        $days = 30;
-        $purchaseStmt = $pdo->prepare("SELECT days FROM gamepass_purchases WHERE paypal_order_id = ? LIMIT 1");
-        $purchaseStmt->execute(array($paypalOrderId));
-        $purchaseRow = $purchaseStmt->fetch(PDO::FETCH_ASSOC);
-        if ($purchaseRow && isset($purchaseRow['days']) && (int)$purchaseRow['days'] > 0) {
-            $days = (int)$purchaseRow['days'];
-        }
+        // Get current season info
+        $season = getCurrentSeasonInfo($pdo);
+        $seasonEndStr = $season['season_end'];
 
         $nowStr = date('Y-m-d H:i:s');
 
         // Upsert user_gamepass
-        $stmt = $pdo->prepare("SELECT id, activated_at, days_total FROM user_gamepass WHERE user_id = ?");
+        $stmt = $pdo->prepare("SELECT id, expires_at FROM user_gamepass WHERE user_id = ?");
         $stmt->execute(array($userId));
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($existing) {
-            $oldActivatedAt = isset($existing['activated_at']) ? $existing['activated_at'] : null;
-            $oldDaysTotal = isset($existing['days_total']) ? (int)$existing['days_total'] : 0;
+            $oldExpiry = isset($existing['expires_at']) ? $existing['expires_at'] : null;
 
-            if (isGamePassActive($oldActivatedAt, $oldDaysTotal)) {
-                // Still active: stack days on top
-                $newDaysTotal = $oldDaysTotal + $days;
-                $expiresAt = getGamePassExpiryDate($oldActivatedAt, $newDaysTotal);
-                $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = ?, days_total = ?, expires_at = ?, paypal_order_id = ?, updated_at = NOW() WHERE user_id = ?");
-                $stmt->execute(array($tier, $newDaysTotal, $expiresAt, $paypalOrderId, $userId));
+            if ($oldExpiry !== null && isGamePassActiveByExpiry($oldExpiry)) {
+                // Still active: if current expiry is already >= season end, keep it (may have extensions)
+                $oldExpiryTs = strtotime($oldExpiry);
+                $seasonEndTs = strtotime($seasonEndStr);
+                $newExpiry = ($oldExpiryTs >= $seasonEndTs) ? $oldExpiry : $seasonEndStr;
             } else {
-                // Expired: start fresh 30-day period
-                $expiresAt = getGamePassExpiryDate($nowStr, $days);
-                $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = ?, activated_at = ?, days_total = ?, expires_at = ?, paypal_order_id = ?, updated_at = NOW() WHERE user_id = ?");
-                $stmt->execute(array($tier, $nowStr, $days, $expiresAt, $paypalOrderId, $userId));
+                // Expired or no expiry: set to current season end
+                $newExpiry = $seasonEndStr;
             }
+
+            $newDaysTotal = (int)ceil((strtotime($newExpiry) - time()) / 86400);
+            $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = ?, activated_at = ?, days_total = ?, expires_at = ?, paypal_order_id = ?, updated_at = NOW() WHERE user_id = ?");
+            $stmt->execute(array($tier, $nowStr, $newDaysTotal, $newExpiry, $paypalOrderId, $userId));
         } else {
-            $expiresAt = getGamePassExpiryDate($nowStr, $days);
+            $newExpiry = $seasonEndStr;
+            $newDaysTotal = (int)ceil((strtotime($newExpiry) - time()) / 86400);
             $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, activated_at, days_total, expires_at, paypal_order_id, created_at, updated_at) VALUES (?, 1, ?, ?, ?, ?, ?, NOW(), NOW())");
-            $stmt->execute(array($userId, $tier, $nowStr, $days, $expiresAt, $paypalOrderId));
+            $stmt->execute(array($userId, $tier, $nowStr, $newDaysTotal, $newExpiry, $paypalOrderId));
         }
 
         // Update gamepass_purchases
@@ -400,7 +470,7 @@ if (!function_exists('activatePaidGamePass')) {
             error_log("RID={$RID} GAMEPASS_PURCHASE_UPDATE_ERR: " . $e->getMessage());
         }
 
-        error_log("RID={$RID} GAMEPASS_ACTIVATED user={$userId} tier={$tier} days={$days} activated_at={$nowStr} order={$paypalOrderId}");
+        error_log("RID={$RID} GAMEPASS_ACTIVATED user={$userId} tier={$tier} expires_at={$newExpiry} season_end={$seasonEndStr} order={$paypalOrderId}");
 
         // Send activation mail ONE TIME
         $roleId = getFirstRoleIdForUser($pdo, $userId);
