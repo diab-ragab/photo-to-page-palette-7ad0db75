@@ -20,6 +20,7 @@ import {
   Crown,
   Sparkles,
   Video,
+  CalendarDays,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { getSiteSettings, updateSiteSettings, clearSettingsCache, type SiteSettings } from '@/lib/siteSettingsApi';
