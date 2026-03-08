@@ -441,9 +441,9 @@ export const GamePass = () => {
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => setTimeLeft(getSeasonResetTime()), 1000);
+    const timer = setInterval(() => setTimeLeft(getSeasonResetTime(seasonEnd || undefined)), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [seasonEnd]);
 
   useEffect(() => {
     const fetchRewards = async () => {
