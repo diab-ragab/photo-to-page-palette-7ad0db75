@@ -461,6 +461,8 @@ export const GamePass = () => {
           if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
           if (data.elite_enabled !== undefined) setEliteEnabled(data.elite_enabled);
           if (data.gold_enabled !== undefined) setGoldEnabled(data.gold_enabled);
+          if (data.season_end) setSeasonEnd(data.season_end);
+          if (data.season_number) setSeasonNumber(data.season_number);
         }
       } catch {
         // silent (landing page should still render)
