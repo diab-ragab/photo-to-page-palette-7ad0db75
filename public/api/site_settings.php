@@ -88,6 +88,7 @@ $defaultSettings = array(
   'gold_extend_per_day_cents' => '0',
   'extensions_enabled' => '1',
   'game_trailer_url' => '',
+  'gamepass_season_start' => '',
 );
 
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
