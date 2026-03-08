@@ -13,6 +13,7 @@ export interface SiteSettings {
   gold_extend_per_day_cents: string;
   extensions_enabled: string;
   game_trailer_url: string;
+  gamepass_season_start: string;
 }
 
 const defaultSettings: SiteSettings = {
