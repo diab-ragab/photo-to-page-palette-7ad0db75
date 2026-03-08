@@ -40,6 +40,7 @@ export const SettingsManager = () => {
     gold_extend_per_day_cents: '0',
     extensions_enabled: '1',
     game_trailer_url: '',
+    gamepass_season_start: '',
   });
 
   const fetchSettings = async () => {
