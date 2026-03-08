@@ -718,7 +718,7 @@ export const GamePass = () => {
           <div className="flex flex-col items-end gap-3">
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
-              <span className="text-muted-foreground">Resets in</span>
+              <span className="text-muted-foreground">Season Ends in</span>
               <div className="flex gap-1">
                 {[
                   { v: timeLeft.days, l: "d" },
