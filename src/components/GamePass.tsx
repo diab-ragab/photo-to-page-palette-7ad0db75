@@ -122,11 +122,17 @@ const SparkleEffect = ({ show }: { show: boolean }) => {
   );
 };
 
-// Calculate time until next month reset
-const getSeasonResetTime = () => {
-  const now = new Date();
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
-  const diff = nextMonth.getTime() - now.getTime();
+// Calculate time until season end (from API data)
+const getSeasonResetTime = (seasonEnd?: string) => {
+  let endDate: Date;
+  if (seasonEnd) {
+    endDate = new Date(seasonEnd);
+  } else {
+    // Fallback: next month (legacy)
+    const now = new Date();
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+  }
+  const diff = Math.max(0, endDate.getTime() - Date.now());
   
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -136,14 +142,15 @@ const getSeasonResetTime = () => {
   return { days, hours, minutes, seconds, totalMs: diff };
 };
 
-const getSeasonName = () => {
+const getSeasonName = (seasonNumber?: number) => {
   const month = new Date().getMonth();
   const monthNames = [
     "Winter Storm", "Frost Bite", "Spring Awakening", "Blossom Fury",
     "Sunfire", "Summer Blaze", "Harvest Moon", "Autumn Winds",
     "Shadow Fall", "Dark Harvest", "Frost Legion", "Winter's End"
   ];
-  return monthNames[month];
+  const base = monthNames[month];
+  return seasonNumber ? `${base} S${seasonNumber}` : base;
 };
 
 type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
@@ -406,6 +413,8 @@ export const GamePass = () => {
   const [currentDay, setCurrentDay] = useState(1);
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(getSeasonResetTime());
+  const [seasonEnd, setSeasonEnd] = useState<string | null>(null);
+  const [seasonNumber, setSeasonNumber] = useState<number | undefined>(undefined);
   const [rewards, setRewards] = useState<PassReward[]>([]);
   const [isLoadingRewards, setIsLoadingRewards] = useState(true);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
@@ -432,9 +441,9 @@ export const GamePass = () => {
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => setTimeLeft(getSeasonResetTime()), 1000);
+    const timer = setInterval(() => setTimeLeft(getSeasonResetTime(seasonEnd || undefined)), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [seasonEnd]);
 
   useEffect(() => {
     const fetchRewards = async () => {
@@ -452,6 +461,8 @@ export const GamePass = () => {
           if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
           if (data.elite_enabled !== undefined) setEliteEnabled(data.elite_enabled);
           if (data.gold_enabled !== undefined) setGoldEnabled(data.gold_enabled);
+          if (data.season_end) setSeasonEnd(data.season_end);
+          if (data.season_number) setSeasonNumber(data.season_number);
         }
       } catch {
         // silent (landing page should still render)
@@ -478,8 +489,7 @@ export const GamePass = () => {
           setHasElitePass(!!data.is_premium);
           const tier = data.user_tier || (data.is_premium ? 'elite' : 'free');
           setUserTier(tier as "free" | "elite" | "gold");
-          if (data.remaining_days !== undefined) setPassExpiresAt(null); // Use remaining_days instead
-          if (data.expires_at && data.remaining_days === undefined) setPassExpiresAt(data.expires_at);
+          if (data.expires_at) setPassExpiresAt(data.expires_at);
           setClaimedDays({ free: data.claimed_days?.free || [], elite: data.claimed_days?.elite || [], gold: data.claimed_days?.gold || [] });
           if (data.current_day) setCurrentDay(data.current_day);
           if (data.user_zen !== undefined) setUserZen(data.user_zen);
@@ -490,6 +500,8 @@ export const GamePass = () => {
           if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
           if (data.elite_enabled !== undefined) setEliteEnabled(data.elite_enabled);
           if (data.gold_enabled !== undefined) setGoldEnabled(data.gold_enabled);
+          if (data.season_end) setSeasonEnd(data.season_end);
+          if (data.season_number) setSeasonNumber(data.season_number);
         }
       } catch (err) {
         const status = (err as FetchJsonError)?.status;
@@ -654,7 +666,7 @@ export const GamePass = () => {
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="outline" className="text-xs border-primary/30 bg-primary/10 text-primary">
                     <Calendar className="h-3 w-3 mr-1" />
-                    {getSeasonName()}
+                    {getSeasonName(seasonNumber)}
                   </Badge>
                   {userTier === "elite" && (
                     <Badge className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-bold text-xs animate-pulse">
@@ -706,7 +718,7 @@ export const GamePass = () => {
           <div className="flex flex-col items-end gap-3">
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
-              <span className="text-muted-foreground">Resets in</span>
+              <span className="text-muted-foreground">Season Ends in</span>
               <div className="flex gap-1">
                 {[
                   { v: timeLeft.days, l: "d" },

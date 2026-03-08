@@ -90,14 +90,14 @@ export const GamePassExtendCards = ({ userTier, passExpiresAt, passRemainingDays
           {daysLeft > 0 ? (
             <>
               <Clock className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
-              {daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining — add more time to keep your perks!
+              {daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining in current season — add more seasons!
             </>
           ) : (
             "Your pass has expired. Renew now to continue receiving daily rewards!"
           )}
         </p>
         <p className="text-xs text-muted-foreground/70 mt-1">
-          ✨ Extensions stack on your current expiry — your pass auto-continues into new cycles.
+          ✨ Extensions add full 30-day seasons to your pass.
         </p>
       </div>
 

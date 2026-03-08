@@ -78,7 +78,7 @@ const Shop = () => {
     loadData();
   }, []);
 
-  // Fetch user's current pass tier for extension cards
+  // Fetch user's current pass tier for extension cards (season-based)
   useEffect(() => {
     if (!user) return;
     apiGet<any>(

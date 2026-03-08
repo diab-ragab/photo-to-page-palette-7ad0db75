@@ -20,6 +20,7 @@ import {
   Crown,
   Sparkles,
   Video,
+  CalendarDays,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { getSiteSettings, updateSiteSettings, clearSettingsCache, type SiteSettings } from '@/lib/siteSettingsApi';
@@ -40,6 +41,7 @@ export const SettingsManager = () => {
     gold_extend_per_day_cents: '0',
     extensions_enabled: '1',
     game_trailer_url: '',
+    gamepass_season_start: '',
   });
 
   const fetchSettings = async () => {
@@ -340,6 +342,43 @@ export const SettingsManager = () => {
                 </p>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Game Trailer */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-cyan-500/20">
+              <CalendarDays className="h-5 w-5 text-cyan-400" />
+            </div>
+            Game Pass Season
+          </CardTitle>
+          <CardDescription>
+            Set the global season anchor date. Every 30 days from this date starts a new season.
+            All players share the same season end date. Leave blank to default to the 1st of each month.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="gamepass_season_start" className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              Season Anchor Date
+            </Label>
+            <Input
+              id="gamepass_season_start"
+              type="date"
+              value={settings.gamepass_season_start}
+              onChange={e => handleChange('gamepass_season_start', e.target.value)}
+              placeholder="YYYY-MM-DD"
+            />
+            <p className="text-xs text-muted-foreground">
+              {settings.gamepass_season_start
+                ? `Seasons cycle every 30 days from ${settings.gamepass_season_start}. All Game Pass holders in a season share the same end date.`
+                : "No anchor set — defaults to the 1st of the current month."
+              }
+            </p>
           </div>
         </CardContent>
       </Card>
