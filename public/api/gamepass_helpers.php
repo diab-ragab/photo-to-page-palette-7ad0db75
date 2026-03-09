@@ -257,7 +257,7 @@ if (!function_exists('ensureGamePassTables')) {
             zen_cost INT DEFAULT 0,
             claimed_at DATETIME NOT NULL,
             cycle_start DATE NOT NULL,
-            UNIQUE KEY uq_user_reward_cycle (user_id, reward_id, cycle_start),
+            UNIQUE KEY uq_user_day_tier_cycle (user_id, day, tier, cycle_start),
             KEY idx_user_cycle (user_id, cycle_start)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 
