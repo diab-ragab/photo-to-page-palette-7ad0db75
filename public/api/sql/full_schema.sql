@@ -244,7 +244,7 @@ CREATE TABLE IF NOT EXISTS gamepass_rewards (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- Game pass claim tracking (unique per user + reward + season cycle)
-CREATE TABLE IF NOT EXISTS gamepass_claims (
+CREATE TABLE IF NOT EXISTS user_gamepass_claims (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   reward_id INT NOT NULL,

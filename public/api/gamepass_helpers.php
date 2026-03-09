@@ -244,6 +244,35 @@ if (!function_exists('ensureGamePassTables')) {
         try { $pdo->exec("ALTER TABLE gamepass_purchases ADD COLUMN days INT DEFAULT 30 AFTER character_name"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE gamepass_purchases ADD COLUMN rid VARCHAR(32) DEFAULT NULL AFTER status"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE gamepass_purchases ADD COLUMN paypal_capture_id VARCHAR(64) DEFAULT NULL AFTER paypal_order_id"); } catch (Exception $e) {}
+
+        // Ensure user_gamepass_claims table exists
+        $pdo->exec("CREATE TABLE IF NOT EXISTS user_gamepass_claims (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            reward_id INT NOT NULL,
+            day INT NOT NULL,
+            tier VARCHAR(10) NOT NULL,
+            character_id INT DEFAULT 0,
+            character_name VARCHAR(100) DEFAULT '',
+            zen_cost INT DEFAULT 0,
+            claimed_at DATETIME NOT NULL,
+            cycle_start DATE NOT NULL,
+            UNIQUE KEY uq_user_reward_cycle (user_id, reward_id, cycle_start),
+            KEY idx_user_cycle (user_id, cycle_start)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+
+        // Safe column adds for user_gamepass_claims
+        try { $pdo->exec("ALTER TABLE user_gamepass_claims ADD COLUMN reward_id INT NOT NULL DEFAULT 0"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE user_gamepass_claims ADD COLUMN zen_cost INT DEFAULT 0"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE user_gamepass_claims ADD COLUMN character_id INT DEFAULT 0"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE user_gamepass_claims ADD COLUMN character_name VARCHAR(100) DEFAULT ''"); } catch (Exception $e) {}
+
+        // Ensure gamepass_settings table exists
+        $pdo->exec("CREATE TABLE IF NOT EXISTS gamepass_settings (
+            setting_key VARCHAR(50) PRIMARY KEY,
+            setting_value VARCHAR(255) NOT NULL,
+            updated_at DATETIME
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
     }
 }
 
