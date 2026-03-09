@@ -207,10 +207,10 @@ CREATE TABLE IF NOT EXISTS topup_orders (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- ============================================================
--- 6. GAME PASS (3-Tier: Free, Elite, Gold)
+-- 6. GAME PASS (3-Tier: Free, Elite, Gold) — Season-Based Model
 -- ============================================================
 
--- User game pass status (activated_at + days_total model)
+-- User game pass status (season-based: expires_at = season end date)
 CREATE TABLE IF NOT EXISTS user_gamepass (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
@@ -223,10 +223,11 @@ CREATE TABLE IF NOT EXISTS user_gamepass (
   created_at DATETIME NOT NULL,
   updated_at DATETIME DEFAULT NULL,
   UNIQUE KEY idx_user_unique (user_id),
-  KEY idx_user (user_id)
+  KEY idx_user (user_id),
+  KEY idx_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
--- Game pass reward definitions (admin-managed)
+-- Game pass reward definitions (admin-managed, per day per tier)
 CREATE TABLE IF NOT EXISTS gamepass_rewards (
   id INT AUTO_INCREMENT PRIMARY KEY,
   day INT NOT NULL,
@@ -242,7 +243,7 @@ CREATE TABLE IF NOT EXISTS gamepass_rewards (
   KEY idx_day_tier (day, tier)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
--- Game pass claim tracking
+-- Game pass claim tracking (unique per user + reward + season cycle)
 CREATE TABLE IF NOT EXISTS gamepass_claims (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
@@ -251,13 +252,14 @@ CREATE TABLE IF NOT EXISTS gamepass_claims (
   tier VARCHAR(10) NOT NULL,
   character_id INT DEFAULT 0,
   character_name VARCHAR(100) DEFAULT '',
+  zen_cost INT DEFAULT 0,
   claimed_at DATETIME NOT NULL,
   cycle_start DATE NOT NULL,
   UNIQUE KEY uq_user_reward_cycle (user_id, reward_id, cycle_start),
   KEY idx_user_cycle (user_id, cycle_start)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
--- Game pass settings (prices, enabled tiers)
+-- Game pass settings (prices, enabled tiers, zen skip cost)
 CREATE TABLE IF NOT EXISTS gamepass_settings (
   setting_key VARCHAR(50) PRIMARY KEY,
   setting_value VARCHAR(255) NOT NULL,
@@ -278,7 +280,27 @@ CREATE TABLE IF NOT EXISTS gamepass_purchases (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   tier VARCHAR(10) NOT NULL,
+  character_name VARCHAR(100) DEFAULT '',
   paypal_order_id VARCHAR(255) DEFAULT NULL,
+  capture_id VARCHAR(255) DEFAULT NULL,
+  amount_cents INT DEFAULT 0,
+  status VARCHAR(20) DEFAULT 'pending',
+  created_at DATETIME NOT NULL,
+  completed_at DATETIME DEFAULT NULL,
+  INDEX idx_user (user_id),
+  INDEX idx_paypal_order (paypal_order_id),
+  INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- Game pass extension records (for stacking additional seasons)
+CREATE TABLE IF NOT EXISTS gamepass_extensions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  tier VARCHAR(10) NOT NULL,
+  days INT NOT NULL DEFAULT 30,
+  amount_cents INT DEFAULT 0,
+  paypal_order_id VARCHAR(255) DEFAULT NULL,
+  capture_id VARCHAR(255) DEFAULT NULL,
   status VARCHAR(20) DEFAULT 'pending',
   created_at DATETIME NOT NULL,
   completed_at DATETIME DEFAULT NULL,
