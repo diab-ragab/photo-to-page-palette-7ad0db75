@@ -46,7 +46,9 @@ define('BAN_DAYS_SECOND', 15);
 $ALLOWED_ORIGINS = array(
   'https://woiendgame.online',
   'https://www.woiendgame.online',
-  'https://woiendgame.lovable.app'
+  'https://woiendgame.lovable.app',
+  'https://id-preview--0298b87b-ea5f-4666-a5ac-62f3c55b4b40.lovable.app',
+  'https://0298b87b-ea5f-4666-a5ac-62f3c55b4b40.lovableproject.com'
 );
 
 if (session_id() === '') { @session_start(); }
