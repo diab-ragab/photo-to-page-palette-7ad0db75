@@ -85,6 +85,8 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCanClaim(status.can_claim);
         setHasClaimed(status.has_claimed);
         setRewardAmount(status.reward_amount);
+        setStackedDays(status.stacked_days || 1);
+        setTotalReward(status.total_reward || status.reward_amount);
         
         const serverSeconds = status.seconds_until_next_claim;
         setCountdown(serverSeconds);
