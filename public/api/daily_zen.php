@@ -20,8 +20,9 @@ handleCors(array('GET','POST','OPTIONS'));
 
 header('Content-Type: application/json; charset=utf-8');
 
-define('DAILY_ZEN_REWARD', 100000);
+define('DAILY_ZEN_REWARD', 400000);
 define('COOLDOWN_SECONDS', 24 * 60 * 60);
+define('MAX_STACK_DAYS', 15);
 
 define('SERVER_SECRET_SALT', 'wOi3ndG4m3_z3N_s4Lt_X9kP2mQ7vL5nR8tY1wZ6');
 
