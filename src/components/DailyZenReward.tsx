@@ -34,6 +34,11 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
   const [canClaim, setCanClaim] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(false);
   const [rewardAmount, setRewardAmount] = useState(0);
+  const [stackedDays, setStackedDays] = useState(1);
+  const [totalReward, setTotalReward] = useState(0);
+  const [maxStackDays] = useState(15);
+  const [claimedTotal, setClaimedTotal] = useState(0);
+  const [claimedStackedDays, setClaimedStackedDays] = useState(0);
   const [countdown, setCountdown] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +85,8 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCanClaim(status.can_claim);
         setHasClaimed(status.has_claimed);
         setRewardAmount(status.reward_amount);
+        setStackedDays(status.stacked_days || 1);
+        setTotalReward(status.total_reward || status.reward_amount);
         
         const serverSeconds = status.seconds_until_next_claim;
         setCountdown(serverSeconds);
@@ -159,6 +166,10 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
       const result = await claimDailyZen();
       
       if (result.success) {
+        const claimedAmt = result.reward_amount || totalReward;
+        const claimedDays = result.stacked_days || stackedDays;
+        setClaimedTotal(claimedAmt);
+        setClaimedStackedDays(claimedDays);
         setCanClaim(false);
         setHasClaimed(true);
         setShowSuccess(true);
@@ -168,13 +179,16 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCountdown(serverSeconds);
         countdownEndTimeRef.current = Date.now() + (serverSeconds * 1000);
         
-        toast.success(`🎉 Claimed ${(result.reward_amount || rewardAmount).toLocaleString()} Zen!`);
+        const msg = claimedDays > 1
+          ? `🎉 Claimed ${claimedDays} days × ${rewardAmount.toLocaleString()} = ${claimedAmt.toLocaleString()} Zen!`
+          : `🎉 Claimed ${claimedAmt.toLocaleString()} Zen!`;
+        toast.success(msg);
         
-        if (onClaim && result.reward_amount) {
-          onClaim(result.reward_amount);
+        if (onClaim && claimedAmt) {
+          onClaim(claimedAmt);
         }
         
-        setTimeout(() => setShowSuccess(false), 3000);
+        setTimeout(() => setShowSuccess(false), 4000);
       } else {
         // Check if banned from claim response
         if (result.is_banned) {
@@ -342,32 +356,51 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
                 </div>
               )}
               
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <motion.div 
-                    className="p-2.5 rounded-full bg-gradient-to-br from-cyan-500/30 to-purple-500/30"
-                    animate={canClaim ? { rotate: [0, 360] } : {}}
-                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                  >
-                    <Coins className="h-6 w-6 text-cyan-400" />
-                  </motion.div>
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Reward</p>
-                    <p className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                      {rewardAmount.toLocaleString()} <span className="text-lg">Zen</span>
-                    </p>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <motion.div 
+                      className="p-2.5 rounded-full bg-gradient-to-br from-cyan-500/30 to-purple-500/30"
+                      animate={canClaim ? { rotate: [0, 360] } : {}}
+                      transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Coins className="h-6 w-6 text-cyan-400" />
+                    </motion.div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                        {stackedDays > 1 && canClaim ? `${stackedDays} Days Stacked!` : 'Daily Reward'}
+                      </p>
+                      <p className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                        {canClaim ? totalReward.toLocaleString() : rewardAmount.toLocaleString()} <span className="text-lg">Zen</span>
+                      </p>
+                    </div>
                   </div>
+                  
+                  {hasClaimed && !canClaim && (
+                    <motion.div 
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/20 border border-green-500/30"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', bounce: 0.5 }}
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-green-400" />
+                      <span className="text-xs font-medium text-green-400">Claimed</span>
+                    </motion.div>
+                  )}
                 </div>
-                
-                {hasClaimed && !canClaim && (
+
+                {/* Stacked days breakdown */}
+                {stackedDays > 1 && canClaim && (
                   <motion.div 
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/20 border border-green-500/30"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', bounce: 0.5 }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
                   >
-                    <CheckCircle2 className="h-4 w-4 text-green-400" />
-                    <span className="text-xs font-medium text-green-400">Claimed</span>
+                    <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
+                    <span className="text-xs text-amber-300">
+                      <span className="font-bold">{stackedDays}</span> unclaimed days × <span className="font-bold">{rewardAmount.toLocaleString()}</span> Zen/day
+                      <span className="text-muted-foreground ml-1">(max {maxStackDays} days)</span>
+                    </span>
                   </motion.div>
                 )}
               </div>
@@ -439,8 +472,13 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
                     </motion.div>
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-4">
                       <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent">
-                        +{rewardAmount.toLocaleString()} Zen
+                        +{claimedTotal.toLocaleString()} Zen
                       </p>
+                      {claimedStackedDays > 1 && (
+                        <p className="text-xs text-amber-400 mt-1">
+                          {claimedStackedDays} days × {rewardAmount.toLocaleString()} Zen
+                        </p>
+                      )}
                       <p className="text-sm text-muted-foreground mt-1">Added to your account!</p>
                     </motion.div>
                   </div>

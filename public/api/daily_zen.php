@@ -20,8 +20,9 @@ handleCors(array('GET','POST','OPTIONS'));
 
 header('Content-Type: application/json; charset=utf-8');
 
-define('DAILY_ZEN_REWARD', 100000);
+define('DAILY_ZEN_REWARD', 400000);
 define('COOLDOWN_SECONDS', 24 * 60 * 60);
+define('MAX_STACK_DAYS', 15);
 
 define('SERVER_SECRET_SALT', 'wOi3ndG4m3_z3N_s4Lt_X9kP2mQ7vL5nR8tY1wZ6');
 
@@ -475,7 +476,8 @@ try {
 
     $remain = secondsUntilNextClaim($pdo, $user['account_id']);
 
-    // Fetch last claim info
+    // Calculate stacked days (unclaimed days since last claim, max 15)
+    $stackedDays = 1;
     $lastClaim = null;
     try {
       $lcStmt = $pdo->prepare("SELECT claimed_at, reward_amount FROM daily_zen_claims WHERE account_id = ? ORDER BY claimed_at DESC LIMIT 1");
@@ -486,8 +488,20 @@ try {
           'claimed_at' => $lcRow['claimed_at'],
           'reward_amount' => (int)$lcRow['reward_amount']
         );
+        // Calculate days since last claim
+        $lastClaimTime = strtotime($lcRow['claimed_at']);
+        $now = time();
+        $diffSeconds = $now - $lastClaimTime;
+        $diffDays = floor($diffSeconds / 86400);
+        // If cooldown passed (>= 1 day), stack = number of full days missed, capped at MAX_STACK_DAYS
+        if ($diffDays >= 1) {
+          $stackedDays = min((int)$diffDays, MAX_STACK_DAYS);
+        }
       }
+      // First time claimers get 1 day
     } catch (Exception $e) {}
+
+    $totalReward = DAILY_ZEN_REWARD * $stackedDays;
 
     $serverStmt = $pdo->query("SELECT UNIX_TIMESTAMP(NOW()) as server_time");
     $serverRow = $serverStmt->fetch();
@@ -498,6 +512,9 @@ try {
       'can_claim'=>(($remain === 0) && !$isBanned),
       'has_claimed'=>($remain > 0),
       'reward_amount'=>DAILY_ZEN_REWARD,
+      'stacked_days'=>$stackedDays,
+      'total_reward'=>$totalReward,
+      'max_stack_days'=>MAX_STACK_DAYS,
       'seconds_until_next_claim'=>$remain,
       'is_banned'=>$isBanned,
       'perm_ban'=>$pen['perm'],
@@ -613,6 +630,24 @@ try {
       // If query fails, continue (do not false-ban)
     }
 
+    // Calculate stacked days for this claim
+    $stackedDays = 1;
+    try {
+      $lcStmt = $pdo->prepare("SELECT claimed_at FROM daily_zen_claims WHERE account_id = ? ORDER BY claimed_at DESC LIMIT 1");
+      $lcStmt->execute(array($user['account_id']));
+      $lcRow = $lcStmt->fetch(PDO::FETCH_ASSOC);
+      if ($lcRow) {
+        $lastClaimTime = strtotime($lcRow['claimed_at']);
+        $now = time();
+        $diffDays = floor(($now - $lastClaimTime) / 86400);
+        if ($diffDays >= 1) {
+          $stackedDays = min((int)$diffDays, MAX_STACK_DAYS);
+        }
+      }
+    } catch (Exception $e) {}
+
+    $totalReward = DAILY_ZEN_REWARD * $stackedDays;
+
     // Deliver Zen (usecash)
     $cfg = getConfig();
     $db  = $cfg['db'];
@@ -623,7 +658,7 @@ try {
       jsonOut(array('success'=>false,'error'=>'DB connection failed'), 500);
     }
 
-    $res = sendZenReward($mysqli, $user['username'], DAILY_ZEN_REWARD);
+    $res = sendZenReward($mysqli, $user['username'], $totalReward);
     $mysqli->close();
 
     if (empty($res['success'])) {
@@ -644,25 +679,25 @@ try {
         $fingerprintHash,
         $ip,
         $subnet,
-        DAILY_ZEN_REWARD,
+        $totalReward,
         $risk
       ));
     } catch (Exception $e) {
       logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'failed_claim', 'log_after_send_failed');
     }
 
-    logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'successful_claim', 'reward:'.DAILY_ZEN_REWARD);
+    logSecurity($pdo, $user['account_id'], $deviceHash, $ip, 'successful_claim', 'reward:'.$totalReward.' stacked:'.$stackedDays);
 
-    // Public claims channel (account + reward only)
+    // Public claims channel
     discordPostTo(DISCORD_PUBLIC_CLAIMS_WEBHOOK_URL, '✅ [DAILY ZEN] CLAIM', array(
       "User: **" . $user['username'] . "**",
-      "Reward: **" . number_format(DAILY_ZEN_REWARD) . "** Zen"
+      "Reward: **" . number_format($totalReward) . "** Zen" . ($stackedDays > 1 ? " (" . $stackedDays . " days stacked)" : "")
     ));
 
-    // Admin claims channel (full details)
+    // Admin claims channel
     discordPostTo(DISCORD_ADMIN_CLAIMS_WEBHOOK_URL, '✅ [DAILY ZEN] CLAIM', array(
       "User: **" . $user['username'] . "** (account_id: " . $user['account_id'] . ")",
-      "Reward: **" . number_format(DAILY_ZEN_REWARD) . "** Zen",
+      "Reward: **" . number_format($totalReward) . "** Zen (" . $stackedDays . " days × " . number_format(DAILY_ZEN_REWARD) . ")",
       "IP: `" . $ip . "`",
       "Subnet: `" . $subnet . "`",
       "Device: `" . substr($deviceHash, 0, 10) . "...`",
@@ -675,8 +710,11 @@ try {
 
     jsonOut(array(
       'success'=>true,
-      'message'=>'Daily Zen claimed successfully!',
-      'reward_amount'=>DAILY_ZEN_REWARD,
+      'message'=>$stackedDays > 1
+        ? 'Claimed ' . $stackedDays . ' stacked days of Zen!'
+        : 'Daily Zen claimed successfully!',
+      'reward_amount'=>$totalReward,
+      'stacked_days'=>$stackedDays,
       'seconds_until_next_claim'=>COOLDOWN_SECONDS,
       'server_time'=>$serverTime
     ));
