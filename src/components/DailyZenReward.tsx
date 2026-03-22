@@ -166,6 +166,10 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
       const result = await claimDailyZen();
       
       if (result.success) {
+        const claimedAmt = result.reward_amount || totalReward;
+        const claimedDays = result.stacked_days || stackedDays;
+        setClaimedTotal(claimedAmt);
+        setClaimedStackedDays(claimedDays);
         setCanClaim(false);
         setHasClaimed(true);
         setShowSuccess(true);
@@ -175,13 +179,16 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
         setCountdown(serverSeconds);
         countdownEndTimeRef.current = Date.now() + (serverSeconds * 1000);
         
-        toast.success(`🎉 Claimed ${(result.reward_amount || rewardAmount).toLocaleString()} Zen!`);
+        const msg = claimedDays > 1
+          ? `🎉 Claimed ${claimedDays} days × ${rewardAmount.toLocaleString()} = ${claimedAmt.toLocaleString()} Zen!`
+          : `🎉 Claimed ${claimedAmt.toLocaleString()} Zen!`;
+        toast.success(msg);
         
-        if (onClaim && result.reward_amount) {
-          onClaim(result.reward_amount);
+        if (onClaim && claimedAmt) {
+          onClaim(claimedAmt);
         }
         
-        setTimeout(() => setShowSuccess(false), 3000);
+        setTimeout(() => setShowSuccess(false), 4000);
       } else {
         // Check if banned from claim response
         if (result.is_banned) {
