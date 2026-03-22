@@ -34,6 +34,11 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
   const [canClaim, setCanClaim] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(false);
   const [rewardAmount, setRewardAmount] = useState(0);
+  const [stackedDays, setStackedDays] = useState(1);
+  const [totalReward, setTotalReward] = useState(0);
+  const [maxStackDays] = useState(15);
+  const [claimedTotal, setClaimedTotal] = useState(0);
+  const [claimedStackedDays, setClaimedStackedDays] = useState(0);
   const [countdown, setCountdown] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
