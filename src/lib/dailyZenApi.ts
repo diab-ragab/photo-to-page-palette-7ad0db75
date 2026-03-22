@@ -34,6 +34,7 @@ interface ClaimResult {
   success: boolean;
   message?: string;
   reward_amount?: number;
+  stacked_days?: number;
   seconds_until_next_claim?: number;
   server_time?: number;
   is_banned?: boolean;

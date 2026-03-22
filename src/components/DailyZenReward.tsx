@@ -472,8 +472,13 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
                     </motion.div>
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-4">
                       <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent">
-                        +{rewardAmount.toLocaleString()} Zen
+                        +{claimedTotal.toLocaleString()} Zen
                       </p>
+                      {claimedStackedDays > 1 && (
+                        <p className="text-xs text-amber-400 mt-1">
+                          {claimedStackedDays} days × {rewardAmount.toLocaleString()} Zen
+                        </p>
+                      )}
                       <p className="text-sm text-muted-foreground mt-1">Added to your account!</p>
                     </motion.div>
                   </div>
