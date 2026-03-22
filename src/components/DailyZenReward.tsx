@@ -356,32 +356,51 @@ export const DailyZenReward = ({ onClaim }: DailyZenRewardProps) => {
                 </div>
               )}
               
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <motion.div 
-                    className="p-2.5 rounded-full bg-gradient-to-br from-cyan-500/30 to-purple-500/30"
-                    animate={canClaim ? { rotate: [0, 360] } : {}}
-                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                  >
-                    <Coins className="h-6 w-6 text-cyan-400" />
-                  </motion.div>
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Reward</p>
-                    <p className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                      {rewardAmount.toLocaleString()} <span className="text-lg">Zen</span>
-                    </p>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <motion.div 
+                      className="p-2.5 rounded-full bg-gradient-to-br from-cyan-500/30 to-purple-500/30"
+                      animate={canClaim ? { rotate: [0, 360] } : {}}
+                      transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Coins className="h-6 w-6 text-cyan-400" />
+                    </motion.div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                        {stackedDays > 1 && canClaim ? `${stackedDays} Days Stacked!` : 'Daily Reward'}
+                      </p>
+                      <p className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                        {canClaim ? totalReward.toLocaleString() : rewardAmount.toLocaleString()} <span className="text-lg">Zen</span>
+                      </p>
+                    </div>
                   </div>
+                  
+                  {hasClaimed && !canClaim && (
+                    <motion.div 
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/20 border border-green-500/30"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', bounce: 0.5 }}
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-green-400" />
+                      <span className="text-xs font-medium text-green-400">Claimed</span>
+                    </motion.div>
+                  )}
                 </div>
-                
-                {hasClaimed && !canClaim && (
+
+                {/* Stacked days breakdown */}
+                {stackedDays > 1 && canClaim && (
                   <motion.div 
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/20 border border-green-500/30"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', bounce: 0.5 }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
                   >
-                    <CheckCircle2 className="h-4 w-4 text-green-400" />
-                    <span className="text-xs font-medium text-green-400">Claimed</span>
+                    <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
+                    <span className="text-xs text-amber-300">
+                      <span className="font-bold">{stackedDays}</span> unclaimed days × <span className="font-bold">{rewardAmount.toLocaleString()}</span> Zen/day
+                      <span className="text-muted-foreground ml-1">(max {maxStackDays} days)</span>
+                    </span>
                   </motion.div>
                 )}
               </div>
