@@ -6,6 +6,9 @@ interface DailyZenStatus {
   can_claim: boolean;
   has_claimed: boolean;
   reward_amount: number;
+  stacked_days?: number;
+  total_reward?: number;
+  max_stack_days?: number;
   seconds_until_next_claim: number;
   server_time?: number;
   csrf_token?: string;
