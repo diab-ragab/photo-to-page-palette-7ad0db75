@@ -476,7 +476,8 @@ try {
 
     $remain = secondsUntilNextClaim($pdo, $user['account_id']);
 
-    // Fetch last claim info
+    // Calculate stacked days (unclaimed days since last claim, max 15)
+    $stackedDays = 1;
     $lastClaim = null;
     try {
       $lcStmt = $pdo->prepare("SELECT claimed_at, reward_amount FROM daily_zen_claims WHERE account_id = ? ORDER BY claimed_at DESC LIMIT 1");
@@ -487,8 +488,20 @@ try {
           'claimed_at' => $lcRow['claimed_at'],
           'reward_amount' => (int)$lcRow['reward_amount']
         );
+        // Calculate days since last claim
+        $lastClaimTime = strtotime($lcRow['claimed_at']);
+        $now = time();
+        $diffSeconds = $now - $lastClaimTime;
+        $diffDays = floor($diffSeconds / 86400);
+        // If cooldown passed (>= 1 day), stack = number of full days missed, capped at MAX_STACK_DAYS
+        if ($diffDays >= 1) {
+          $stackedDays = min((int)$diffDays, MAX_STACK_DAYS);
+        }
       }
+      // First time claimers get 1 day
     } catch (Exception $e) {}
+
+    $totalReward = DAILY_ZEN_REWARD * $stackedDays;
 
     $serverStmt = $pdo->query("SELECT UNIX_TIMESTAMP(NOW()) as server_time");
     $serverRow = $serverStmt->fetch();
@@ -499,6 +512,9 @@ try {
       'can_claim'=>(($remain === 0) && !$isBanned),
       'has_claimed'=>($remain > 0),
       'reward_amount'=>DAILY_ZEN_REWARD,
+      'stacked_days'=>$stackedDays,
+      'total_reward'=>$totalReward,
+      'max_stack_days'=>MAX_STACK_DAYS,
       'seconds_until_next_claim'=>$remain,
       'is_banned'=>$isBanned,
       'perm_ban'=>$pen['perm'],
