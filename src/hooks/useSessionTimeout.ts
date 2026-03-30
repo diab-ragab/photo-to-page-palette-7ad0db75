@@ -237,7 +237,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     ];
 
     // Throttle activity updates to prevent excessive timer resets
-    let throttleTimeout: NodeJS.Timeout | null = null;
+    let throttleTimeout: ReturnType<typeof setTimeout> | null = null;
     const throttledResetTimer = () => {
       if (throttleTimeout) return;
       
