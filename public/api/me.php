@@ -1,7 +1,7 @@
 <?php
 /**
  * me.php - Current user info + auto Free Pass activation
- * PHP 5.x compatible - SEASON-BASED model
+ * PHP 5.x compatible - INDIVIDUAL 30-DAY MODEL, 2 Tiers (Free + Premium)
  */
 
 ini_set('display_errors', '0');
@@ -40,11 +40,11 @@ $username = isset($user['name']) ? $user['name'] : '';
 
 $pdo = getDB();
 
-// Auto-activate Free Pass (idempotent - only on first call)
+// Auto-activate Free Pass (idempotent)
 $freePassResult = autoActivateFreePass($pdo, $userId, $RID);
 
-// Get current gamepass info - SEASON-BASED (use expires_at)
-$gamepass = array('tier' => 'free', 'is_premium' => false, 'expires_at' => null, 'remaining_days' => 0, 'is_active' => false);
+// Get current gamepass info - INDIVIDUAL MODEL
+$gamepass = array('tier' => 'free', 'is_premium' => false, 'expires_at' => null, 'remaining_days' => 0, 'is_active' => false, 'current_day' => 1);
 try {
   $stmt = $pdo->prepare("SELECT tier, is_premium, expires_at, activated_at, days_total FROM user_gamepass WHERE user_id = ? LIMIT 1");
   $stmt->execute(array($userId));
@@ -54,19 +54,15 @@ try {
     $gamepass['is_premium'] = (int)$gpRow['is_premium'] === 1;
     $gamepass['expires_at'] = isset($gpRow['expires_at']) ? $gpRow['expires_at'] : null;
     
+    $activatedAt = isset($gpRow['activated_at']) ? $gpRow['activated_at'] : null;
+    $gamepass['current_day'] = getUserCurrentDay($activatedAt);
+    
     if ($gamepass['expires_at'] !== null) {
-      // Season-based: use expires_at directly
       $gamepass['remaining_days'] = getGamePassRemainingDaysFromExpiry($gamepass['expires_at']);
       $gamepass['is_active'] = isGamePassActiveByExpiry($gamepass['expires_at']);
     } elseif ($gamepass['tier'] === 'free') {
-      $gamepass['is_active'] = true; // free pass is always active
+      $gamepass['is_active'] = true;
     }
-    
-    // Add season info
-    $season = getCurrentSeasonInfo($pdo);
-    $gamepass['season_end'] = $season['season_end'];
-    $gamepass['season_number'] = $season['season_number'];
-    $gamepass['season_days_remaining'] = $season['days_remaining'];
   }
 } catch (Exception $e) {
   error_log("RID={$RID} ME_GAMEPASS_ERR: " . $e->getMessage());

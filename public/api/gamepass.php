@@ -2,14 +2,14 @@
 /**
  * gamepass.php - Game Pass status and reward claiming API
  * PHP 5.x compatible
- * SEASON-BASED MODEL: uses global season anchor date
+ * INDIVIDUAL 30-DAY MODEL: each user has their own 30-day cycle
+ * 2 Tiers: free, premium
  *
  * GET  ?action=status
  * GET  ?action=rewards
  * POST ?action=claim
  */
 
-// IMPORTANT: initialize buffering + error handlers BEFORE including dependencies
 $RID = substr(md5(uniqid(mt_rand(), true)), 0, 12);
 ob_start();
 
@@ -30,21 +30,23 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
-set_exception_handler(function($e) {
+function _gp_exception_handler($e) {
   error_log("GAMEPASS EX: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
   json_fail(500, "Server error");
-});
+}
+set_exception_handler('_gp_exception_handler');
 
-set_error_handler(function($severity, $message, $file, $line) {
+function _gp_error_handler($severity, $message, $file, $line) {
   if (!($severity & (E_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR))) {
     error_log("GAMEPASS WARN: $message in $file:$line");
     return true;
   }
   error_log("GAMEPASS ERR: $message in $file:$line");
   throw new ErrorException($message, 0, $severity, $file, $line);
-});
+}
+set_error_handler('_gp_error_handler');
 
-register_shutdown_function(function() {
+function _gp_shutdown_handler() {
   $err = error_get_last();
   if (!$err) return;
   $fatalTypes = array(E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR);
@@ -52,7 +54,8 @@ register_shutdown_function(function() {
     error_log("GAMEPASS FATAL: {$err['message']} in {$err['file']}:{$err['line']}");
     json_fail(500, 'Server error');
   }
-});
+}
+register_shutdown_function('_gp_shutdown_handler');
 
 require_once __DIR__ . '/bootstrap.php';
 handleCors(array('GET', 'POST', 'OPTIONS'));
@@ -76,22 +79,6 @@ function getZenSkipCost() {
   }
 }
 
-/**
- * Get cycle info from global season (replaces old month-based logic)
- */
-function getCycleInfo() {
-  global $pdo;
-  $season = getCurrentSeasonInfo($pdo);
-  return array(
-    'current_day' => $season['current_day'],
-    'cycle_start' => $season['season_start_date'],
-    'days_remaining' => $season['days_remaining'],
-    'season_start' => $season['season_start'],
-    'season_end' => $season['season_end'],
-    'season_number' => $season['season_number'],
-  );
-}
-
 // Detect reward table columns dynamically
 function getRewardColumns() {
   global $pdo;
@@ -109,7 +96,6 @@ function fetchRewards($whereClause = '', $params = array()) {
   $cols = getRewardColumns();
   
   $nameCol = in_array('reward_name', $cols) ? 'reward_name' : (in_array('item_name', $cols) ? 'item_name' : 'name');
-  $typeCol = in_array('reward_type', $cols) ? 'reward_type' : (in_array('item_type', $cols) ? 'item_type' : null);
   
   $selectParts = array('id', 'day', 'tier', 'item_id', 'quantity', 'rarity', 'icon');
   $selectParts[] = "$nameCol as item_name";
@@ -197,55 +183,42 @@ try {
   switch ($action) {
 
     case 'rewards':
-      $cycle = getCycleInfo();
       $rewards = fetchRewards();
 
-      // Fetch prices and enabled status
-      $elitePriceCents = 999;
-      $goldPriceCents = 1999;
+      $premiumPriceCents = 999;
       $gamepassEnabled = true;
-      $eliteEnabled = true;
-      $goldEnabled = true;
+      $premiumEnabled = true;
 
       try {
-        $ssStmt = $pdo->query("SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ('gamepass_elite_price','gamepass_gold_price')");
+        $ssStmt = $pdo->query("SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ('gamepass_premium_price')");
         if ($ssStmt) {
           $ssRows = $ssStmt->fetchAll(PDO::FETCH_KEY_PAIR);
-          if (isset($ssRows['gamepass_elite_price'])) {
-            $v = (int)$ssRows['gamepass_elite_price'];
-            if ($v > 0) $elitePriceCents = $v;
-          }
-          if (isset($ssRows['gamepass_gold_price'])) {
-            $v = (int)$ssRows['gamepass_gold_price'];
-            if ($v > 0) $goldPriceCents = $v;
+          if (isset($ssRows['gamepass_premium_price'])) {
+            $v = (int)$ssRows['gamepass_premium_price'];
+            if ($v > 0) $premiumPriceCents = $v;
           }
         }
       } catch (Exception $e) {}
 
       try {
-        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('gamepass_enabled','elite_enabled','gold_enabled')");
+        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('gamepass_enabled','premium_enabled','premium_price_cents')");
         if ($stmtS) {
           $settings = $stmtS->fetchAll(PDO::FETCH_KEY_PAIR);
           if (isset($settings['gamepass_enabled'])) $gamepassEnabled = ($settings['gamepass_enabled'] === '1' || $settings['gamepass_enabled'] === 1);
-          if (isset($settings['elite_enabled'])) $eliteEnabled = ($settings['elite_enabled'] === '1' || $settings['elite_enabled'] === 1);
-          if (isset($settings['gold_enabled'])) $goldEnabled = ($settings['gold_enabled'] === '1' || $settings['gold_enabled'] === 1);
+          if (isset($settings['premium_enabled'])) $premiumEnabled = ($settings['premium_enabled'] === '1' || $settings['premium_enabled'] === 1);
+          if (isset($settings['premium_price_cents'])) {
+            $v = (int)$settings['premium_price_cents'];
+            if ($v > 0) $premiumPriceCents = $v;
+          }
         }
       } catch (Exception $e) {}
 
       json_out(200, array(
         'success' => true,
-        'current_day' => $cycle['current_day'],
-        'cycle_start' => $cycle['cycle_start'],
-        'days_remaining' => $cycle['days_remaining'],
-        'season_start' => $cycle['season_start'],
-        'season_end' => $cycle['season_end'],
-        'season_number' => $cycle['season_number'],
         'zen_cost_per_day' => getZenSkipCost(),
-        'elite_price_cents' => $elitePriceCents,
-        'gold_price_cents' => $goldPriceCents,
+        'premium_price_cents' => $premiumPriceCents,
         'gamepass_enabled' => $gamepassEnabled,
-        'elite_enabled' => $eliteEnabled,
-        'gold_enabled' => $goldEnabled,
+        'premium_enabled' => $premiumEnabled,
         'rewards' => formatRewards($rewards)
       ));
       break;
@@ -257,43 +230,39 @@ try {
       }
 
       $userId = (int)$user['user_id'];
-      $cycle = getCycleInfo();
 
-      // Premium status & tier - SEASON-BASED (use expires_at)
+      // Get user's gamepass info
       $isPremium = false;
       $userTier = 'free';
       $expiresAt = null;
       $remainingDays = 0;
+      $activatedAt = null;
+      $currentDay = 1;
+      $cycleStart = date('Y-m-d');
+
       try {
         $stmt = $pdo->prepare("SELECT is_premium, tier, activated_at, days_total, expires_at FROM user_gamepass WHERE user_id = ?");
         $stmt->execute(array($userId));
         $gp = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($gp) {
+          $activatedAt = isset($gp['activated_at']) ? $gp['activated_at'] : null;
           $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
+          $dbTier = isset($gp['tier']) ? $gp['tier'] : 'free';
 
-          if (isset($gp['tier']) && in_array($gp['tier'], array('elite', 'gold'))) {
-            $userTier = $gp['tier'];
-            // Season-based: check expires_at directly
+          // Calculate current day from activated_at
+          $currentDay = getUserCurrentDay($activatedAt);
+          $cycleStart = getUserCycleStart($activatedAt);
+
+          if ($dbTier === 'premium') {
+            $userTier = 'premium';
             if ($expiresAt !== null) {
               $isPremium = isGamePassActiveByExpiry($expiresAt);
               $remainingDays = getGamePassRemainingDaysFromExpiry($expiresAt);
-            } else {
-              // Legacy fallback
-              $activatedAt = isset($gp['activated_at']) ? $gp['activated_at'] : null;
-              $daysTotal = isset($gp['days_total']) ? (int)$gp['days_total'] : null;
-              if ($daysTotal !== null && $daysTotal > 0) {
-                $isPremium = isGamePassActive($activatedAt, $daysTotal);
-                $remainingDays = getGamePassRemainingDays($activatedAt, $daysTotal);
-                // Compute expires_at for response
-                $expiresAt = getGamePassExpiryDate($activatedAt, $daysTotal);
-              }
             }
-          } elseif ((int)$gp['is_premium'] === 1) {
-            $userTier = 'elite';
-            if ($expiresAt !== null) {
-              $isPremium = isGamePassActiveByExpiry($expiresAt);
-              $remainingDays = getGamePassRemainingDaysFromExpiry($expiresAt);
+            // If expired, reset display to free
+            if (!$isPremium) {
+              $userTier = 'free';
             }
           }
         }
@@ -303,11 +272,11 @@ try {
 
       $userZen = getUserZenBalance($userId);
 
-      // Claims - use season_start_date as cycle key
-      $claimedDays = array('free' => array(), 'elite' => array(), 'gold' => array());
+      // Claims for this user's cycle
+      $claimedDays = array('free' => array(), 'premium' => array());
       try {
         $stmt = $pdo->prepare("SELECT day, tier FROM user_gamepass_claims WHERE user_id = ? AND cycle_start = ?");
-        $stmt->execute(array($userId, $cycle['cycle_start']));
+        $stmt->execute(array($userId, $cycleStart));
         $claims = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($claims as $c) {
@@ -322,27 +291,23 @@ try {
 
       $rewards = fetchRewards();
 
-      // Fetch prices and enabled status
-      $elitePriceCents = 999;
-      $goldPriceCents = 1999;
+      $premiumPriceCents = 999;
       $gamepassEnabled = true;
-      $eliteEnabled = true;
-      $goldEnabled = true;
+      $premiumEnabled = true;
       try {
-        $ssStmt = $pdo->query("SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ('gamepass_elite_price','gamepass_gold_price')");
+        $ssStmt = $pdo->query("SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ('gamepass_premium_price')");
         if ($ssStmt) {
           $ssRows = $ssStmt->fetchAll(PDO::FETCH_KEY_PAIR);
-          if (isset($ssRows['gamepass_elite_price'])) { $v = (int)$ssRows['gamepass_elite_price']; if ($v > 0) $elitePriceCents = $v; }
-          if (isset($ssRows['gamepass_gold_price'])) { $v = (int)$ssRows['gamepass_gold_price']; if ($v > 0) $goldPriceCents = $v; }
+          if (isset($ssRows['gamepass_premium_price'])) { $v = (int)$ssRows['gamepass_premium_price']; if ($v > 0) $premiumPriceCents = $v; }
         }
       } catch (Exception $e) {}
       try {
-        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('gamepass_enabled','elite_enabled','gold_enabled')");
+        $stmtS = $pdo->query("SELECT setting_key, setting_value FROM gamepass_settings WHERE setting_key IN ('gamepass_enabled','premium_enabled','premium_price_cents')");
         if ($stmtS) {
           $settings = $stmtS->fetchAll(PDO::FETCH_KEY_PAIR);
           if (isset($settings['gamepass_enabled'])) $gamepassEnabled = ($settings['gamepass_enabled'] === '1' || $settings['gamepass_enabled'] === 1);
-          if (isset($settings['elite_enabled'])) $eliteEnabled = ($settings['elite_enabled'] === '1' || $settings['elite_enabled'] === 1);
-          if (isset($settings['gold_enabled'])) $goldEnabled = ($settings['gold_enabled'] === '1' || $settings['gold_enabled'] === 1);
+          if (isset($settings['premium_enabled'])) $premiumEnabled = ($settings['premium_enabled'] === '1' || $settings['premium_enabled'] === 1);
+          if (isset($settings['premium_price_cents'])) { $v = (int)$settings['premium_price_cents']; if ($v > 0) $premiumPriceCents = $v; }
         }
       } catch (Exception $e) {}
 
@@ -350,30 +315,25 @@ try {
         'success' => true,
         'is_premium' => $isPremium,
         'user_tier' => $userTier,
-        'current_day' => $cycle['current_day'],
-        'cycle_start' => $cycle['cycle_start'],
-        'days_remaining' => $cycle['days_remaining'],
-        'season_start' => $cycle['season_start'],
-        'season_end' => $cycle['season_end'],
-        'season_number' => $cycle['season_number'],
+        'current_day' => $currentDay,
+        'cycle_start' => $cycleStart,
+        'days_remaining' => $remainingDays,
         'claimed_days' => $claimedDays,
         'user_zen' => $userZen,
         'zen_cost_per_day' => getZenSkipCost(),
-        'elite_price_cents' => $elitePriceCents,
-        'gold_price_cents' => $goldPriceCents,
+        'premium_price_cents' => $premiumPriceCents,
         'gamepass_enabled' => $gamepassEnabled,
-        'elite_enabled' => $eliteEnabled,
-        'gold_enabled' => $goldEnabled,
+        'premium_enabled' => $premiumEnabled,
         'rewards' => formatRewards($rewards),
         'expires_at' => $expiresAt,
         'remaining_days' => $remainingDays,
-        'pass_active' => $isPremium
+        'pass_active' => $isPremium,
+        'activated_at' => $activatedAt
       ));
       break;
 
     case 'claim':
       $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '';
-      error_log("GAMEPASS_CLAIM method=$method");
       
       $input = getJsonInput();
       if (empty($input)) {
@@ -392,11 +352,9 @@ try {
       $userId = (int)$user['user_id'];
 
       $day = isset($input['day']) ? (int)$input['day'] : 0;
-      $tier = (isset($input['tier']) && in_array($input['tier'], array('free', 'elite', 'gold'))) ? $input['tier'] : 'free';
+      $tier = (isset($input['tier']) && in_array($input['tier'], array('free', 'premium'))) ? $input['tier'] : 'free';
       $roleId = isset($input['roleId']) ? (int)$input['roleId'] : 0;
       $payWithZen = (isset($input['payWithZen']) && ($input['payWithZen'] === true || $input['payWithZen'] === 'true' || $input['payWithZen'] === '1'));
-
-      error_log("GAMEPASS_CLAIM_INPUT user=$userId day=$day tier=$tier roleId=$roleId payWithZen=" . ($payWithZen ? 'true' : 'false'));
 
       if ($day < 1 || $day > 30) {
         json_fail(400, 'Invalid day');
@@ -410,15 +368,22 @@ try {
         json_fail(400, 'Invalid character selected. Please choose a valid character.');
       }
 
-      $cycle = getCycleInfo();
-      $zenCost = 0;
+      // Get user's pass info for current_day calculation
+      $stmt = $pdo->prepare("SELECT activated_at, tier AS db_tier, expires_at FROM user_gamepass WHERE user_id = ?");
+      $stmt->execute(array($userId));
+      $gpInfo = $stmt->fetch(PDO::FETCH_ASSOC);
 
+      $userActivatedAt = ($gpInfo && isset($gpInfo['activated_at'])) ? $gpInfo['activated_at'] : null;
+      $userCurrentDay = getUserCurrentDay($userActivatedAt);
+      $cycleStart = getUserCycleStart($userActivatedAt);
+
+      $zenCost = 0;
       $zenSkipCost = getZenSkipCost();
       
       // Check if day is in the future (locked)
-      if ($day > $cycle['current_day']) {
+      if ($day > $userCurrentDay) {
         if ($tier === 'free') {
-          $daysAhead = $day - $cycle['current_day'];
+          $daysAhead = $day - $userCurrentDay;
           $zenCost = $daysAhead * $zenSkipCost;
 
           if (!$payWithZen) {
@@ -441,48 +406,32 @@ try {
             ));
           }
         } else {
-          json_fail(400, 'Cannot claim future Elite rewards');
+          json_fail(400, 'Cannot claim future Premium rewards');
         }
       }
 
-      // Tier eligibility check - use expires_at (season-based)
-      if ($tier === 'elite' || $tier === 'gold') {
-        $stmt = $pdo->prepare("SELECT tier, expires_at, activated_at, days_total FROM user_gamepass WHERE user_id = ?");
-        $stmt->execute(array($userId));
-        $gpCheck = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$gpCheck) {
+      // Tier eligibility check
+      if ($tier === 'premium') {
+        if (!$gpInfo) {
           json_fail(403, 'No Game Pass found. Purchase a pass first.');
         }
         
-        $checkExpiry = isset($gpCheck['expires_at']) ? $gpCheck['expires_at'] : null;
-        $passActive = false;
-        if ($checkExpiry !== null) {
-          $passActive = isGamePassActiveByExpiry($checkExpiry);
-        } else {
-          // Legacy fallback
-          $checkActivated = isset($gpCheck['activated_at']) ? $gpCheck['activated_at'] : null;
-          $checkDays = isset($gpCheck['days_total']) ? (int)$gpCheck['days_total'] : 0;
-          $passActive = isGamePassActive($checkActivated, $checkDays);
-        }
+        $checkExpiry = isset($gpInfo['expires_at']) ? $gpInfo['expires_at'] : null;
+        $passActive = ($checkExpiry !== null) ? isGamePassActiveByExpiry($checkExpiry) : false;
         
         if (!$passActive) {
-          json_fail(403, 'Your Game Pass has expired. Please renew.');
+          json_fail(403, 'Your Premium Pass has expired. Please renew.');
         }
         
-        $dbTier = isset($gpCheck['tier']) ? $gpCheck['tier'] : 'free';
-        $tierRank = array('free' => 0, 'elite' => 1, 'gold' => 2);
-        $dbRank = isset($tierRank[$dbTier]) ? $tierRank[$dbTier] : 0;
-        $reqRank = isset($tierRank[$tier]) ? $tierRank[$tier] : 0;
-        
-        if ($dbRank < $reqRank) {
-          json_fail(403, 'You need ' . ucfirst($tier) . ' Pass to claim this reward.');
+        $dbTier = isset($gpInfo['db_tier']) ? $gpInfo['db_tier'] : 'free';
+        if ($dbTier !== 'premium') {
+          json_fail(403, 'You need Premium Pass to claim this reward.');
         }
       }
 
       // Check already claimed
       $stmt = $pdo->prepare("SELECT id FROM user_gamepass_claims WHERE user_id = ? AND day = ? AND tier = ? AND cycle_start = ?");
-      $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start']));
+      $stmt->execute(array($userId, $day, $tier, $cycleStart));
       if ($stmt->fetch()) {
         json_fail(400, 'Already claimed this reward today');
       }
@@ -498,17 +447,14 @@ try {
       $zenCostColExists = hasZenCostColumn();
       if ($zenCostColExists && $zenCost > 0) {
         $stmt = $pdo->prepare("INSERT INTO user_gamepass_claims (user_id, day, tier, cycle_start, reward_id, zen_cost, claimed_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start'], $reward['id'], $zenCost));
+        $stmt->execute(array($userId, $day, $tier, $cycleStart, $reward['id'], $zenCost));
       } else {
         $stmt = $pdo->prepare("INSERT INTO user_gamepass_claims (user_id, day, tier, cycle_start, reward_id, claimed_at) VALUES (?, ?, ?, ?, ?, NOW())");
-        $stmt->execute(array($userId, $day, $tier, $cycle['cycle_start'], $reward['id']));
+        $stmt->execute(array($userId, $day, $tier, $cycleStart, $reward['id']));
       }
 
       // Deliver reward
-      $deliveryResult = array('success' => true);
-      
       if ($reward['item_id'] === -4) {
-        // Bonus spins
         $spinsToAdd = max(1, $reward['quantity']);
         try {
           $pdo->exec("CREATE TABLE IF NOT EXISTS user_bonus_spins (
@@ -522,12 +468,10 @@ try {
           
           $stmt = $pdo->prepare("INSERT INTO user_bonus_spins (user_id, spins, reason, created_at) VALUES (?, ?, 'gamepass_reward', NOW())");
           $stmt->execute(array($userId, $spinsToAdd));
-          error_log("GAMEPASS_SPINS user={$userId} spins={$spinsToAdd} day={$day} tier={$tier}");
         } catch (Exception $e) {
           error_log("GAMEPASS_SPINS_ERR: " . $e->getMessage());
         }
       } elseif ($reward['item_id'] === -1) {
-        // Zen reward
         $zenAmount = $reward['zen'] > 0 ? $reward['zen'] : $reward['quantity'];
         if ($zenAmount > 0) {
           try {
@@ -542,7 +486,6 @@ try {
           }
         }
       } elseif ($reward['item_id'] === -2) {
-        // Coins reward
         $coinsAmount = $reward['coins'] > 0 ? $reward['coins'] : $reward['quantity'];
         if ($coinsAmount > 0) {
           try {
@@ -557,11 +500,9 @@ try {
           }
         }
       } elseif ($reward['item_id'] > 0) {
-        // Physical item - send via game mail
         $mailer = new GameMailer($pdo);
         $qty = max(1, $reward['quantity']);
-        $deliveryResult = $mailer->sendRewardMail($roleId, $reward['item_id'], $qty, "Game Pass Day {$day} ({$tier})");
-        error_log("GAMEPASS_DELIVER user={$userId} role={$roleId} item={$reward['item_id']} qty={$qty} success=" . ($deliveryResult['success'] ? 'yes' : 'no'));
+        $mailer->sendRewardMail($roleId, $reward['item_id'], $qty, "Game Pass Day {$day} ({$tier})");
       }
 
       $responseData = array(
