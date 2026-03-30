@@ -21,14 +21,14 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
   
   const sessionTimeoutMs = rememberMe ? REMEMBER_ME_TIMEOUT_MS : DEFAULT_SESSION_TIMEOUT_MS;
   
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const warningRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warningRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
   const lastServerRefreshRef = useRef<number>(Date.now());
-  const serverRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const serverRefreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showWarning, setShowWarning] = useState(false);
   const [remainingTime, setRemainingTime] = useState(0);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Refresh server-side session to prevent expiration
   const refreshServerSession = useCallback(async (): Promise<boolean> => {
@@ -237,7 +237,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     ];
 
     // Throttle activity updates to prevent excessive timer resets
-    let throttleTimeout: NodeJS.Timeout | null = null;
+    let throttleTimeout: ReturnType<typeof setTimeout> | null = null;
     const throttledResetTimer = () => {
       if (throttleTimeout) return;
       
