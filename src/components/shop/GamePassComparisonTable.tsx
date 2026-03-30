@@ -1,24 +1,22 @@
 import { motion } from "framer-motion";
-import { Check, X, Crown, Sparkles, Zap } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Check, X, Crown, Zap } from "lucide-react";
 
 interface ComparisonRow {
   feature: string;
   free: boolean | string;
-  elite: boolean | string;
-  gold: boolean | string;
+  premium: boolean | string;
 }
 
 const comparisonData: ComparisonRow[] = [
-  { feature: "Daily login rewards", free: true, elite: true, gold: true },
-  { feature: "Daily Zen bonus", free: "10", elite: "50", gold: "100 (2×)" },
-  { feature: "Daily Coins bonus", free: false, elite: "500", gold: "1500" },
-  { feature: "Daily EXP bonus", free: false, elite: "1000", gold: "3000" },
-  { feature: "Exclusive items & gear", free: false, elite: true, gold: true },
-  { feature: "Gold-only legendary items", free: false, elite: false, gold: true },
-  { feature: "In-game badge", free: false, elite: "Elite", gold: "Gold Crown" },
-  { feature: "Priority support", free: false, elite: false, gold: true },
-  { feature: "Duration", free: "∞", elite: "30 days", gold: "30 days" },
+  { feature: "Daily login rewards", free: true, premium: true },
+  { feature: "Daily Zen bonus", free: "10", premium: "100" },
+  { feature: "Daily Coins bonus", free: false, premium: "1500" },
+  { feature: "Daily EXP bonus", free: false, premium: "3000" },
+  { feature: "Exclusive items & gear", free: false, premium: true },
+  { feature: "Legendary items", free: false, premium: true },
+  { feature: "In-game badge", free: false, premium: "Premium Crown" },
+  { feature: "Priority support", free: false, premium: true },
+  { feature: "Duration", free: "∞", premium: "30 days" },
 ];
 
 const CellValue = ({ value }: { value: boolean | string }) => {
@@ -40,17 +38,16 @@ const CellValue = ({ value }: { value: boolean | string }) => {
 };
 
 interface GamePassComparisonTableProps {
-  elitePriceCents: number;
-  goldPriceCents: number;
+  premiumPriceCents: number;
 }
 
-export const GamePassComparisonTable = ({ elitePriceCents, goldPriceCents }: GamePassComparisonTableProps) => {
+export const GamePassComparisonTable = ({ premiumPriceCents }: GamePassComparisonTableProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="max-w-4xl mx-auto"
+      className="max-w-3xl mx-auto"
     >
       <div className="text-center mb-8">
         <h3 className="text-xl md:text-2xl font-display font-bold mb-2">Compare Tiers</h3>
@@ -59,13 +56,12 @@ export const GamePassComparisonTable = ({ elitePriceCents, goldPriceCents }: Gam
 
       <div className="glass-card rounded-2xl overflow-hidden border border-border/50">
         <div className="overflow-x-auto scrollbar-hide">
-          <div className="min-w-[500px]">
+          <div className="min-w-[400px]">
             {/* Header */}
-            <div className="grid grid-cols-[minmax(140px,1.5fr)_repeat(3,1fr)] gap-0 border-b border-border/50">
+            <div className="grid grid-cols-[minmax(140px,1.5fr)_repeat(2,1fr)] gap-0 border-b border-border/50">
               <div className="p-4 flex items-end sticky left-0 bg-card/95 backdrop-blur-sm z-10">
                 <span className="text-xs text-muted-foreground font-display uppercase tracking-wider">Feature</span>
               </div>
-              {/* Free */}
               <div className="p-4 text-center border-l border-border/30">
                 <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center mx-auto mb-2">
                   <Zap className="w-4 h-4 text-muted-foreground" />
@@ -73,26 +69,13 @@ export const GamePassComparisonTable = ({ elitePriceCents, goldPriceCents }: Gam
                 <p className="font-display font-bold text-sm">Free</p>
                 <p className="text-xs text-muted-foreground">€0</p>
               </div>
-              {/* Elite */}
-              <div className="p-4 text-center border-l border-border/30 bg-accent/5">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center mx-auto mb-2"
-                  style={{ background: "linear-gradient(135deg, hsl(270 70% 60%), hsl(280 80% 50%))" }}>
-                  <Crown className="w-4 h-4 text-white" />
-                </div>
-                <p className="font-display font-bold text-sm">Elite</p>
-                <p className="text-xs text-muted-foreground">€{(elitePriceCents / 100).toFixed(2)}</p>
-              </div>
-              {/* Gold */}
-              <div className="p-4 text-center border-l border-border/30 bg-hdr-orange/5 relative overflow-hidden">
-                <Badge className="absolute top-2 right-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-[8px] uppercase tracking-wider font-display px-1.5 py-0.5">
-                  Best
-                </Badge>
+              <div className="p-4 text-center border-l border-border/30 bg-amber-500/5 relative overflow-hidden">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center mx-auto mb-2"
                   style={{ background: "linear-gradient(135deg, hsl(38 90% 55%), hsl(25 95% 55%))" }}>
-                  <Sparkles className="w-4 h-4 text-white" />
+                  <Crown className="w-4 h-4 text-white" />
                 </div>
-                <p className="font-display font-bold text-sm">Gold</p>
-                <p className="text-xs text-muted-foreground">€{(goldPriceCents / 100).toFixed(2)}</p>
+                <p className="font-display font-bold text-sm">Premium</p>
+                <p className="text-xs text-muted-foreground">€{(premiumPriceCents / 100).toFixed(2)}</p>
               </div>
             </div>
 
@@ -103,7 +86,7 @@ export const GamePassComparisonTable = ({ elitePriceCents, goldPriceCents }: Gam
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.4 + i * 0.04 }}
-                className={`grid grid-cols-[minmax(140px,1.5fr)_repeat(3,1fr)] gap-0 ${i < comparisonData.length - 1 ? "border-b border-border/30" : ""} hover:bg-muted/20 transition-colors`}
+                className={`grid grid-cols-[minmax(140px,1.5fr)_repeat(2,1fr)] gap-0 ${i < comparisonData.length - 1 ? "border-b border-border/30" : ""} hover:bg-muted/20 transition-colors`}
               >
                 <div className="p-3 flex items-center sticky left-0 bg-card/95 backdrop-blur-sm z-10">
                   <span className="text-sm text-muted-foreground">{row.feature}</span>
@@ -111,11 +94,8 @@ export const GamePassComparisonTable = ({ elitePriceCents, goldPriceCents }: Gam
                 <div className="p-3 text-center flex items-center justify-center border-l border-border/20">
                   <CellValue value={row.free} />
                 </div>
-                <div className="p-3 text-center flex items-center justify-center border-l border-border/20 bg-accent/[0.03]">
-                  <CellValue value={row.elite} />
-                </div>
-                <div className="p-3 text-center flex items-center justify-center border-l border-border/20 bg-hdr-orange/[0.03]">
-                  <CellValue value={row.gold} />
+                <div className="p-3 text-center flex items-center justify-center border-l border-border/20 bg-amber-500/[0.03]">
+                  <CellValue value={row.premium} />
                 </div>
               </motion.div>
             ))}

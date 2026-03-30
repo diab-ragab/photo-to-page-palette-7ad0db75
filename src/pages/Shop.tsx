@@ -26,19 +26,13 @@ const Shop = () => {
   const { addToCart, totalItems } = useCart();
   const { user } = useAuth();
 
-  // Game pass pricing from API
-  const [elitePriceCents, setElitePriceCents] = useState(999);
-  const [goldPriceCents, setGoldPriceCents] = useState(1999);
-  const [eliteEnabled, setEliteEnabled] = useState(true);
-  const [goldEnabled, setGoldEnabled] = useState(true);
+  const [premiumPriceCents, setPremiumPriceCents] = useState(999);
+  const [premiumEnabled, setPremiumEnabled] = useState(true);
 
-  // Extension settings
   const [extensionsEnabled, setExtensionsEnabled] = useState(true);
-  const [eliteExtendPerDay, setEliteExtendPerDay] = useState(0);
-  const [goldExtendPerDay, setGoldExtendPerDay] = useState(0);
+  const [premiumExtendPerDay, setPremiumExtendPerDay] = useState(0);
 
-  // User's current pass info for extension
-  const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
+  const [userTier, setUserTier] = useState<"free" | "premium">("free");
   const [passExpiresAt, setPassExpiresAt] = useState<string | null>(null);
   const [passRemainingDays, setPassRemainingDays] = useState<number | undefined>(undefined);
 
@@ -52,22 +46,15 @@ const Shop = () => {
         ]);
         if (shopRes.success) setProducts(shopRes.products);
         if (passRes?.success) {
-          if (passRes.elite_enabled !== undefined) setEliteEnabled(passRes.elite_enabled);
-          if (passRes.gold_enabled !== undefined) setGoldEnabled(passRes.gold_enabled);
+          if (passRes.premium_enabled !== undefined) setPremiumEnabled(passRes.premium_enabled);
+          if (passRes.premium_price_cents) setPremiumPriceCents(passRes.premium_price_cents);
         }
-        // Prices from site_settings take priority
         if (settingsRes) {
-          const ep = parseInt(settingsRes.gamepass_elite_price);
-          const gp = parseInt(settingsRes.gamepass_gold_price);
-          if (!isNaN(ep) && ep > 0) setElitePriceCents(ep);
-          if (!isNaN(gp) && gp > 0) setGoldPriceCents(gp);
-          // Extension settings
+          const pp = parseInt(settingsRes.gamepass_premium_price || "0");
+          if (!isNaN(pp) && pp > 0) setPremiumPriceCents(pp);
           setExtensionsEnabled(settingsRes.extensions_enabled !== '0');
-          const eed = parseInt(settingsRes.elite_extend_per_day_cents);
-          const ged = parseInt(settingsRes.gold_extend_per_day_cents);
-          // If 0 or unset, auto-calculate from base price / 30
-          setEliteExtendPerDay(eed > 0 ? eed : Math.ceil((ep > 0 ? ep : 999) / 30));
-          setGoldExtendPerDay(ged > 0 ? ged : Math.ceil((gp > 0 ? gp : 1999) / 30));
+          const epd = parseInt(settingsRes.premium_extend_per_day_cents || "0");
+          setPremiumExtendPerDay(epd > 0 ? epd : Math.ceil((pp > 0 ? pp : 999) / 30));
         }
       } catch {
         // silent
@@ -78,21 +65,17 @@ const Shop = () => {
     loadData();
   }, []);
 
-  // Fetch user's current pass tier for extension cards (season-based)
   useEffect(() => {
     if (!user) return;
-    apiGet<any>(
-      `/gamepass.php?action=status&rid=${Date.now()}`,
-      true,
-      { showErrorToast: false, silentStatuses: [401, 403] }
-    ).then(data => {
-      if (data?.success) {
-        const tier = data.user_tier || (data.is_premium ? "elite" : "free");
-        setUserTier(tier as "free" | "elite" | "gold");
-        if (data.expires_at) setPassExpiresAt(data.expires_at);
-        if (data.remaining_days !== undefined) setPassRemainingDays(data.remaining_days);
-      }
-    }).catch(() => {});
+    apiGet<any>(`/gamepass.php?action=status&rid=${Date.now()}`, true, { showErrorToast: false, silentStatuses: [401, 403] })
+      .then(data => {
+        if (data?.success) {
+          const tier = data.user_tier || (data.is_premium ? "premium" : "free");
+          setUserTier(tier as "free" | "premium");
+          if (data.expires_at) setPassExpiresAt(data.expires_at);
+          if (data.remaining_days !== undefined) setPassRemainingDays(data.remaining_days);
+        }
+      }).catch(() => {});
   }, [user]);
 
   const handleAdd = (product: ShopProduct, qty = 1) => {
@@ -109,61 +92,34 @@ const Shop = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <SEO
-        title="Shop"
-        description="Flash sales and premium Game Pass for WOI Endgame. Get exclusive rewards, items, and bonuses."
-        keywords="WOI shop, game pass, flash sale, elite, gold"
-      />
+      <SEO title="Shop" description="Flash sales and premium Game Pass for WOI Endgame." keywords="WOI shop, game pass, flash sale, premium" />
       <Navbar />
 
-      {/* Hero */}
       <section className="pt-24 pb-16 relative overflow-hidden">
         <div className="absolute inset-0 hdr-bg opacity-30" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
         <div className="container mx-auto px-4 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center"
-          >
-            <h1 className="text-4xl md:text-6xl font-display font-bold mb-4">
-              <span className="text-gradient">Shop</span>
-            </h1>
-            <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-              Grab limited-time flash deals & unlock premium Game Pass tiers.
-            </p>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
+            <h1 className="text-4xl md:text-6xl font-display font-bold mb-4"><span className="text-gradient">Shop</span></h1>
+            <p className="text-muted-foreground max-w-lg mx-auto text-lg">Grab limited-time flash deals & unlock the Premium Game Pass.</p>
           </motion.div>
         </div>
       </section>
 
       <main className="container mx-auto px-4 pb-20 space-y-20">
-        {/* Floating cart bar */}
         {totalItems > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
             <Link to="/cart">
               <Button size="lg" className="gap-3 shadow-xl shadow-primary/20 rounded-full px-8">
-                <ShoppingCart className="w-5 h-5" />
-                <span>{totalItems} item{totalItems !== 1 ? "s" : ""} in cart</span>
-                <ArrowRight className="w-4 h-4" />
+                <ShoppingCart className="w-5 h-5" /><span>{totalItems} item{totalItems !== 1 ? "s" : ""} in cart</span><ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
           </motion.div>
         )}
 
-        {/* ─── FLASH SALES ─── */}
         <section>
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-3 mb-8"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-hdr-orange to-hdr-magenta flex items-center justify-center shadow-lg">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-hdr-orange to-hdr-magenta flex items-center justify-center shadow-lg"><Zap className="w-5 h-5 text-white" /></div>
             <div className="flex-1">
               <h2 className="text-2xl md:text-3xl font-display font-bold">Flash Sales</h2>
               <p className="text-sm text-muted-foreground">Limited time offers — grab them while you can!</p>
@@ -174,12 +130,7 @@ const Shop = () => {
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="glass-card p-4 space-y-3">
-                  <Skeleton className="h-36 w-full rounded-lg" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                </div>
+                <div key={i} className="glass-card p-4 space-y-3"><Skeleton className="h-36 w-full rounded-lg" /><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-full" /><Skeleton className="h-8 w-full" /></div>
               ))}
             </div>
           ) : products.length === 0 ? (
@@ -190,77 +141,45 @@ const Shop = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {products.map((product, i) => (
-                <FlashSaleCard
-                  key={product.id}
-                  product={product}
-                  index={i}
-                  onAdd={handleAdd}
-                />
-              ))}
+              {products.map((product, i) => (<FlashSaleCard key={product.id} product={product} index={i} onAdd={handleAdd} />))}
             </div>
           )}
         </section>
 
-        {/* ─── DIVIDER ─── */}
         <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center">
-            <span className="bg-background px-6 text-sm text-muted-foreground font-display uppercase tracking-widest">
-              Premium
-            </span>
-          </div>
+          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
+          <div className="relative flex justify-center"><span className="bg-background px-6 text-sm text-muted-foreground font-display uppercase tracking-widest">Premium</span></div>
         </div>
 
-        {/* ─── GAME PASS ─── */}
         <section className="relative">
           <GamePassParticles />
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-10 relative z-10"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/20">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10 relative z-10">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/20">
               <Crown className="w-7 h-7 text-white" />
             </div>
             <h2 className="text-2xl md:text-3xl font-display font-bold mb-2">Game Pass</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Unlock exclusive daily rewards, premium items, and in-game perks for 30 days.
-            </p>
+            <p className="text-muted-foreground max-w-md mx-auto">Unlock exclusive daily rewards, premium items, and in-game perks for 30 days.</p>
           </motion.div>
 
-          <GamePassCards
-            elitePriceCents={elitePriceCents}
-            goldPriceCents={goldPriceCents}
-            eliteEnabled={eliteEnabled}
-            goldEnabled={goldEnabled}
-          />
+          <GamePassCards premiumPriceCents={premiumPriceCents} premiumEnabled={premiumEnabled} />
 
-          {/* Comparison Table */}
           <div className="mt-16">
-            <GamePassComparisonTable
-              elitePriceCents={elitePriceCents}
-              goldPriceCents={goldPriceCents}
-            />
+            <GamePassComparisonTable premiumPriceCents={premiumPriceCents} />
           </div>
 
-          {/* Extension Cards — shown only for users with active pass and if enabled */}
           {extensionsEnabled && userTier !== "free" && (
             <div className="mt-16">
               <GamePassExtendCards
-                userTier={userTier}
+                userTier={userTier as "free" | "elite" | "gold"}
                 passExpiresAt={passExpiresAt}
                 passRemainingDays={passRemainingDays}
-                elitePerDayCents={eliteExtendPerDay}
-                goldPerDayCents={goldExtendPerDay}
+                elitePerDayCents={premiumExtendPerDay}
+                goldPerDayCents={premiumExtendPerDay}
               />
             </div>
           )}
         </section>
 
-        {/* ─── LIVE ACTIVITY ─── */}
         <LiveActivityFeed />
       </main>
 
