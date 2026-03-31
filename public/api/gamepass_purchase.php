@@ -102,7 +102,7 @@ $totalCents = $premiumCents;
 if ($totalCents < 50) $totalCents = 50;
 
 $totalFormatted = number_format($totalCents / 100, 2, '.', '');
-$productName = 'Premium Game Pass (30 days)';
+$productName = 'Premium Game Pass - Season ' . $seasonNumber;
 
 // PayPal
 $ppCfg = getPayPalConfig();

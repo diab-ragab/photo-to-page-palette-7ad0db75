@@ -396,7 +396,7 @@ export const GamePass = () => {
 
         <div className="mt-6 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Day <span className="font-bold text-foreground">{currentDay}</span> of 30</span>
+            <span className="text-muted-foreground">Season Day <span className="font-bold text-foreground">{currentDay}</span> of 30</span>
             <span className="font-bold text-primary">{Math.round(progressPercent)}%</span>
           </div>
           <div className="relative h-2 rounded-full bg-muted/50 overflow-hidden">
