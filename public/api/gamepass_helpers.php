@@ -1,15 +1,98 @@
 <?php
 /**
  * gamepass_helpers.php - Shared Game Pass helper functions
- * PHP 5.x compatible (no closures, no short arrays, no ??)
+ * PHP 5.x compatible
  *
- * INDIVIDUAL 30-DAY MODEL:
- * Each user gets exactly 30 days from their purchase/activation date.
- * Free pass has no expiry. Premium pass = activated_at + 30 days.
- * current_day = floor((now - activated_at) / 86400) + 1, capped at 30.
- *
+ * GLOBAL 30-DAY SEASON MODEL:
+ * All players share the same 30-day season timeline.
+ * Season auto-rotates every 30 days.
+ * New players start from Day 1 and can claim all past days.
  * 2 Tiers: free, premium
  */
+
+/**
+ * Get the global season info - auto-rotates every 30 days
+ * Returns: season_start, season_end, current_day (1-30), remaining_days, season_number, cycle_start
+ */
+if (!function_exists('getGlobalSeasonInfo')) {
+    function getGlobalSeasonInfo($pdo) {
+        $seasonStart = null;
+        try {
+            $stmt = $pdo->prepare("SELECT setting_value FROM gamepass_settings WHERE setting_key = 'season_start'");
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row && trim($row['setting_value']) !== '') {
+                $seasonStart = $row['setting_value'];
+            }
+        } catch (Exception $e) {}
+
+        // If no season_start, create one (today at midnight)
+        if (!$seasonStart) {
+            $seasonStart = date('Y-m-d 00:00:00');
+            try {
+                $pdo->prepare("INSERT IGNORE INTO gamepass_settings (setting_key, setting_value, updated_at) VALUES ('season_start', ?, NOW())")
+                    ->execute(array($seasonStart));
+            } catch (Exception $e) {}
+        }
+
+        $startTs = strtotime($seasonStart);
+        if ($startTs === false) {
+            $startTs = strtotime(date('Y-m-d 00:00:00'));
+        }
+        $now = time();
+        $elapsed = $now - $startTs;
+        $daysSinceStart = (int)floor($elapsed / 86400);
+
+        // Auto-rotate: if past 30 days, advance season
+        $seasonNumber = 1;
+        // Read season number from DB
+        try {
+            $stmt = $pdo->prepare("SELECT setting_value FROM gamepass_settings WHERE setting_key = 'season_number'");
+            $stmt->execute();
+            $snRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($snRow) $seasonNumber = max(1, (int)$snRow['setting_value']);
+        } catch (Exception $e) {}
+
+        $rotated = false;
+        while ($daysSinceStart >= 30) {
+            $startTs += 30 * 86400;
+            $daysSinceStart -= 30;
+            $seasonNumber++;
+            $rotated = true;
+        }
+
+        if ($rotated) {
+            $newStart = date('Y-m-d H:i:s', $startTs);
+            try {
+                $pdo->prepare("UPDATE gamepass_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = 'season_start'")
+                    ->execute(array($newStart));
+            } catch (Exception $e) {}
+            try {
+                // Upsert season_number
+                $pdo->prepare("INSERT INTO gamepass_settings (setting_key, setting_value, updated_at) VALUES ('season_number', ?, NOW()) ON DUPLICATE KEY UPDATE setting_value = ?, updated_at = NOW()")
+                    ->execute(array($seasonNumber, $seasonNumber));
+            } catch (Exception $e) {}
+            $seasonStart = $newStart;
+
+            // Reset all claims for the new season (old cycle_start won't match anyway)
+            error_log("SEASON_ROTATED to season #{$seasonNumber} start={$newStart}");
+        }
+
+        $currentDay = $daysSinceStart + 1; // 1-30
+        $seasonEnd = date('Y-m-d H:i:s', $startTs + 30 * 86400);
+        $remainingDays = 30 - $daysSinceStart;
+        $cycleStart = date('Y-m-d', $startTs);
+
+        return array(
+            'season_start' => $seasonStart,
+            'season_end' => $seasonEnd,
+            'current_day' => $currentDay,
+            'remaining_days' => $remainingDays,
+            'season_number' => $seasonNumber,
+            'cycle_start' => $cycleStart,
+        );
+    }
+}
 
 /**
  * Calculate remaining days from expires_at
@@ -36,54 +119,19 @@ if (!function_exists('isGamePassActiveByExpiry')) {
 }
 
 /**
- * Get the current day for a user based on their activated_at date
- * Returns 1-30 (capped)
- */
-if (!function_exists('getUserCurrentDay')) {
-    function getUserCurrentDay($activatedAt) {
-        if ($activatedAt === null || trim($activatedAt) === '') return 1;
-        $activatedTs = strtotime($activatedAt);
-        if ($activatedTs === false) return 1;
-        $elapsed = floor((time() - $activatedTs) / 86400);
-        $day = (int)$elapsed + 1;
-        if ($day < 1) $day = 1;
-        if ($day > 30) $day = 30;
-        return $day;
-    }
-}
-
-/**
- * Get the cycle_start date for a user (date portion of activated_at)
- */
-if (!function_exists('getUserCycleStart')) {
-    function getUserCycleStart($activatedAt) {
-        if ($activatedAt === null || trim($activatedAt) === '') return date('Y-m-d');
-        $ts = strtotime($activatedAt);
-        if ($ts === false) return date('Y-m-d');
-        return date('Y-m-d', $ts);
-    }
-}
-
-/**
  * Get first active RoleID for a user
  */
 if (!function_exists('getFirstRoleIdForUser')) {
     function getFirstRoleIdForUser($pdo, $userId) {
         $userId = (int)$userId;
         if ($userId <= 0) return 0;
-
         $stmt = $pdo->prepare("SELECT name FROM users WHERE id = ? LIMIT 1");
         $stmt->execute(array($userId));
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
         if (!$user) return 0;
-
-        $accountName = $user['name'];
-
         $stmt = $pdo->prepare("SELECT RoleID FROM basetab_sg WHERE AccountID = ? AND IsDel = 0 ORDER BY RoleID ASC LIMIT 1");
-        $stmt->execute(array($accountName));
+        $stmt->execute(array($user['name']));
         $char = $stmt->fetch(PDO::FETCH_ASSOC);
-
         return $char ? intval($char['RoleID']) : 0;
     }
 }
@@ -108,7 +156,6 @@ if (!function_exists('ensureGamePassTables')) {
             KEY idx_user (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 
-        // Safe column adds
         try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free'"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN paypal_order_id VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN updated_at DATETIME DEFAULT NULL"); } catch (Exception $e) {}
@@ -171,14 +218,11 @@ if (!function_exists('ensureGamePassTables')) {
 
 /**
  * Auto-activate Free Pass for a user (one-time, idempotent)
- * Free pass: activated_at = NOW, no expiry
  */
 if (!function_exists('autoActivateFreePass')) {
     function autoActivateFreePass($pdo, $userId, $RID) {
         $userId = (int)$userId;
-        if ($userId <= 0) {
-            return array('success' => false, 'message' => 'Invalid user ID');
-        }
+        if ($userId <= 0) return array('success' => false, 'message' => 'Invalid user ID');
 
         ensureGamePassTables($pdo);
 
@@ -190,7 +234,6 @@ if (!function_exists('autoActivateFreePass')) {
             return array('success' => true, 'message' => 'Pass already exists', 'tier' => $existing['tier'], 'new' => false);
         }
 
-        // Free pass: activated_at = now, no expiry
         $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, activated_at, days_total, expires_at, created_at, updated_at) VALUES (?, 0, 'free', NOW(), 30, NULL, NOW(), NOW())");
         $stmt->execute(array($userId));
 
@@ -242,12 +285,10 @@ if (!function_exists('ensureExtensionTable')) {
 
 /**
  * Extend a Game Pass by adding days to expires_at
- * Individual model: stack days on current expiry, or start from now if expired
  */
 if (!function_exists('extendGamePass')) {
     function extendGamePass($pdo, $userId, $tier, $paypalOrderId, $captureId, $extensionId, $RID) {
         $userId = (int)$userId;
-
         ensureExtensionTable($pdo);
 
         $extStmt = $pdo->prepare("SELECT days_added FROM gamepass_extensions WHERE id = ? LIMIT 1");
@@ -276,11 +317,9 @@ if (!function_exists('extendGamePass')) {
 
         if ($gp) {
             $oldExpiry = isset($gp['expires_at']) ? $gp['expires_at'] : null;
-
             if ($oldExpiry !== null && isGamePassActiveByExpiry($oldExpiry)) {
                 $newExpiryTs = strtotime($oldExpiry) + ($days * 86400);
             } else {
-                // Expired - start from now
                 $newExpiryTs = time() + ($days * 86400);
             }
             $newExpiry = date('Y-m-d H:i:s', $newExpiryTs);
@@ -301,14 +340,13 @@ if (!function_exists('extendGamePass')) {
         $stmt->execute(array($oldExpiry, $newExpiry, $captureId, $extensionId));
 
         error_log("RID={$RID} EXTEND_COMPLETED user={$userId} tier={$tier} days={$days} new_expiry={$newExpiry}");
-
         return array('success' => true, 'message' => 'Pass extended', 'days_added' => $days, 'days_total' => $newDaysTotal);
     }
 }
 
 /**
- * Activate a paid Game Pass (premium) - INDIVIDUAL 30-DAY MODEL
- * Sets expires_at to NOW + 30 days
+ * Activate a paid Game Pass (premium) - GLOBAL SEASON MODEL
+ * Sets expires_at to the end of the current season
  */
 if (!function_exists('activatePaidGamePass')) {
     function activatePaidGamePass($pdo, $userId, $tier, $paypalOrderId, $captureId, $RID) {
@@ -323,18 +361,16 @@ if (!function_exists('activatePaidGamePass')) {
         // Idempotency
         $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ? AND paypal_order_id = ?");
         $stmt->execute(array($userId, $paypalOrderId));
-        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
-            return false;
-        }
+        if ($stmt->fetch(PDO::FETCH_ASSOC)) return false;
 
         $stmt = $pdo->prepare("SELECT id FROM gamepass_purchases WHERE paypal_order_id = ? AND status = 'completed' LIMIT 1");
         $stmt->execute(array($paypalOrderId));
-        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
-            return false;
-        }
+        if ($stmt->fetch(PDO::FETCH_ASSOC)) return false;
 
+        // Get season end for expiry
+        $seasonInfo = getGlobalSeasonInfo($pdo);
+        $expiresAt = $seasonInfo['season_end'];
         $nowStr = date('Y-m-d H:i:s');
-        $expiresAt = date('Y-m-d H:i:s', time() + (30 * 86400));
 
         // Upsert user_gamepass
         $stmt = $pdo->prepare("SELECT id, expires_at FROM user_gamepass WHERE user_id = ?");
@@ -342,19 +378,13 @@ if (!function_exists('activatePaidGamePass')) {
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($existing) {
-            $oldExpiry = isset($existing['expires_at']) ? $existing['expires_at'] : null;
-
-            // If still active, stack 30 days on top
-            if ($oldExpiry !== null && isGamePassActiveByExpiry($oldExpiry)) {
-                $expiresAt = date('Y-m-d H:i:s', strtotime($oldExpiry) + (30 * 86400));
-            }
-
             $newDaysTotal = (int)ceil((strtotime($expiresAt) - time()) / 86400);
             $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = 'premium', activated_at = ?, days_total = ?, expires_at = ?, paypal_order_id = ?, updated_at = NOW() WHERE user_id = ?");
             $stmt->execute(array($nowStr, $newDaysTotal, $expiresAt, $paypalOrderId, $userId));
         } else {
-            $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, activated_at, days_total, expires_at, paypal_order_id, created_at, updated_at) VALUES (?, 1, 'premium', ?, 30, ?, ?, NOW(), NOW())");
-            $stmt->execute(array($userId, $nowStr, $expiresAt, $paypalOrderId));
+            $daysTotal = (int)ceil((strtotime($expiresAt) - time()) / 86400);
+            $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, activated_at, days_total, expires_at, paypal_order_id, created_at, updated_at) VALUES (?, 1, 'premium', ?, ?, ?, ?, NOW(), NOW())");
+            $stmt->execute(array($userId, $nowStr, $daysTotal, $expiresAt, $paypalOrderId));
         }
 
         // Update purchases
