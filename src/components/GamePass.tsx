@@ -204,9 +204,9 @@ export const GamePass = () => {
   const clearClaimAnimation = useCallback(() => setClaimAnimation(null), []);
 
   useEffect(() => {
-    const timer = setInterval(() => setTimeLeft(getPassResetTime(passExpiresAt)), 1000);
+    const timer = setInterval(() => setTimeLeft(getCountdown(seasonEnd)), 1000);
     return () => clearInterval(timer);
-  }, [passExpiresAt]);
+  }, [seasonEnd]);
 
   useEffect(() => {
     const fetchRewards = async () => {
