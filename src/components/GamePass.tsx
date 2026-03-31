@@ -218,6 +218,11 @@ export const GamePass = () => {
           if (data.premium_price_cents) setPremiumPriceCents(data.premium_price_cents);
           if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
           if (data.premium_enabled !== undefined) setPremiumEnabled(data.premium_enabled);
+          if (data.season) {
+            setSeasonEnd(data.season.season_end);
+            setSeasonNumber(data.season.season_number || 1);
+            if (data.season.current_day) setCurrentDay(data.season.current_day);
+          }
         }
       } catch {} finally { setIsLoadingRewards(false); }
     };
