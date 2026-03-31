@@ -3,7 +3,7 @@
  * gamepass_purchase.php - Create PayPal order to purchase Premium Game Pass
  * POST { character_name: "..." }
  * Returns { success: true, url: "...", paypal_order_id: "..." }
- * PHP 5.3+ compatible - INDIVIDUAL 30-DAY MODEL
+ * PHP 5.3+ compatible - GLOBAL 30-DAY SEASON MODEL
  */
 
 require_once __DIR__ . '/bootstrap.php';
@@ -102,7 +102,11 @@ $totalCents = $premiumCents;
 if ($totalCents < 50) $totalCents = 50;
 
 $totalFormatted = number_format($totalCents / 100, 2, '.', '');
-$productName = 'Premium Game Pass (30 days)';
+
+// Get global season info
+$seasonInfo = getGlobalSeasonInfo($pdo);
+$seasonNumber = $seasonInfo['season_number'];
+$productName = 'Premium Game Pass - Season ' . $seasonNumber;
 
 // PayPal
 $ppCfg = getPayPalConfig();

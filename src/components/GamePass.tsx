@@ -55,9 +55,9 @@ const SparkleEffect = ({ show }: { show: boolean }) => {
   );
 };
 
-const getPassResetTime = (expiresAt?: string | null) => {
-  if (!expiresAt) return { days: 0, hours: 0, minutes: 0, seconds: 0, totalMs: 0 };
-  const diff = Math.max(0, new Date(expiresAt).getTime() - Date.now());
+const getCountdown = (endDate?: string | null) => {
+  if (!endDate) return { days: 0, hours: 0, minutes: 0, seconds: 0, totalMs: 0 };
+  const diff = Math.max(0, new Date(endDate).getTime() - Date.now());
   return {
     days: Math.floor(diff / (1000 * 60 * 60 * 24)),
     hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
@@ -184,7 +184,9 @@ export const GamePass = () => {
   const [currentDay, setCurrentDay] = useState(1);
   const [loading, setLoading] = useState(false);
   const [passExpiresAt, setPassExpiresAt] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState(getPassResetTime(null));
+  const [seasonEnd, setSeasonEnd] = useState<string | null>(null);
+  const [seasonNumber, setSeasonNumber] = useState(1);
+  const [timeLeft, setTimeLeft] = useState(getCountdown(null));
   const [rewards, setRewards] = useState<PassReward[]>([]);
   const [isLoadingRewards, setIsLoadingRewards] = useState(true);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
@@ -202,9 +204,9 @@ export const GamePass = () => {
   const clearClaimAnimation = useCallback(() => setClaimAnimation(null), []);
 
   useEffect(() => {
-    const timer = setInterval(() => setTimeLeft(getPassResetTime(passExpiresAt)), 1000);
+    const timer = setInterval(() => setTimeLeft(getCountdown(seasonEnd)), 1000);
     return () => clearInterval(timer);
-  }, [passExpiresAt]);
+  }, [seasonEnd]);
 
   useEffect(() => {
     const fetchRewards = async () => {
@@ -216,6 +218,11 @@ export const GamePass = () => {
           if (data.premium_price_cents) setPremiumPriceCents(data.premium_price_cents);
           if (data.gamepass_enabled !== undefined) setGamepassEnabled(data.gamepass_enabled);
           if (data.premium_enabled !== undefined) setPremiumEnabled(data.premium_enabled);
+          if (data.season) {
+            setSeasonEnd(data.season.season_end);
+            setSeasonNumber(data.season.season_number || 1);
+            if (data.season.current_day) setCurrentDay(data.season.current_day);
+          }
         }
       } catch {} finally { setIsLoadingRewards(false); }
     };
@@ -231,7 +238,13 @@ export const GamePass = () => {
           setHasPremiumPass(!!data.is_premium);
           setUserTier(data.user_tier === 'premium' ? 'premium' : 'free');
           if (data.expires_at) setPassExpiresAt(data.expires_at);
-          if (data.current_day) setCurrentDay(data.current_day);
+          if (data.season) {
+            setSeasonEnd(data.season.season_end);
+            setSeasonNumber(data.season.season_number || 1);
+            if (data.season.current_day) setCurrentDay(data.season.current_day);
+          } else if (data.current_day) {
+            setCurrentDay(data.current_day);
+          }
           setClaimedDays({ free: data.claimed_days?.free || [], premium: data.claimed_days?.premium || [] });
           if (data.user_zen !== undefined) setUserZen(data.user_zen);
           if (data.zen_cost_per_day > 0) setZenCostPerDay(data.zen_cost_per_day);
@@ -332,7 +345,7 @@ export const GamePass = () => {
                 </div>
               </div>
               <div>
-                <h2 className="text-2xl font-bold tracking-tight">Game Pass</h2>
+                <h2 className="text-2xl font-bold tracking-tight">Season {seasonNumber}</h2>
                 <div className="flex items-center gap-2 mt-1">
                   {userTier === "premium" && (
                     <Badge className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-bold text-xs animate-pulse">
@@ -342,7 +355,7 @@ export const GamePass = () => {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-4 text-sm flex-wrap">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/50">
                 <Gift className="h-4 w-4 text-primary" /><span className="text-muted-foreground">Free:</span>
                 <span className="font-bold text-foreground">{claimedDays.free.length}/30</span>
@@ -362,9 +375,9 @@ export const GamePass = () => {
           </div>
 
           <div className="flex flex-col items-end gap-3">
-            {userTier === "premium" && passExpiresAt && (
+            {seasonEnd && (
               <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground animate-pulse" /><span className="text-muted-foreground">Pass Expires in</span>
+                <Clock className="h-4 w-4 text-muted-foreground animate-pulse" /><span className="text-muted-foreground">Season Ends in</span>
                 <div className="flex gap-1">
                   {[{ v: timeLeft.days, l: "d" }, { v: String(timeLeft.hours).padStart(2, "0"), l: "h" }, { v: String(timeLeft.minutes).padStart(2, "0"), l: "m" }, { v: String(timeLeft.seconds).padStart(2, "0"), l: "s" }].map((t, i) => (
                     <div key={i} className="px-2 py-1 rounded-md bg-muted/80 border border-border/50 font-mono text-sm font-bold">{t.v}<span className="text-muted-foreground text-xs">{t.l}</span></div>
@@ -383,7 +396,7 @@ export const GamePass = () => {
 
         <div className="mt-6 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Day <span className="font-bold text-foreground">{currentDay}</span> of 30</span>
+            <span className="text-muted-foreground">Season Day <span className="font-bold text-foreground">{currentDay}</span> of 30</span>
             <span className="font-bold text-primary">{Math.round(progressPercent)}%</span>
           </div>
           <div className="relative h-2 rounded-full bg-muted/50 overflow-hidden">

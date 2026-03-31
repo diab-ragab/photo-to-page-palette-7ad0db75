@@ -2,7 +2,7 @@
 /**
  * gamepass.php - Game Pass status and reward claiming API
  * PHP 5.x compatible
- * INDIVIDUAL 30-DAY MODEL: each user has their own 30-day cycle
+ * GLOBAL 30-DAY SEASON MODEL: all players share the same season timeline
  * 2 Tiers: free, premium
  *
  * GET  ?action=status
@@ -79,7 +79,6 @@ function getZenSkipCost() {
   }
 }
 
-// Detect reward table columns dynamically
 function getRewardColumns() {
   global $pdo;
   try {
@@ -92,30 +91,22 @@ function getRewardColumns() {
 
 function fetchRewards($whereClause = '', $params = array()) {
   global $pdo;
-  
   $cols = getRewardColumns();
-  
   $nameCol = in_array('reward_name', $cols) ? 'reward_name' : (in_array('item_name', $cols) ? 'item_name' : 'name');
-  
   $selectParts = array('id', 'day', 'tier', 'item_id', 'quantity', 'rarity', 'icon');
   $selectParts[] = "$nameCol as item_name";
-  
   $hasCoins = in_array('coins', $cols);
   $hasZen = in_array('zen', $cols);
   $hasExp = in_array('exp', $cols);
-  
   if ($hasCoins) $selectParts[] = 'coins';
   if ($hasZen) $selectParts[] = 'zen';
   if ($hasExp) $selectParts[] = 'exp';
-  
   $sql = "SELECT " . implode(', ', $selectParts) . " FROM gamepass_rewards";
   if ($whereClause) $sql .= " WHERE $whereClause";
   $sql .= " ORDER BY day ASC, tier ASC";
-  
   $stmt = $pdo->prepare($sql);
   $stmt->execute($params);
   $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-  
   $rewards = array();
   foreach ($rows as $r) {
     $reward = array(
@@ -131,7 +122,6 @@ function fetchRewards($whereClause = '', $params = array()) {
       'rarity' => isset($r['rarity']) && $r['rarity'] !== '' ? $r['rarity'] : 'common',
       'icon' => isset($r['icon']) && $r['icon'] !== '' ? $r['icon'] : 'GIFT'
     );
-    
     if ($reward['item_id'] === -1) {
       if ($reward['zen'] <= 0) $reward['zen'] = $reward['quantity'];
       $reward['quantity'] = 0;
@@ -142,10 +132,8 @@ function fetchRewards($whereClause = '', $params = array()) {
       if ($reward['exp'] <= 0) $reward['exp'] = $reward['quantity'];
       $reward['quantity'] = 0;
     }
-    
     $rewards[] = $reward;
   }
-  
   return $rewards;
 }
 
@@ -184,7 +172,6 @@ try {
 
     case 'rewards':
       $rewards = fetchRewards();
-
       $premiumPriceCents = 999;
       $gamepassEnabled = true;
       $premiumEnabled = true;
@@ -213,13 +200,18 @@ try {
         }
       } catch (Exception $e) {}
 
+      // Get global season info
+      ensureGamePassTables($pdo);
+      $seasonInfo = getGlobalSeasonInfo($pdo);
+
       json_out(200, array(
         'success' => true,
         'zen_cost_per_day' => getZenSkipCost(),
         'premium_price_cents' => $premiumPriceCents,
         'gamepass_enabled' => $gamepassEnabled,
         'premium_enabled' => $premiumEnabled,
-        'rewards' => formatRewards($rewards)
+        'rewards' => formatRewards($rewards),
+        'season' => $seasonInfo
       ));
       break;
 
@@ -230,15 +222,18 @@ try {
       }
 
       $userId = (int)$user['user_id'];
+      ensureGamePassTables($pdo);
+
+      // Get GLOBAL season info
+      $seasonInfo = getGlobalSeasonInfo($pdo);
+      $currentDay = $seasonInfo['current_day'];
+      $cycleStart = $seasonInfo['cycle_start'];
 
       // Get user's gamepass info
       $isPremium = false;
       $userTier = 'free';
       $expiresAt = null;
       $remainingDays = 0;
-      $activatedAt = null;
-      $currentDay = 1;
-      $cycleStart = date('Y-m-d');
 
       try {
         $stmt = $pdo->prepare("SELECT is_premium, tier, activated_at, days_total, expires_at FROM user_gamepass WHERE user_id = ?");
@@ -246,13 +241,8 @@ try {
         $gp = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($gp) {
-          $activatedAt = isset($gp['activated_at']) ? $gp['activated_at'] : null;
           $expiresAt = isset($gp['expires_at']) ? $gp['expires_at'] : null;
           $dbTier = isset($gp['tier']) ? $gp['tier'] : 'free';
-
-          // Calculate current day from activated_at
-          $currentDay = getUserCurrentDay($activatedAt);
-          $cycleStart = getUserCycleStart($activatedAt);
 
           if ($dbTier === 'premium') {
             $userTier = 'premium';
@@ -260,7 +250,6 @@ try {
               $isPremium = isGamePassActiveByExpiry($expiresAt);
               $remainingDays = getGamePassRemainingDaysFromExpiry($expiresAt);
             }
-            // If expired, reset display to free
             if (!$isPremium) {
               $userTier = 'free';
             }
@@ -272,13 +261,12 @@ try {
 
       $userZen = getUserZenBalance($userId);
 
-      // Claims for this user's cycle
+      // Claims for this season (cycle_start)
       $claimedDays = array('free' => array(), 'premium' => array());
       try {
         $stmt = $pdo->prepare("SELECT day, tier FROM user_gamepass_claims WHERE user_id = ? AND cycle_start = ?");
         $stmt->execute(array($userId, $cycleStart));
         $claims = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
         foreach ($claims as $c) {
           $t = isset($c['tier']) ? $c['tier'] : 'free';
           if (isset($claimedDays[$t])) {
@@ -317,7 +305,7 @@ try {
         'user_tier' => $userTier,
         'current_day' => $currentDay,
         'cycle_start' => $cycleStart,
-        'days_remaining' => $remainingDays,
+        'days_remaining' => $seasonInfo['remaining_days'],
         'claimed_days' => $claimedDays,
         'user_zen' => $userZen,
         'zen_cost_per_day' => getZenSkipCost(),
@@ -328,7 +316,7 @@ try {
         'expires_at' => $expiresAt,
         'remaining_days' => $remainingDays,
         'pass_active' => $isPremium,
-        'activated_at' => $activatedAt
+        'season' => $seasonInfo
       ));
       break;
 
@@ -368,22 +356,20 @@ try {
         json_fail(400, 'Invalid character selected. Please choose a valid character.');
       }
 
-      // Get user's pass info for current_day calculation
-      $stmt = $pdo->prepare("SELECT activated_at, tier AS db_tier, expires_at FROM user_gamepass WHERE user_id = ?");
-      $stmt->execute(array($userId));
-      $gpInfo = $stmt->fetch(PDO::FETCH_ASSOC);
+      ensureGamePassTables($pdo);
 
-      $userActivatedAt = ($gpInfo && isset($gpInfo['activated_at'])) ? $gpInfo['activated_at'] : null;
-      $userCurrentDay = getUserCurrentDay($userActivatedAt);
-      $cycleStart = getUserCycleStart($userActivatedAt);
+      // Use GLOBAL season info for current_day and cycle_start
+      $seasonInfo = getGlobalSeasonInfo($pdo);
+      $seasonCurrentDay = $seasonInfo['current_day'];
+      $cycleStart = $seasonInfo['cycle_start'];
 
       $zenCost = 0;
       $zenSkipCost = getZenSkipCost();
       
-      // Check if day is in the future (locked)
-      if ($day > $userCurrentDay) {
+      // Check if day is in the future (locked) based on GLOBAL season day
+      if ($day > $seasonCurrentDay) {
         if ($tier === 'free') {
-          $daysAhead = $day - $userCurrentDay;
+          $daysAhead = $day - $seasonCurrentDay;
           $zenCost = $daysAhead * $zenSkipCost;
 
           if (!$payWithZen) {
@@ -412,6 +398,10 @@ try {
 
       // Tier eligibility check
       if ($tier === 'premium') {
+        $stmt = $pdo->prepare("SELECT tier AS db_tier, expires_at FROM user_gamepass WHERE user_id = ?");
+        $stmt->execute(array($userId));
+        $gpInfo = $stmt->fetch(PDO::FETCH_ASSOC);
+
         if (!$gpInfo) {
           json_fail(403, 'No Game Pass found. Purchase a pass first.');
         }
@@ -429,7 +419,7 @@ try {
         }
       }
 
-      // Check already claimed
+      // Check already claimed (using global cycle_start)
       $stmt = $pdo->prepare("SELECT id FROM user_gamepass_claims WHERE user_id = ? AND day = ? AND tier = ? AND cycle_start = ?");
       $stmt->execute(array($userId, $day, $tier, $cycleStart));
       if ($stmt->fetch()) {
@@ -443,7 +433,7 @@ try {
       }
       $reward = $rewards[0];
 
-      // Insert claim
+      // Insert claim with global cycle_start
       $zenCostColExists = hasZenCostColumn();
       if ($zenCostColExists && $zenCost > 0) {
         $stmt = $pdo->prepare("INSERT INTO user_gamepass_claims (user_id, day, tier, cycle_start, reward_id, zen_cost, claimed_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");

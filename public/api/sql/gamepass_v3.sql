@@ -1,7 +1,8 @@
 -- =============================================
--- Game Pass V3 - Individual 30-Day Model
+-- Game Pass V3 - Global 30-Day Season Model
 -- 2 Tiers: Free + Premium
--- Each player gets 30 days from their purchase date
+-- All players share the same season timeline
+-- Season auto-rotates every 30 days
 -- =============================================
 
 -- STEP 1: Drop old data (CAUTION: deletes everything)
@@ -23,7 +24,11 @@ INSERT IGNORE INTO gamepass_settings (setting_key, setting_value, updated_at) VA
 INSERT IGNORE INTO gamepass_settings (setting_key, setting_value, updated_at) VALUES ('zen_skip_cost', '100000', NOW());
 INSERT IGNORE INTO gamepass_settings (setting_key, setting_value, updated_at) VALUES ('gamepass_enabled', '1', NOW());
 
--- STEP 5: Update site_settings 
+-- STEP 5: Set global season start (today) and season number
+INSERT IGNORE INTO gamepass_settings (setting_key, setting_value, updated_at) VALUES ('season_start', NOW(), NOW());
+INSERT IGNORE INTO gamepass_settings (setting_key, setting_value, updated_at) VALUES ('season_number', '1', NOW());
+
+-- STEP 6: Update site_settings 
 DELETE FROM site_settings WHERE setting_key IN ('gamepass_gold_price', 'gamepass_elite_price');
 INSERT IGNORE INTO site_settings (setting_key, setting_value, updated_at) VALUES ('gamepass_premium_price', '999', NOW());
 

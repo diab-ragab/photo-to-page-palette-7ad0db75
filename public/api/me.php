@@ -1,7 +1,7 @@
 <?php
 /**
  * me.php - Current user info + auto Free Pass activation
- * PHP 5.x compatible - INDIVIDUAL 30-DAY MODEL, 2 Tiers (Free + Premium)
+ * PHP 5.x compatible - GLOBAL 30-DAY SEASON MODEL, 2 Tiers (Free + Premium)
  */
 
 ini_set('display_errors', '0');
@@ -43,8 +43,11 @@ $pdo = getDB();
 // Auto-activate Free Pass (idempotent)
 $freePassResult = autoActivateFreePass($pdo, $userId, $RID);
 
-// Get current gamepass info - INDIVIDUAL MODEL
-$gamepass = array('tier' => 'free', 'is_premium' => false, 'expires_at' => null, 'remaining_days' => 0, 'is_active' => false, 'current_day' => 1);
+// Get global season info
+$seasonInfo = getGlobalSeasonInfo($pdo);
+
+// Get current gamepass info
+$gamepass = array('tier' => 'free', 'is_premium' => false, 'expires_at' => null, 'remaining_days' => 0, 'is_active' => false, 'current_day' => $seasonInfo['current_day']);
 try {
   $stmt = $pdo->prepare("SELECT tier, is_premium, expires_at, activated_at, days_total FROM user_gamepass WHERE user_id = ? LIMIT 1");
   $stmt->execute(array($userId));
@@ -54,8 +57,8 @@ try {
     $gamepass['is_premium'] = (int)$gpRow['is_premium'] === 1;
     $gamepass['expires_at'] = isset($gpRow['expires_at']) ? $gpRow['expires_at'] : null;
     
-    $activatedAt = isset($gpRow['activated_at']) ? $gpRow['activated_at'] : null;
-    $gamepass['current_day'] = getUserCurrentDay($activatedAt);
+    // Use GLOBAL season current_day
+    $gamepass['current_day'] = $seasonInfo['current_day'];
     
     if ($gamepass['expires_at'] !== null) {
       $gamepass['remaining_days'] = getGamePassRemainingDaysFromExpiry($gamepass['expires_at']);
@@ -82,5 +85,6 @@ json_out_me(200, array(
     'is_admin' => $isAdmin,
   ),
   'gamepass' => $gamepass,
+  'season' => $seasonInfo,
   'free_pass_new' => isset($freePassResult['new']) ? $freePassResult['new'] : false,
 ));
