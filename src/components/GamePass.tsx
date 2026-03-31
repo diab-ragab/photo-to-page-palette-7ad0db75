@@ -184,7 +184,9 @@ export const GamePass = () => {
   const [currentDay, setCurrentDay] = useState(1);
   const [loading, setLoading] = useState(false);
   const [passExpiresAt, setPassExpiresAt] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState(getPassResetTime(null));
+  const [seasonEnd, setSeasonEnd] = useState<string | null>(null);
+  const [seasonNumber, setSeasonNumber] = useState(1);
+  const [timeLeft, setTimeLeft] = useState(getCountdown(null));
   const [rewards, setRewards] = useState<PassReward[]>([]);
   const [isLoadingRewards, setIsLoadingRewards] = useState(true);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
