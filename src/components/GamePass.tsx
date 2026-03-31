@@ -55,9 +55,9 @@ const SparkleEffect = ({ show }: { show: boolean }) => {
   );
 };
 
-const getPassResetTime = (expiresAt?: string | null) => {
-  if (!expiresAt) return { days: 0, hours: 0, minutes: 0, seconds: 0, totalMs: 0 };
-  const diff = Math.max(0, new Date(expiresAt).getTime() - Date.now());
+const getCountdown = (endDate?: string | null) => {
+  if (!endDate) return { days: 0, hours: 0, minutes: 0, seconds: 0, totalMs: 0 };
+  const diff = Math.max(0, new Date(endDate).getTime() - Date.now());
   return {
     days: Math.floor(diff / (1000 * 60 * 60 * 24)),
     hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
