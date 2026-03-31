@@ -102,6 +102,10 @@ $totalCents = $premiumCents;
 if ($totalCents < 50) $totalCents = 50;
 
 $totalFormatted = number_format($totalCents / 100, 2, '.', '');
+
+// Get global season info
+$seasonInfo = getGlobalSeasonInfo($pdo);
+$seasonNumber = $seasonInfo['season_number'];
 $productName = 'Premium Game Pass - Season ' . $seasonNumber;
 
 // PayPal
