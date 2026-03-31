@@ -3,7 +3,7 @@
  * gamepass_purchase.php - Create PayPal order to purchase Premium Game Pass
  * POST { character_name: "..." }
  * Returns { success: true, url: "...", paypal_order_id: "..." }
- * PHP 5.3+ compatible - INDIVIDUAL 30-DAY MODEL
+ * PHP 5.3+ compatible - GLOBAL 30-DAY SEASON MODEL
  */
 
 require_once __DIR__ . '/bootstrap.php';
