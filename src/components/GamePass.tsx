@@ -238,7 +238,13 @@ export const GamePass = () => {
           setHasPremiumPass(!!data.is_premium);
           setUserTier(data.user_tier === 'premium' ? 'premium' : 'free');
           if (data.expires_at) setPassExpiresAt(data.expires_at);
-          if (data.current_day) setCurrentDay(data.current_day);
+          if (data.season) {
+            setSeasonEnd(data.season.season_end);
+            setSeasonNumber(data.season.season_number || 1);
+            if (data.season.current_day) setCurrentDay(data.season.current_day);
+          } else if (data.current_day) {
+            setCurrentDay(data.current_day);
+          }
           setClaimedDays({ free: data.claimed_days?.free || [], premium: data.claimed_days?.premium || [] });
           if (data.user_zen !== undefined) setUserZen(data.user_zen);
           if (data.zen_cost_per_day > 0) setZenCostPerDay(data.zen_cost_per_day);
