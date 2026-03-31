@@ -345,7 +345,7 @@ export const GamePass = () => {
                 </div>
               </div>
               <div>
-                <h2 className="text-2xl font-bold tracking-tight">Game Pass</h2>
+                <h2 className="text-2xl font-bold tracking-tight">Season {seasonNumber}</h2>
                 <div className="flex items-center gap-2 mt-1">
                   {userTier === "premium" && (
                     <Badge className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black font-bold text-xs animate-pulse">
@@ -355,7 +355,7 @@ export const GamePass = () => {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-4 text-sm flex-wrap">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/50">
                 <Gift className="h-4 w-4 text-primary" /><span className="text-muted-foreground">Free:</span>
                 <span className="font-bold text-foreground">{claimedDays.free.length}/30</span>
@@ -375,9 +375,9 @@ export const GamePass = () => {
           </div>
 
           <div className="flex flex-col items-end gap-3">
-            {userTier === "premium" && passExpiresAt && (
+            {seasonEnd && (
               <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground animate-pulse" /><span className="text-muted-foreground">Pass Expires in</span>
+                <Clock className="h-4 w-4 text-muted-foreground animate-pulse" /><span className="text-muted-foreground">Season Ends in</span>
                 <div className="flex gap-1">
                   {[{ v: timeLeft.days, l: "d" }, { v: String(timeLeft.hours).padStart(2, "0"), l: "h" }, { v: String(timeLeft.minutes).padStart(2, "0"), l: "m" }, { v: String(timeLeft.seconds).padStart(2, "0"), l: "s" }].map((t, i) => (
                     <div key={i} className="px-2 py-1 rounded-md bg-muted/80 border border-border/50 font-mono text-sm font-bold">{t.v}<span className="text-muted-foreground text-xs">{t.l}</span></div>
