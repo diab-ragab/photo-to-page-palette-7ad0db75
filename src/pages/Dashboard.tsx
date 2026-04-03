@@ -189,62 +189,7 @@ const Dashboard = () => {
     doCapture();
   }, [user, searchParams, setSearchParams]);
 
-  // Handle ?gamepass_extended= query param — capture extend PayPal order
-  useEffect(() => {
-    const gpDays = searchParams.get("gamepass_extended");
-    const paypalFlag = searchParams.get("paypal");
-    const token = searchParams.get("token") || "";
-    if (!gpDays || !paypalFlag || gamepassCaptureRef.current) return;
-    if (!user) return;
-    gamepassCaptureRef.current = true;
-
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete("gamepass_extended");
-    newParams.delete("paypal");
-    newParams.delete("token");
-    setSearchParams(newParams, { replace: true });
-
-    setGamepassCaptureStatus("capturing");
-
-    const doCapture = async () => {
-      try {
-        let paypalOrderId = token;
-        if (!paypalOrderId) {
-          paypalOrderId = localStorage.getItem("gamepass_extend_paypal_order_id") || "";
-        }
-        if (!paypalOrderId) {
-          setGamepassCaptureStatus("error");
-          return;
-        }
-
-        const res = await fetch(`${API_BASE}/gamepass_extend_capture.php`, {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            ...getAuthHeaders(),
-          },
-          body: JSON.stringify({ paypal_order_id: paypalOrderId }),
-        });
-
-        const data = await res.json();
-        if (data.success) {
-          setGamepassCaptureStatus("success");
-          setCapturedTier(`${data.tier || ""} +${data.days_added || gpDays} days`);
-          localStorage.removeItem("gamepass_extend_paypal_order_id");
-        } else {
-          console.error("[GamePass Extend Capture]", data.message);
-          setGamepassCaptureStatus("error");
-        }
-      } catch (err) {
-        console.error("[GamePass Extend Capture] Error:", err);
-        setGamepassCaptureStatus("error");
-      }
-    };
-
-    doCapture();
-  }, [user, searchParams, setSearchParams]);
+  // Extensions removed — global season model doesn't support manual extensions
 
   // Calculate VIP progress
   const getVipLevel = (points: number) => {

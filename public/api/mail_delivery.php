@@ -108,12 +108,9 @@ class GameMailer {
      * Send Game Pass reward mail (daily claim)
      */
     public function sendGamePassReward($roleId, $day, $tier, $itemId, $qty, $coins = 0, $zen = 0, $exp = 0) {
-        if ($tier === 'gold') {
-            $title = "Gold Pass - Day {$day}";
-            $text  = "Your Gold Pass Day {$day} reward awaits, Champion! Claim your ultimate treasure from WOI Endgame.";
-        } else if ($tier === 'elite') {
-            $title = "Elite Pass - Day {$day}";
-            $text  = "Your Elite Pass Day {$day} reward is here, Warrior! Enjoy your exclusive loot from WOI Endgame.";
+        if ($tier === 'premium') {
+            $title = "Premium Pass - Day {$day}";
+            $text  = "Your Premium Pass Day {$day} reward is here, Champion! Enjoy your exclusive loot from WOI Endgame.";
         } else {
             $title = "Free Pass - Day {$day}";
             $text  = "Your Free Pass Day {$day} reward is ready! Keep adventuring in WOI Endgame.";
@@ -125,7 +122,7 @@ class GameMailer {
      * Send Game Pass activation mail (one-time, no attachments)
      * 
      * @param int $roleId - Character ID
-     * @param string $tier - 'free', 'elite', or 'gold'
+     * @param string $tier - 'free' or 'premium'
      * @return array - Result with success status
      */
     public function sendGamePassActivationMail($roleId, $tier) {
@@ -135,7 +132,7 @@ class GameMailer {
         }
 
         $tier = strtolower(trim($tier));
-        if (!in_array($tier, array('free', 'elite', 'gold'))) {
+        if (!in_array($tier, array('free', 'premium'))) {
             return array('success' => false, 'message' => 'Invalid tier');
         }
 
@@ -145,12 +142,9 @@ class GameMailer {
         if ($tier === 'free') {
             $title = 'Free Pass Activated';
             $text  = 'Welcome to WOI Endgame! Your Free Pass is now active. Enjoy the free track rewards!';
-        } else if ($tier === 'elite') {
-            $title = 'Elite Pass Activated';
-            $text  = 'Thank you for purchasing WOI Endgame Elite Pass! Your Elite Pass is active for 30 days. Enjoy exclusive premium rewards!';
-        } else if ($tier === 'gold') {
-            $title = 'Gold Pass Activated';
-            $text  = 'Thank you for purchasing WOI Endgame Gold Pass! Your Gold Pass is active for 30 days. Enjoy ultimate premium rewards!';
+        } else {
+            $title = 'Premium Pass Activated';
+            $text  = 'Thank you for purchasing WOI Endgame Premium Pass! Your Premium Pass is active for this season. Enjoy exclusive premium rewards!';
         }
 
         // No attachments for activation mail
