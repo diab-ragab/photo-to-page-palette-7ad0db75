@@ -367,10 +367,10 @@ if (!function_exists('activatePaidGamePass')) {
         $stmt->execute(array($paypalOrderId));
         if ($stmt->fetch(PDO::FETCH_ASSOC)) return false;
 
-        // Get season end for expiry
+        // Get season dates: activated_at = season_start, expires_at = season_end
         $seasonInfo = getGlobalSeasonInfo($pdo);
+        $activatedAt = $seasonInfo['season_start'];
         $expiresAt = $seasonInfo['season_end'];
-        $nowStr = date('Y-m-d H:i:s');
 
         // Upsert user_gamepass
         $stmt = $pdo->prepare("SELECT id, expires_at FROM user_gamepass WHERE user_id = ?");
@@ -378,13 +378,11 @@ if (!function_exists('activatePaidGamePass')) {
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($existing) {
-            $newDaysTotal = (int)ceil((strtotime($expiresAt) - time()) / 86400);
-            $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = 'premium', activated_at = ?, days_total = ?, expires_at = ?, paypal_order_id = ?, updated_at = NOW() WHERE user_id = ?");
-            $stmt->execute(array($nowStr, $newDaysTotal, $expiresAt, $paypalOrderId, $userId));
+            $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = 'premium', activated_at = ?, days_total = 30, expires_at = ?, paypal_order_id = ?, updated_at = NOW() WHERE user_id = ?");
+            $stmt->execute(array($activatedAt, $expiresAt, $paypalOrderId, $userId));
         } else {
-            $daysTotal = (int)ceil((strtotime($expiresAt) - time()) / 86400);
-            $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, activated_at, days_total, expires_at, paypal_order_id, created_at, updated_at) VALUES (?, 1, 'premium', ?, ?, ?, ?, NOW(), NOW())");
-            $stmt->execute(array($userId, $nowStr, $daysTotal, $expiresAt, $paypalOrderId));
+            $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, activated_at, days_total, expires_at, paypal_order_id, created_at, updated_at) VALUES (?, 1, 'premium', ?, 30, ?, ?, NOW(), NOW())");
+            $stmt->execute(array($userId, $activatedAt, $expiresAt, $paypalOrderId));
         }
 
         // Update purchases
