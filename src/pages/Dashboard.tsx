@@ -174,7 +174,7 @@ const Dashboard = () => {
         if (data.success) {
           setGamepassCaptureStatus("success");
           setCapturedTier(data.tier || gpTier);
-          setUserTier((data.tier || gpTier) as "free" | "elite" | "gold");
+          setUserTier(data.tier === 'premium' ? 'premium' : 'free');
           localStorage.removeItem("gamepass_paypal_order_id");
         } else {
           console.error("[GamePass Capture]", data.message);
