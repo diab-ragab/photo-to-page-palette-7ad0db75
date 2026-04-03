@@ -65,8 +65,6 @@ const Shop = () => {
         if (data?.success) {
           const tier = data.user_tier || (data.is_premium ? "premium" : "free");
           setUserTier(tier as "free" | "premium");
-          if (data.expires_at) setPassExpiresAt(data.expires_at);
-          if (data.remaining_days !== undefined) setPassRemainingDays(data.remaining_days);
         }
       }).catch(() => {});
   }, [user]);
