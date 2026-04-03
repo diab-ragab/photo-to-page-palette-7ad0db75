@@ -46,8 +46,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     themeColor: "from-cyan-400 to-blue-600",
     startsIn: "Next Month",
     plannedRewards: [
-      { name: "Ice Titan Mount", icon: "🦣", rarity: "legendary", type: "elite" },
-      { name: "Frozen Crown", icon: "❄️", rarity: "legendary", type: "elite" },
+      { name: "Ice Titan Mount", icon: "🦣", rarity: "legendary", type: "premium" },
+      { name: "Frozen Crown", icon: "❄️", rarity: "legendary", type: "premium" },
       { name: "Snowstorm Pet", icon: "⛄", rarity: "epic", type: "free" },
       { name: "Frost Armor", icon: "🧊", rarity: "rare", type: "free" },
     ],
