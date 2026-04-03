@@ -58,7 +58,7 @@ const Dashboard = () => {
   const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites, streakData } = useVoteSystem();
   const [userZen, setUserZen] = useState(0);
   const [activeTab, setActiveTab] = useState("rewards");
-  const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
+  const [userTier, setUserTier] = useState<"free" | "premium">("free");
   const [gamepassCaptureStatus, setGamepassCaptureStatus] = useState<"idle" | "capturing" | "success" | "error">("idle");
   const [capturedTier, setCapturedTier] = useState("");
   const gamepassCaptureRef = useRef(false);
