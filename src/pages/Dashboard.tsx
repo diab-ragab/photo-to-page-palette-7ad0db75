@@ -116,8 +116,8 @@ const Dashboard = () => {
       { showErrorToast: false, silentStatuses: [401, 403] }
     ).then(data => {
       if (data?.success) {
-        const tier = data.user_tier || (data.is_premium ? "elite" : "free");
-        setUserTier(tier as "free" | "elite" | "gold");
+        const tier = data.user_tier === 'premium' ? 'premium' : 'free';
+        setUserTier(tier);
       }
     }).catch(() => {});
   }, [user]);
