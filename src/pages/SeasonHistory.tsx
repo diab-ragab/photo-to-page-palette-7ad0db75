@@ -102,8 +102,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     theme: "Tropical Paradise",
     themeColor: "from-yellow-400 to-orange-500",
     plannedRewards: [
-      { name: "Tidal Serpent Mount", icon: "🐍", rarity: "legendary", type: "elite" },
-      { name: "Ocean King Trident", icon: "🔱", rarity: "legendary", type: "elite" },
+      { name: "Tidal Serpent Mount", icon: "🐍", rarity: "legendary", type: "premium" },
+      { name: "Ocean King Trident", icon: "🔱", rarity: "legendary", type: "premium" },
       { name: "Crab Companion", icon: "🦀", rarity: "epic", type: "free" },
       { name: "Beach Warrior Set", icon: "🏖️", rarity: "rare", type: "free" },
     ],
