@@ -358,11 +358,18 @@ switch ($action) {
     $q = isset($_GET['q']) ? trim($_GET['q']) : '';
     if (strlen($q) < 2) json_fail(400, 'Search query too short');
 
+    // Detect username column
+    $uCol = 'name';
+    try {
+      $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+      if (in_array('login', $cols) && !in_array('name', $cols)) $uCol = 'login';
+    } catch (Exception $e) {}
+
     $stmt = $pdo->prepare("
-      SELECT memb___id AS username
-      FROM MEMB_INFO
-      WHERE memb___id LIKE ?
-      ORDER BY memb___id ASC
+      SELECT ID as id, `{$uCol}` AS username
+      FROM users
+      WHERE `{$uCol}` LIKE ?
+      ORDER BY `{$uCol}` ASC
       LIMIT 20
     ");
     $stmt->execute(array('%' . $q . '%'));
@@ -373,11 +380,10 @@ switch ($action) {
       $gpStmt = $pdo->prepare("
         SELECT ug.is_premium, ug.expires_at, ug.tier
         FROM user_gamepass ug
-        JOIN users ON users.id = ug.user_id
-        WHERE users.username = ?
+        WHERE ug.user_id = ?
         LIMIT 1
       ");
-      $gpStmt->execute(array($u['username']));
+      $gpStmt->execute(array((int)$u['id']));
       $gp = $gpStmt->fetch(PDO::FETCH_ASSOC);
 
       $tier = 'free';
@@ -410,7 +416,14 @@ switch ($action) {
     if ($username === '') json_fail(400, 'Username is required');
     if ($durationDays < 1 || $durationDays > 365) json_fail(400, 'Duration must be 1-365 days');
 
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+    // Detect username column
+    $uCol = 'name';
+    try {
+      $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+      if (in_array('login', $cols) && !in_array('name', $cols)) $uCol = 'login';
+    } catch (Exception $e) {}
+
+    $stmt = $pdo->prepare("SELECT ID as id FROM users WHERE `{$uCol}` = ?");
     $stmt->execute(array($username));
     $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$userRow) json_fail(404, 'User not found: ' . $username);
@@ -469,7 +482,14 @@ switch ($action) {
     $username = isset($input['username']) ? trim($input['username']) : '';
     if ($username === '') json_fail(400, 'Username is required');
 
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+    // Detect username column
+    $uCol = 'name';
+    try {
+      $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+      if (in_array('login', $cols) && !in_array('name', $cols)) $uCol = 'login';
+    } catch (Exception $e) {}
+
+    $stmt = $pdo->prepare("SELECT ID as id FROM users WHERE `{$uCol}` = ?");
     $stmt->execute(array($username));
     $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$userRow) json_fail(404, 'User not found: ' . $username);
