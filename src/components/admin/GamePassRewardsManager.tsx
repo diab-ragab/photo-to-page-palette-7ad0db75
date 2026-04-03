@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Gift, Crown, Plus, Pencil, Trash2, Save, X, Coins, Gem, Package, Diamond, Power, Search, UserPlus, Ban } from "lucide-react";
+import { Gift, Crown, Plus, Pencil, Trash2, Save, X, Coins, Gem, Package, Power, Search, UserPlus, Ban } from "lucide-react";
 import { API_BASE, getAuthHeaders } from "@/lib/apiFetch";
 
 type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
@@ -18,7 +18,7 @@ type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
 export interface GamePassReward {
   id?: number;
   day: number;
-  tier: "free" | "elite" | "gold";
+  tier: "free" | "premium";
   item_id: number;
   item_name: string;
   quantity: number;
@@ -41,7 +41,6 @@ const rarityOptions = [
   { value: "legendary", label: "Legendary", color: "text-amber-500" },
 ];
 
-// Use text codes that are safe for MySQL utf8 (not utf8mb4)
 const iconOptions = [
   { value: "GIFT", display: "🎁" },
   { value: "GEM", display: "💎" },
@@ -69,12 +68,10 @@ const iconOptions = [
   { value: "SCROLL", display: "📜" },
 ];
 
-// Helper to get display icon from value
 const getIconDisplay = (value: string): string => {
   const option = iconOptions.find(o => o.value === value);
   return option ? option.display : value;
 };
-
 
 const defaultReward: Omit<GamePassReward, "id"> = {
   day: 1,
@@ -89,7 +86,6 @@ const defaultReward: Omit<GamePassReward, "id"> = {
   icon: "GIFT",
 };
 
-// Extracted form component to prevent focus issues
 interface RewardFormContentProps {
   editData: Omit<GamePassReward, "id">;
   setEditData: (data: Omit<GamePassReward, "id">) => void;
@@ -122,7 +118,7 @@ const RewardFormContent = memo(function RewardFormContent({
         </div>
         <div>
           <label className="text-sm font-medium mb-2 block">Tier</label>
-          <Select value={editData.tier} onValueChange={(v: "free" | "elite" | "gold") => setEditData({ ...editData, tier: v })}>
+          <Select value={editData.tier} onValueChange={(v: "free" | "premium") => setEditData({ ...editData, tier: v })}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -130,18 +126,14 @@ const RewardFormContent = memo(function RewardFormContent({
               <SelectItem value="free">
                 <span className="flex items-center gap-2"><Gift className="h-4 w-4" /> Free</span>
               </SelectItem>
-              <SelectItem value="elite">
-                <span className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Elite</span>
-              </SelectItem>
-              <SelectItem value="gold">
-                <span className="flex items-center gap-2"><Diamond className="h-4 w-4 text-violet-500" /> Gold</span>
+              <SelectItem value="premium">
+                <span className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Premium</span>
               </SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Quick reward type selector */}
       <div>
         <label className="text-sm font-medium mb-2 block">Reward Type</label>
         <Select
@@ -292,14 +284,12 @@ const RewardFormContent = memo(function RewardFormContent({
   );
 });
 
-// Helper to append sessionToken to URL for servers that strip auth headers
 function adminUrl(path: string): string {
   const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken") || "";
   const sep = path.includes("?") ? "&" : "?";
   return token ? `${API_BASE}/${path}${sep}sessionToken=${encodeURIComponent(token)}` : `${API_BASE}/${path}`;
 }
 
-// Helper to inject sessionToken into POST body for header-stripping fallback
 function withToken(body: Record<string, unknown>): string {
   const token = localStorage.getItem("woi_session_token") || localStorage.getItem("sessionToken") || "";
   if (token) body.sessionToken = token;
@@ -316,27 +306,23 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   const [editData, setEditData] = useState<Omit<GamePassReward, "id">>(defaultReward);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [filterTier, setFilterTier] = useState<"all" | "free" | "elite" | "gold">("all");
+  const [filterTier, setFilterTier] = useState<"all" | "free" | "premium">("all");
   const [isSeeding, setIsSeeding] = useState(false);
   
   // Settings state
   const [zenSkipCost, setZenSkipCost] = useState<number>(100000);
   const [zenSkipCostInput, setZenSkipCostInput] = useState<string>("100000");
-  const [elitePrice, setElitePrice] = useState<number>(999);
-  const [elitePriceInput, setElitePriceInput] = useState<string>("9.99");
-  const [goldPrice, setGoldPrice] = useState<number>(1999);
-  const [goldPriceInput, setGoldPriceInput] = useState<string>("19.99");
+  const [premiumPrice, setPremiumPrice] = useState<number>(999);
+  const [premiumPriceInput, setPremiumPriceInput] = useState<string>("9.99");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-   const [gamepassEnabled, setGamepassEnabled] = useState(true);
-  const [eliteEnabled, setEliteEnabled] = useState(true);
-  const [goldEnabled, setGoldEnabled] = useState(true);
+  const [gamepassEnabled, setGamepassEnabled] = useState(true);
+  const [premiumEnabled, setPremiumEnabled] = useState(true);
   const [isTogglingEnabled, setIsTogglingEnabled] = useState(false);
 
   // Assign pass state
   const [assignSearch, setAssignSearch] = useState("");
   const [assignResults, setAssignResults] = useState<Array<{ username: string; current_tier: string; expires_at: string | null }>>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [assignTier, setAssignTier] = useState<"elite" | "gold">("elite");
   const [assignDuration, setAssignDuration] = useState("30");
   const [isAssigning, setIsAssigning] = useState(false);
 
@@ -355,15 +341,11 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       if (data.success && data.settings) {
         setZenSkipCost(data.settings.zen_skip_cost || 100000);
         setZenSkipCostInput(String(data.settings.zen_skip_cost || 100000));
-        const ep = data.settings.elite_price_cents || 999;
-        const gp = data.settings.gold_price_cents || 1999;
-        setElitePrice(ep);
-        setElitePriceInput((ep / 100).toFixed(2));
-        setGoldPrice(gp);
-        setGoldPriceInput((gp / 100).toFixed(2));
+        const pp = data.settings.premium_price_cents || 999;
+        setPremiumPrice(pp);
+        setPremiumPriceInput((pp / 100).toFixed(2));
         setGamepassEnabled(data.settings.gamepass_enabled !== false);
-        setEliteEnabled(data.settings.elite_enabled !== false);
-        setGoldEnabled(data.settings.gold_enabled !== false);
+        setPremiumEnabled(data.settings.premium_enabled !== false);
       }
     } catch (error) {
       console.error("Failed to fetch settings:", error);
@@ -382,9 +364,8 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       const data = await response.json();
       if (data.success) {
         if (key === 'gamepass_enabled') setGamepassEnabled(enabled);
-        if (key === 'elite_enabled') setEliteEnabled(enabled);
-        if (key === 'gold_enabled') setGoldEnabled(enabled);
-        const label = key === 'gamepass_enabled' ? 'Game Pass' : key === 'elite_enabled' ? 'Elite Tier' : 'Gold Tier';
+        if (key === 'premium_enabled') setPremiumEnabled(enabled);
+        const label = key === 'gamepass_enabled' ? 'Game Pass' : 'Premium Tier';
         toast({ title: enabled ? `${label} Enabled` : `${label} Disabled`, description: enabled ? `${label} is now available to players.` : `${label} is now hidden from players.` });
       } else {
         toast({ title: "Error", description: data.error || "Failed to toggle", variant: "destructive" });
@@ -402,10 +383,9 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
       toast({ title: "Error", description: "Zen cost cannot be negative", variant: "destructive" });
       return;
     }
-    const epCents = Math.round(parseFloat(elitePriceInput) * 100) || 0;
-    const gpCents = Math.round(parseFloat(goldPriceInput) * 100) || 0;
-    if (epCents < 100 || gpCents < 100) {
-      toast({ title: "Error", description: "Prices must be at least €1.00", variant: "destructive" });
+    const ppCents = Math.round(parseFloat(premiumPriceInput) * 100) || 0;
+    if (ppCents < 100) {
+      toast({ title: "Error", description: "Price must be at least €1.00", variant: "destructive" });
       return;
     }
     
@@ -415,13 +395,12 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: withToken({ zen_skip_cost: cost, elite_price_cents: epCents, gold_price_cents: gpCents }),
+        body: withToken({ zen_skip_cost: cost, premium_price_cents: ppCents }),
       });
       const data = await response.json();
       if (data.success) {
         setZenSkipCost(cost);
-        setElitePrice(epCents);
-        setGoldPrice(gpCents);
+        setPremiumPrice(ppCents);
         toast({ title: "Success", description: "Settings saved!" });
       } else {
         toast({ title: "Error", description: data.error || "Failed to save settings", variant: "destructive" });
@@ -536,7 +515,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     setIsEditing(true);
   };
 
-  const handleSeedTier = async (tier: "elite" | "gold") => {
+  const handleSeedTier = async (tier: "free" | "premium") => {
     if (!confirm(`This will DELETE all existing ${tier.toUpperCase()} rewards and replace them with 30 seeded rewards. Continue?`)) return;
     setIsSeeding(true);
     try {
@@ -586,16 +565,16 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     }
   };
 
-  const handleAssignPass = async (username: string) => {
+  const handleAssignPass = async (targetUsername: string) => {
     const days = parseInt(assignDuration) || 30;
-    if (!confirm(`Assign ${assignTier.toUpperCase()} Game Pass to "${username}" for ${days} days?`)) return;
+    if (!confirm(`Assign PREMIUM Game Pass to "${targetUsername}" for ${days} days?`)) return;
     setIsAssigning(true);
     try {
       const response = await fetch(adminUrl("gamepass_admin.php?action=assign_pass"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: withToken({ username, tier: assignTier, duration_days: days }),
+        body: withToken({ username: targetUsername, tier: "premium", duration_days: days }),
       });
       const data = await response.json();
       if (data.success) {
@@ -611,15 +590,15 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     }
   };
 
-  const handleRevokePass = async (username: string) => {
-    if (!confirm(`Revoke Game Pass from "${username}"?`)) return;
+  const handleRevokePass = async (targetUsername: string) => {
+    if (!confirm(`Revoke Game Pass from "${targetUsername}"?`)) return;
     setIsAssigning(true);
     try {
       const response = await fetch(adminUrl("gamepass_admin.php?action=revoke_pass"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: withToken({ username }),
+        body: withToken({ username: targetUsername }),
       });
       const data = await response.json();
       if (data.success) {
@@ -645,6 +624,21 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
     .filter(r => filterTier === "all" || r.tier === filterTier)
     .sort((a, b) => a.day - b.day || (a.tier === "free" ? -1 : 1));
 
+  const getTierBadge = (tier: string) => {
+    if (tier === "premium") {
+      return (
+        <Badge className="bg-amber-500/80 text-xs">
+          <Crown className="h-3 w-3 mr-1" /> Premium
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="secondary" className="text-xs">
+        <Gift className="h-3 w-3 mr-1" /> Free
+      </Badge>
+    );
+  };
+
   return (
     <>
       {/* Settings Card */}
@@ -655,7 +649,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
             Game Pass Settings
           </CardTitle>
           <CardDescription>
-            Configure tier prices and Zen skip cost
+            Configure premium price and Zen skip cost
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -683,83 +677,40 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
             </div>
           )}
 
-          {/* Per-Tier Toggles */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Elite Toggle */}
-            <div className={`flex items-center justify-between p-3 rounded-lg border ${eliteEnabled ? "border-amber-500/30 bg-amber-500/5" : "border-destructive/30 bg-destructive/5"}`}>
-              <div className="flex items-center gap-2">
-                <Crown className={`h-4 w-4 ${eliteEnabled ? "text-amber-400" : "text-destructive"}`} />
-                <div>
-                  <p className="font-medium text-sm">{eliteEnabled ? "Elite Active" : "Elite OFF"}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {eliteEnabled ? "Players can buy Elite" : "Elite purchases disabled"}
-                  </p>
-                </div>
+          {/* Premium Toggle */}
+          <div className={`flex items-center justify-between p-3 rounded-lg border ${premiumEnabled ? "border-amber-500/30 bg-amber-500/5" : "border-destructive/30 bg-destructive/5"}`}>
+            <div className="flex items-center gap-2">
+              <Crown className={`h-4 w-4 ${premiumEnabled ? "text-amber-400" : "text-destructive"}`} />
+              <div>
+                <p className="font-medium text-sm">{premiumEnabled ? "Premium Active" : "Premium OFF"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {premiumEnabled ? "Players can buy Premium" : "Premium purchases disabled"}
+                </p>
               </div>
-              <Switch
-                checked={eliteEnabled}
-                onCheckedChange={(v) => handleToggleEnabled('elite_enabled', v)}
-                disabled={isTogglingEnabled}
-              />
             </div>
-            {/* Gold Toggle */}
-            <div className={`flex items-center justify-between p-3 rounded-lg border ${goldEnabled ? "border-violet-500/30 bg-violet-500/5" : "border-destructive/30 bg-destructive/5"}`}>
-              <div className="flex items-center gap-2">
-                <Diamond className={`h-4 w-4 ${goldEnabled ? "text-violet-400" : "text-destructive"}`} />
-                <div>
-                  <p className="font-medium text-sm">{goldEnabled ? "Gold Active" : "Gold OFF"}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {goldEnabled ? "Players can buy Gold" : "Gold purchases disabled"}
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={goldEnabled}
-                onCheckedChange={(v) => handleToggleEnabled('gold_enabled', v)}
-                disabled={isTogglingEnabled}
-              />
-            </div>
+            <Switch
+              checked={premiumEnabled}
+              onCheckedChange={(v) => handleToggleEnabled('premium_enabled', v)}
+              disabled={isTogglingEnabled}
+            />
           </div>
-          {(!eliteEnabled || !goldEnabled) && (
-            <div className="flex items-center gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-sm">
-              <Power className="h-4 w-4 shrink-0" />
-              <span>
-                {!eliteEnabled && !goldEnabled ? "Elite & Gold tiers are disabled." : !eliteEnabled ? "Elite tier is disabled." : "Gold tier is disabled."}
-                {" "}Players cannot purchase disabled tiers.
-              </span>
-            </div>
-          )}
-          {/* Tier Prices */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Elite Pass Price (€)</label>
-              <Input
-                type="number"
-                min={1}
-                step={0.01}
-                value={elitePriceInput}
-                onChange={(e) => setElitePriceInput(e.target.value)}
-                placeholder="9.99"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Current: €{(elitePrice / 100).toFixed(2)}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Gold Pass Price (€)</label>
-              <Input
-                type="number"
-                min={1}
-                step={0.01}
-                value={goldPriceInput}
-                onChange={(e) => setGoldPriceInput(e.target.value)}
-                placeholder="19.99"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Current: €{(goldPrice / 100).toFixed(2)} · Upgrade price: €{((goldPrice - elitePrice) / 100).toFixed(2)}
-              </p>
-            </div>
+
+          {/* Premium Price */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">Premium Pass Price (€)</label>
+            <Input
+              type="number"
+              min={1}
+              step={0.01}
+              value={premiumPriceInput}
+              onChange={(e) => setPremiumPriceInput(e.target.value)}
+              placeholder="9.99"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Current: €{(premiumPrice / 100).toFixed(2)}
+            </p>
           </div>
+
           {/* Zen Skip Cost */}
           <div className="flex flex-col sm:flex-row gap-3 items-end">
             <div className="flex-1">
@@ -794,11 +745,10 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
             Assign Game Pass
           </CardTitle>
           <CardDescription>
-            Search for a user and assign or revoke their Game Pass tier
+            Search for a user and assign or revoke their Premium Game Pass
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Search */}
           <div className="flex gap-2">
             <Input
               placeholder="Search username..."
@@ -812,38 +762,18 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
             </Button>
           </div>
 
-          {/* Tier & Duration controls */}
-          <div className="flex gap-3 flex-wrap">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Tier to Assign</label>
-              <Select value={assignTier} onValueChange={(v: "elite" | "gold") => setAssignTier(v)}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="elite">
-                    <span className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Elite</span>
-                  </SelectItem>
-                  <SelectItem value="gold">
-                    <span className="flex items-center gap-2"><Diamond className="h-4 w-4 text-violet-500" /> Gold</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Duration (days)</label>
-              <Input
-                type="number"
-                min={1}
-                max={365}
-                value={assignDuration}
-                onChange={(e) => setAssignDuration(e.target.value)}
-                className="w-[100px]"
-              />
-            </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Duration (days)</label>
+            <Input
+              type="number"
+              min={1}
+              max={365}
+              value={assignDuration}
+              onChange={(e) => setAssignDuration(e.target.value)}
+              className="w-[100px]"
+            />
           </div>
 
-          {/* Results */}
           {assignResults.length > 0 && (
             <div className="border rounded-lg divide-y">
               {assignResults.map((u) => (
@@ -852,11 +782,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                     <p className="font-medium text-sm truncate">{u.username}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>Current:</span>
-                      <Badge variant={u.current_tier === "gold" ? "default" : u.current_tier === "elite" ? "default" : "secondary"}
-                        className={u.current_tier === "gold" ? "bg-violet-500/80 text-xs" : "text-xs"}>
-                        {u.current_tier === "gold" ? <Diamond className="h-3 w-3 mr-1" /> : u.current_tier === "elite" ? <Crown className="h-3 w-3 mr-1" /> : null}
-                        {u.current_tier}
-                      </Badge>
+                      {getTierBadge(u.current_tier)}
                       {u.expires_at && u.current_tier !== "free" && (
                         <span>expires {new Date(u.expires_at).toLocaleDateString()}</span>
                       )}
@@ -869,7 +795,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                       disabled={isAssigning}
                     >
                       <UserPlus className="h-3 w-3 mr-1" />
-                      Assign {assignTier}
+                      Assign Premium
                     </Button>
                     {u.current_tier !== "free" && (
                       <Button
@@ -900,32 +826,31 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                 Game Pass Rewards
               </CardTitle>
               <CardDescription>
-                Configure daily rewards for Free, Elite, and Gold pass tiers
+                Configure daily rewards for Free and Premium pass tiers
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Select value={filterTier} onValueChange={(v: "all" | "free" | "elite" | "gold") => setFilterTier(v)}>
-                <SelectTrigger className="w-[120px]">
+            <div className="flex gap-2 flex-wrap">
+              <Select value={filterTier} onValueChange={(v: "all" | "free" | "premium") => setFilterTier(v)}>
+                <SelectTrigger className="w-[130px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Tiers</SelectItem>
                   <SelectItem value="free">Free Only</SelectItem>
-                  <SelectItem value="elite">Elite Only</SelectItem>
-                  <SelectItem value="gold">Gold Only</SelectItem>
+                  <SelectItem value="premium">Premium Only</SelectItem>
                 </SelectContent>
               </Select>
               <Button onClick={handleAddNew}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Reward
               </Button>
-              <Button variant="outline" disabled={isSeeding} onClick={() => handleSeedTier("elite")} className="text-amber-500 border-amber-500/30 hover:bg-amber-500/10">
-                <Crown className="h-4 w-4 mr-2" />
-                {isSeeding ? "Seeding..." : "Seed Elite 30"}
+              <Button variant="outline" disabled={isSeeding} onClick={() => handleSeedTier("free")} className="text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10">
+                <Gift className="h-4 w-4 mr-2" />
+                {isSeeding ? "Seeding..." : "Seed Free 30"}
               </Button>
-              <Button variant="outline" disabled={isSeeding} onClick={() => handleSeedTier("gold")} className="text-violet-500 border-violet-500/30 hover:bg-violet-500/10">
-                <Diamond className="h-4 w-4 mr-2" />
-                {isSeeding ? "Seeding..." : "Seed Gold 30"}
+              <Button variant="outline" disabled={isSeeding} onClick={() => handleSeedTier("premium")} className="text-amber-500 border-amber-500/30 hover:bg-amber-500/10">
+                <Crown className="h-4 w-4 mr-2" />
+                {isSeeding ? "Seeding..." : "Seed Premium 30"}
               </Button>
             </div>
           </div>
@@ -956,11 +881,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                         <p className="font-medium text-sm">{reward.item_name}</p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>Day {reward.day}</span>
-                          <Badge variant={reward.tier === "gold" ? "default" : reward.tier === "elite" ? "default" : "secondary"} 
-                            className={`text-xs ${reward.tier === "gold" ? "bg-violet-500/80" : ""}`}>
-                            {reward.tier === "gold" ? <Diamond className="h-3 w-3 mr-1" /> : reward.tier === "elite" ? <Crown className="h-3 w-3 mr-1" /> : <Gift className="h-3 w-3 mr-1" />}
-                            {reward.tier}
-                          </Badge>
+                          {getTierBadge(reward.tier)}
                         </div>
                       </div>
                     </div>
@@ -1001,13 +922,7 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
                 {filteredRewards.map((reward) => (
                   <TableRow key={reward.id}>
                     <TableCell className="font-medium">{reward.day}</TableCell>
-                    <TableCell>
-                      <Badge variant={reward.tier === "gold" ? "default" : reward.tier === "elite" ? "default" : "secondary"}
-                        className={reward.tier === "gold" ? "bg-violet-500/80" : ""}>
-                        {reward.tier === "gold" ? <Diamond className="h-3 w-3 mr-1" /> : reward.tier === "elite" ? <Crown className="h-3 w-3 mr-1" /> : <Gift className="h-3 w-3 mr-1" />}
-                        {reward.tier}
-                      </Badge>
-                    </TableCell>
+                    <TableCell>{getTierBadge(reward.tier)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="text-xl">{getIconDisplay(reward.icon)}</span>
