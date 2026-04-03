@@ -22,7 +22,7 @@ interface SeasonReward {
   name: string;
   icon: string;
   rarity: "common" | "rare" | "epic" | "legendary";
-  type: "free" | "elite";
+  type: "free" | "premium";
 }
 
 interface UpcomingSeason {
