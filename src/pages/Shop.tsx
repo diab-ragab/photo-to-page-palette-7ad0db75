@@ -160,17 +160,6 @@ const Shop = () => {
             <GamePassComparisonTable premiumPriceCents={premiumPriceCents} />
           </div>
 
-          {extensionsEnabled && userTier !== "free" && (
-            <div className="mt-16">
-              <GamePassExtendCards
-                userTier={userTier as "free" | "elite" | "gold"}
-                passExpiresAt={passExpiresAt}
-                passRemainingDays={passRemainingDays}
-                elitePerDayCents={premiumExtendPerDay}
-                goldPerDayCents={premiumExtendPerDay}
-              />
-            </div>
-          )}
         </section>
 
         <LiveActivityFeed />
