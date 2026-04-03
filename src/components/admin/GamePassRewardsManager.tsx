@@ -761,17 +761,9 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
             </Button>
           </div>
 
-          <div>
-            <label className="text-sm font-medium mb-1 block">Duration (days)</label>
-            <Input
-              type="number"
-              min={1}
-              max={365}
-              value={assignDuration}
-              onChange={(e) => setAssignDuration(e.target.value)}
-              className="w-[100px]"
-            />
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Pass will be active from season start until the current season ends (30 days total).
+          </p>
 
           {assignResults.length > 0 && (
             <div className="border rounded-lg divide-y">

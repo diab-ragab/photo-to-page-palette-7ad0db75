@@ -467,11 +467,11 @@ switch ($action) {
       error_log("GAMEPASS_ADMIN_LOG: " . $e->getMessage());
     }
 
-    error_log("GAMEPASS_ADMIN_ASSIGN: user=$username tier=premium duration={$durationDays}d expires=$expiresAt by admin");
+    error_log("GAMEPASS_ADMIN_ASSIGN: user=$username tier=premium season expires=$expiresAt by admin");
 
     json_out(200, array(
       'success' => true,
-      'message' => 'Premium Game Pass assigned to ' . $username . ' for ' . $durationDays . ' days',
+      'message' => 'Premium Game Pass assigned to ' . $username . ' until season ends (' . substr($expiresAt, 0, 10) . ')',
       'expires_at' => $expiresAt
     ));
     break;
