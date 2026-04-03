@@ -2,8 +2,8 @@
 /**
  * gamepass_capture.php - Capture PayPal order and activate Game Pass
  * POST { paypal_order_id: "..." }
- * Returns { success: true, tier: "elite"|"gold", expires_at: "..." }
- * PHP 5.3+ compatible
+ * Returns { success: true, tier: "premium", expires_at: "..." }
+ * PHP 5.3+ compatible - Global 30-Day Season Model (Free + Premium)
  */
 
 require_once __DIR__ . '/bootstrap.php';
