@@ -58,7 +58,7 @@ const Dashboard = () => {
   const { voteData, voteSites, loading, sitesLoading, submitVote, availableVotes, totalSites, streakData } = useVoteSystem();
   const [userZen, setUserZen] = useState(0);
   const [activeTab, setActiveTab] = useState("rewards");
-  const [userTier, setUserTier] = useState<"free" | "elite" | "gold">("free");
+  const [userTier, setUserTier] = useState<"free" | "premium">("free");
   const [gamepassCaptureStatus, setGamepassCaptureStatus] = useState<"idle" | "capturing" | "success" | "error">("idle");
   const [capturedTier, setCapturedTier] = useState("");
   const gamepassCaptureRef = useRef(false);
@@ -116,8 +116,8 @@ const Dashboard = () => {
       { showErrorToast: false, silentStatuses: [401, 403] }
     ).then(data => {
       if (data?.success) {
-        const tier = data.user_tier || (data.is_premium ? "elite" : "free");
-        setUserTier(tier as "free" | "elite" | "gold");
+        const tier = data.user_tier === 'premium' ? 'premium' : 'free';
+        setUserTier(tier);
       }
     }).catch(() => {});
   }, [user]);
@@ -174,7 +174,7 @@ const Dashboard = () => {
         if (data.success) {
           setGamepassCaptureStatus("success");
           setCapturedTier(data.tier || gpTier);
-          setUserTier((data.tier || gpTier) as "free" | "elite" | "gold");
+          setUserTier(data.tier === 'premium' ? 'premium' : 'free');
           localStorage.removeItem("gamepass_paypal_order_id");
         } else {
           console.error("[GamePass Capture]", data.message);
@@ -367,16 +367,10 @@ const Dashboard = () => {
                 <h1 className="text-lg md:text-2xl font-display text-foreground truncate">
                   {user?.username}
                 </h1>
-                {userTier === "gold" && (
-                  <Badge className="bg-gradient-to-r from-amber-500 to-yellow-400 text-white border-0 text-[10px] md:text-xs px-2 py-0.5 font-display shadow-md shadow-amber-500/20 animate-pulse">
+                {userTier === "premium" && (
+                  <Badge className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black border-0 text-[10px] md:text-xs px-2 py-0.5 font-display shadow-md shadow-amber-500/20 animate-pulse">
                     <Crown className="h-3 w-3 mr-1" />
-                    GOLD
-                  </Badge>
-                )}
-                {userTier === "elite" && (
-                  <Badge className="bg-gradient-to-r from-purple-600 to-indigo-500 text-white border-0 text-[10px] md:text-xs px-2 py-0.5 font-display shadow-md shadow-purple-500/20">
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    ELITE
+                    PREMIUM
                   </Badge>
                 )}
               </div>

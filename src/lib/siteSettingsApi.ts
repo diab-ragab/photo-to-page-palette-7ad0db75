@@ -7,11 +7,7 @@ export interface SiteSettings {
   download_gdrive: string;
   download_filefm: string;
   flash_sale_end: string;
-  gamepass_elite_price: string;
-  gamepass_gold_price: string;
-  elite_extend_per_day_cents: string;
-  gold_extend_per_day_cents: string;
-  extensions_enabled: string;
+  gamepass_premium_price: string;
   game_trailer_url: string;
   gamepass_season_start: string;
 }
@@ -23,11 +19,7 @@ const defaultSettings: SiteSettings = {
   download_gdrive: 'https://drive.google.com/file/d/1wYtPOZ5pWw4yVO4_R_wVlKxMvvkgJfJ3/view?usp=sharing',
   download_filefm: 'https://files.fm/u/czrengvywk',
   flash_sale_end: '',
-  gamepass_elite_price: '999',
-  gamepass_gold_price: '1999',
-  elite_extend_per_day_cents: '0',
-  gold_extend_per_day_cents: '0',
-  extensions_enabled: '1',
+  gamepass_premium_price: '999',
   game_trailer_url: '',
   gamepass_season_start: '',
 };

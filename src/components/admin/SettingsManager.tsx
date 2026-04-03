@@ -18,16 +18,17 @@ import {
   Users,
   Timer,
   Crown,
-  Sparkles,
   Video,
   CalendarDays,
+  RotateCcw,
 } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 import { getSiteSettings, updateSiteSettings, clearSettingsCache, type SiteSettings } from '@/lib/siteSettingsApi';
+import { apiPost, getAuthHeaders, API_BASE } from '@/lib/apiFetch';
 
 export const SettingsManager = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resettingSeason, setResettingSeason] = useState(false);
   const [settings, setSettings] = useState<SiteSettings>({
     discord_link: '',
     discord_members: '',
@@ -35,11 +36,7 @@ export const SettingsManager = () => {
     download_gdrive: '',
     download_filefm: '',
     flash_sale_end: '',
-    gamepass_elite_price: '999',
-    gamepass_gold_price: '1999',
-    elite_extend_per_day_cents: '0',
-    gold_extend_per_day_cents: '0',
-    extensions_enabled: '1',
+    gamepass_premium_price: '999',
     game_trailer_url: '',
     gamepass_season_start: '',
   });
@@ -79,6 +76,30 @@ export const SettingsManager = () => {
 
   const handleChange = (key: keyof SiteSettings, value: string) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleResetSeason = async () => {
+    if (!confirm('Are you sure you want to reset the season? This will start a new Season from today. All current season claims will become invalid.')) return;
+    setResettingSeason(true);
+    try {
+      const res = await fetch(`${API_BASE}/gamepass_admin.php?action=reset_season`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...getAuthHeaders() },
+        credentials: 'include',
+        body: JSON.stringify({ confirm: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Season reset! Now on Season ${data.season_number || 'new'}`);
+        fetchSettings();
+      } else {
+        toast.error(data.error || 'Failed to reset season');
+      }
+    } catch {
+      toast.error('Failed to reset season');
+    } finally {
+      setResettingSeason(false);
+    }
   };
 
   if (loading) {
@@ -238,115 +259,37 @@ export const SettingsManager = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-purple-500/20">
-              <Crown className="h-5 w-5 text-purple-400" />
+            <div className="p-2 rounded-lg bg-amber-500/20">
+              <Crown className="h-5 w-5 text-amber-400" />
             </div>
             Game Pass Pricing
           </CardTitle>
           <CardDescription>
-            Set the prices (in Euro cents) for Elite and Gold Game Pass tiers shown in the shop.
+            Set the price (in Euro cents) for the Premium Game Pass shown in the shop.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="gamepass_elite_price" className="flex items-center gap-2">
-                <Crown className="h-4 w-4 text-purple-400" />
-                Elite Price (cents)
-              </Label>
-              <Input
-                id="gamepass_elite_price"
-                type="number"
-                min={0}
-                value={settings.gamepass_elite_price}
-                onChange={e => handleChange('gamepass_elite_price', e.target.value)}
-                placeholder="999"
-              />
-              <p className="text-xs text-muted-foreground">
-                = €{(parseInt(settings.gamepass_elite_price || '0') / 100).toFixed(2)}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="gamepass_gold_price" className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-amber-400" />
-                Gold Price (cents)
-              </Label>
-              <Input
-                id="gamepass_gold_price"
-                type="number"
-                min={0}
-                value={settings.gamepass_gold_price}
-                onChange={e => handleChange('gamepass_gold_price', e.target.value)}
-                placeholder="1999"
-              />
-              <p className="text-xs text-muted-foreground">
-                = €{(parseInt(settings.gamepass_gold_price || '0') / 100).toFixed(2)}
-              </p>
-            </div>
-          </div>
-
-          <div className="border-t pt-4 mt-4">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-medium text-muted-foreground">Extension Per-Day Pricing</p>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="extensions_enabled" className="text-xs text-muted-foreground">Extensions Enabled</Label>
-                <Switch
-                  id="extensions_enabled"
-                  checked={settings.extensions_enabled === '1'}
-                  onCheckedChange={(checked) => handleChange('extensions_enabled', checked ? '1' : '0')}
-                />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mb-4">
-              Set the cost per day when extending a Game Pass. Leave at 0 to auto-calculate (base price ÷ 30). Toggle off to hide extension cards from the shop.
+          <div className="space-y-2">
+            <Label htmlFor="gamepass_premium_price" className="flex items-center gap-2">
+              <Crown className="h-4 w-4 text-amber-400" />
+              Premium Price (cents)
+            </Label>
+            <Input
+              id="gamepass_premium_price"
+              type="number"
+              min={0}
+              value={settings.gamepass_premium_price}
+              onChange={e => handleChange('gamepass_premium_price', e.target.value)}
+              placeholder="999"
+            />
+            <p className="text-xs text-muted-foreground">
+              = €{(parseInt(settings.gamepass_premium_price || '0') / 100).toFixed(2)} per season (30 days)
             </p>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="elite_extend_per_day_cents" className="flex items-center gap-2">
-                  <Crown className="h-4 w-4 text-purple-400" />
-                  Elite Per-Day (cents)
-                </Label>
-                <Input
-                  id="elite_extend_per_day_cents"
-                  type="number"
-                  min={0}
-                  value={settings.elite_extend_per_day_cents}
-                  onChange={e => handleChange('elite_extend_per_day_cents', e.target.value)}
-                  placeholder="0 = auto"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {parseInt(settings.elite_extend_per_day_cents || '0') > 0
-                    ? `= €${(parseInt(settings.elite_extend_per_day_cents) / 100).toFixed(2)}/day — 30 days = €${(parseInt(settings.elite_extend_per_day_cents) * 30 / 100).toFixed(2)}`
-                    : `Auto: €${(Math.ceil(parseInt(settings.gamepass_elite_price || '999') / 30) / 100).toFixed(2)}/day`
-                  }
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="gold_extend_per_day_cents" className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-400" />
-                  Gold Per-Day (cents)
-                </Label>
-                <Input
-                  id="gold_extend_per_day_cents"
-                  type="number"
-                  min={0}
-                  value={settings.gold_extend_per_day_cents}
-                  onChange={e => handleChange('gold_extend_per_day_cents', e.target.value)}
-                  placeholder="0 = auto"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {parseInt(settings.gold_extend_per_day_cents || '0') > 0
-                    ? `= €${(parseInt(settings.gold_extend_per_day_cents) / 100).toFixed(2)}/day — 30 days = €${(parseInt(settings.gold_extend_per_day_cents) * 30 / 100).toFixed(2)}`
-                    : `Auto: €${(Math.ceil(parseInt(settings.gamepass_gold_price || '1999') / 30) / 100).toFixed(2)}/day`
-                  }
-                </p>
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Game Trailer */}
+      {/* Game Pass Season */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -356,15 +299,14 @@ export const SettingsManager = () => {
             Game Pass Season
           </CardTitle>
           <CardDescription>
-            Set the global season anchor date. Every 30 days from this date starts a new season.
-            All players share the same season end date. Leave blank to default to the 1st of each month.
+            The global season auto-rotates every 30 days. You can manually set the start date or reset the season entirely.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="gamepass_season_start" className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              Season Anchor Date
+              Season Start Date
             </Label>
             <Input
               id="gamepass_season_start"
@@ -375,9 +317,24 @@ export const SettingsManager = () => {
             />
             <p className="text-xs text-muted-foreground">
               {settings.gamepass_season_start
-                ? `Seasons cycle every 30 days from ${settings.gamepass_season_start}. All Game Pass holders in a season share the same end date.`
-                : "No anchor set — defaults to the 1st of the current month."
+                ? `Season started on ${settings.gamepass_season_start}. Auto-rotates every 30 days.`
+                : "No anchor set — the server auto-creates a season start on first request."
               }
+            </p>
+          </div>
+
+          <div className="border-t pt-4">
+            <Button
+              variant="destructive"
+              onClick={handleResetSeason}
+              disabled={resettingSeason}
+              className="gap-2"
+            >
+              <RotateCcw className={`h-4 w-4 ${resettingSeason ? 'animate-spin' : ''}`} />
+              {resettingSeason ? 'Resetting...' : 'Reset Season Now'}
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              This starts a brand new season from today. All current-season claims become invalid.
             </p>
           </div>
         </CardContent>
@@ -393,7 +350,7 @@ export const SettingsManager = () => {
             Game Trailer
           </CardTitle>
           <CardDescription>
-            Set the YouTube video URL displayed on the homepage. Paste a full YouTube link (e.g. https://www.youtube.com/watch?v=...).
+            Set the YouTube video URL displayed on the homepage.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

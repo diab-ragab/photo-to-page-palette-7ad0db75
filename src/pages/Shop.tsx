@@ -13,7 +13,7 @@ import { GamePassComparisonTable } from "@/components/shop/GamePassComparisonTab
 import { FlashSaleCountdown } from "@/components/shop/FlashSaleCountdown";
 import { GamePassParticles } from "@/components/shop/GamePassParticles";
 import { LiveActivityFeed } from "@/components/shop/LiveActivityFeed";
-import { GamePassExtendCards } from "@/components/shop/GamePassExtendCards";
+
 import { ShoppingCart, ArrowRight, Zap, Crown, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -29,12 +29,8 @@ const Shop = () => {
   const [premiumPriceCents, setPremiumPriceCents] = useState(999);
   const [premiumEnabled, setPremiumEnabled] = useState(true);
 
-  const [extensionsEnabled, setExtensionsEnabled] = useState(true);
-  const [premiumExtendPerDay, setPremiumExtendPerDay] = useState(0);
 
   const [userTier, setUserTier] = useState<"free" | "premium">("free");
-  const [passExpiresAt, setPassExpiresAt] = useState<string | null>(null);
-  const [passRemainingDays, setPassRemainingDays] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     const loadData = async () => {
@@ -52,9 +48,6 @@ const Shop = () => {
         if (settingsRes) {
           const pp = parseInt(settingsRes.gamepass_premium_price || "0");
           if (!isNaN(pp) && pp > 0) setPremiumPriceCents(pp);
-          setExtensionsEnabled(settingsRes.extensions_enabled !== '0');
-          const epd = parseInt(settingsRes.premium_extend_per_day_cents || "0");
-          setPremiumExtendPerDay(epd > 0 ? epd : Math.ceil((pp > 0 ? pp : 999) / 30));
         }
       } catch {
         // silent
@@ -72,8 +65,6 @@ const Shop = () => {
         if (data?.success) {
           const tier = data.user_tier || (data.is_premium ? "premium" : "free");
           setUserTier(tier as "free" | "premium");
-          if (data.expires_at) setPassExpiresAt(data.expires_at);
-          if (data.remaining_days !== undefined) setPassRemainingDays(data.remaining_days);
         }
       }).catch(() => {});
   }, [user]);
@@ -167,17 +158,6 @@ const Shop = () => {
             <GamePassComparisonTable premiumPriceCents={premiumPriceCents} />
           </div>
 
-          {extensionsEnabled && userTier !== "free" && (
-            <div className="mt-16">
-              <GamePassExtendCards
-                userTier={userTier as "free" | "elite" | "gold"}
-                passExpiresAt={passExpiresAt}
-                passRemainingDays={passRemainingDays}
-                elitePerDayCents={premiumExtendPerDay}
-                goldPerDayCents={premiumExtendPerDay}
-              />
-            </div>
-          )}
         </section>
 
         <LiveActivityFeed />

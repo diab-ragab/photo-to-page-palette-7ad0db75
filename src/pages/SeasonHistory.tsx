@@ -22,7 +22,7 @@ interface SeasonReward {
   name: string;
   icon: string;
   rarity: "common" | "rare" | "epic" | "legendary";
-  type: "free" | "elite";
+  type: "free" | "premium";
 }
 
 interface UpcomingSeason {
@@ -46,8 +46,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     themeColor: "from-cyan-400 to-blue-600",
     startsIn: "Next Month",
     plannedRewards: [
-      { name: "Ice Titan Mount", icon: "🦣", rarity: "legendary", type: "elite" },
-      { name: "Frozen Crown", icon: "❄️", rarity: "legendary", type: "elite" },
+      { name: "Ice Titan Mount", icon: "🦣", rarity: "legendary", type: "premium" },
+      { name: "Frozen Crown", icon: "❄️", rarity: "legendary", type: "premium" },
       { name: "Snowstorm Pet", icon: "⛄", rarity: "epic", type: "free" },
       { name: "Frost Armor", icon: "🧊", rarity: "rare", type: "free" },
     ],
@@ -60,8 +60,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     theme: "Nature's Rebirth",
     themeColor: "from-green-400 to-emerald-600",
     plannedRewards: [
-      { name: "Forest Guardian Mount", icon: "🦌", rarity: "legendary", type: "elite" },
-      { name: "Bloom Crown", icon: "🌸", rarity: "legendary", type: "elite" },
+      { name: "Forest Guardian Mount", icon: "🦌", rarity: "legendary", type: "premium" },
+      { name: "Bloom Crown", icon: "🌸", rarity: "legendary", type: "premium" },
       { name: "Butterfly Swarm Pet", icon: "🦋", rarity: "epic", type: "free" },
       { name: "Vine Armor", icon: "🌿", rarity: "rare", type: "free" },
     ],
@@ -74,8 +74,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     theme: "Cherry Blossom Festival",
     themeColor: "from-pink-400 to-rose-600",
     plannedRewards: [
-      { name: "Sakura Dragon", icon: "🐲", rarity: "legendary", type: "elite" },
-      { name: "Petal Wings", icon: "🌺", rarity: "legendary", type: "elite" },
+      { name: "Sakura Dragon", icon: "🐲", rarity: "legendary", type: "premium" },
+      { name: "Petal Wings", icon: "🌺", rarity: "legendary", type: "premium" },
       { name: "Koi Fish Pet", icon: "🐟", rarity: "epic", type: "free" },
       { name: "Blossom Robe", icon: "👘", rarity: "rare", type: "free" },
     ],
@@ -88,8 +88,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     theme: "Solar Eclipse",
     themeColor: "from-orange-400 to-red-600",
     plannedRewards: [
-      { name: "Solar Phoenix", icon: "🔥", rarity: "legendary", type: "elite" },
-      { name: "Sun God Helm", icon: "☀️", rarity: "legendary", type: "elite" },
+      { name: "Solar Phoenix", icon: "🔥", rarity: "legendary", type: "premium" },
+      { name: "Sun God Helm", icon: "☀️", rarity: "legendary", type: "premium" },
       { name: "Flame Spirit Pet", icon: "🌟", rarity: "epic", type: "free" },
       { name: "Ember Cloak", icon: "🧥", rarity: "rare", type: "free" },
     ],
@@ -102,8 +102,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     theme: "Tropical Paradise",
     themeColor: "from-yellow-400 to-orange-500",
     plannedRewards: [
-      { name: "Tidal Serpent Mount", icon: "🐍", rarity: "legendary", type: "elite" },
-      { name: "Ocean King Trident", icon: "🔱", rarity: "legendary", type: "elite" },
+      { name: "Tidal Serpent Mount", icon: "🐍", rarity: "legendary", type: "premium" },
+      { name: "Ocean King Trident", icon: "🔱", rarity: "legendary", type: "premium" },
       { name: "Crab Companion", icon: "🦀", rarity: "epic", type: "free" },
       { name: "Beach Warrior Set", icon: "🏖️", rarity: "rare", type: "free" },
     ],
@@ -116,8 +116,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     theme: "Lightning Gods",
     themeColor: "from-indigo-500 to-purple-700",
     plannedRewards: [
-      { name: "Storm Dragon", icon: "⚡", rarity: "legendary", type: "elite" },
-      { name: "Thunder God Armor", icon: "🌩️", rarity: "legendary", type: "elite" },
+      { name: "Storm Dragon", icon: "⚡", rarity: "legendary", type: "premium" },
+      { name: "Thunder God Armor", icon: "🌩️", rarity: "legendary", type: "premium" },
       { name: "Electric Sprite Pet", icon: "💫", rarity: "epic", type: "free" },
       { name: "Lightning Staff", icon: "🪄", rarity: "rare", type: "free" },
     ],
@@ -264,7 +264,7 @@ const SeasonHistory = () => {
                         >
                           <div className="flex items-center gap-1 mb-2">
                             <span className="text-3xl">{reward.icon}</span>
-                            {reward.type === "elite" && (
+                            {reward.type === "premium" && (
                               <Crown className="h-3 w-3 text-amber-500" />
                             )}
                           </div>

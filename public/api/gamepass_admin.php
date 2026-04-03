@@ -444,6 +444,69 @@ switch ($action) {
     json_out(200, array('success' => true, 'message' => 'Game Pass revoked from ' . $username));
     break;
 
+  case 'reset_season':
+    // Admin-only: reset season to start from today
+    $user = getCurrentUser();
+    if (!$user) json_fail(401, 'Not authenticated');
+    $userId = (int)$user['user_id'];
+    if (!isUserAdmin($userId, isset($user['username']) ? $user['username'] : '')) {
+      json_fail(403, 'Admin access required');
+    }
+
+    $input = getJsonInput();
+    if (empty($input['confirm'])) {
+      json_fail(400, 'Confirmation required');
+    }
+
+    $newStart = date('Y-m-d 00:00:00');
+    // Read current season number
+    $seasonNumber = 1;
+    try {
+      $stmt = $pdo->prepare("SELECT setting_value FROM gamepass_settings WHERE setting_key = 'season_number'");
+      $stmt->execute();
+      $snRow = $stmt->fetch(PDO::FETCH_ASSOC);
+      if ($snRow) $seasonNumber = max(1, (int)$snRow['setting_value']) + 1;
+    } catch (Exception $e) {}
+
+    // Update season_start
+    try {
+      $stmt = $pdo->prepare("SELECT 1 FROM gamepass_settings WHERE setting_key = 'season_start' LIMIT 1");
+      $stmt->execute();
+      if ($stmt->fetch()) {
+        $pdo->prepare("UPDATE gamepass_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = 'season_start'")->execute(array($newStart));
+      } else {
+        $pdo->prepare("INSERT INTO gamepass_settings (setting_key, setting_value, updated_at) VALUES ('season_start', ?, NOW())")->execute(array($newStart));
+      }
+    } catch (Exception $e) {}
+
+    // Update season_number
+    try {
+      $stmt = $pdo->prepare("SELECT 1 FROM gamepass_settings WHERE setting_key = 'season_number' LIMIT 1");
+      $stmt->execute();
+      if ($stmt->fetch()) {
+        $pdo->prepare("UPDATE gamepass_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = 'season_number'")->execute(array($seasonNumber));
+      } else {
+        $pdo->prepare("INSERT INTO gamepass_settings (setting_key, setting_value, updated_at) VALUES ('season_number', ?, NOW())")->execute(array($seasonNumber));
+      }
+    } catch (Exception $e) {}
+
+    // Also sync to site_settings
+    try {
+      $dateOnly = date('Y-m-d');
+      $stmt = $pdo->prepare("SELECT 1 FROM site_settings WHERE setting_key = 'gamepass_season_start' LIMIT 1");
+      $stmt->execute();
+      if ($stmt->fetch()) {
+        $pdo->prepare("UPDATE site_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = 'gamepass_season_start'")->execute(array($dateOnly));
+      } else {
+        $pdo->prepare("INSERT INTO site_settings (setting_key, setting_value, updated_at) VALUES ('gamepass_season_start', ?, NOW())")->execute(array($dateOnly));
+      }
+    } catch (Exception $e) {}
+
+    error_log("SEASON_RESET by admin user={$userId} new_season={$seasonNumber} start={$newStart}");
+
+    json_out(200, array('success' => true, 'message' => 'Season reset successfully', 'season_number' => $seasonNumber, 'season_start' => $newStart));
+    break;
+
   default:
     json_fail(400, 'Invalid action');
 }
