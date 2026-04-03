@@ -411,10 +411,8 @@ switch ($action) {
 
     $input = getJsonInput();
     $username = isset($input['username']) ? trim($input['username']) : '';
-    $durationDays = isset($input['duration_days']) ? (int)$input['duration_days'] : 30;
 
     if ($username === '') json_fail(400, 'Username is required');
-    if ($durationDays < 1 || $durationDays > 365) json_fail(400, 'Duration must be 1-365 days');
 
     // Detect username column
     $uCol = 'name';
@@ -433,17 +431,20 @@ switch ($action) {
       $pdo->exec("ALTER TABLE user_gamepass ADD COLUMN tier VARCHAR(10) DEFAULT 'free'");
     } catch (Exception $e) {}
 
-    $expiresAt = date('Y-m-d H:i:s', time() + ($durationDays * 86400));
-    $nowStr = date('Y-m-d H:i:s');
+    // Use global season dates: activated_at = season_start, expires_at = season_end
+    $season = getGlobalSeasonInfo($pdo);
+    $activatedAt = $season['season_start'];
+    $expiresAt = $season['season_end'];
+    $daysTotal = 30;
 
     $stmt = $pdo->prepare("SELECT id FROM user_gamepass WHERE user_id = ?");
     $stmt->execute(array($targetUserId));
     if ($stmt->fetch()) {
       $stmt = $pdo->prepare("UPDATE user_gamepass SET is_premium = 1, tier = 'premium', activated_at = ?, expires_at = ?, days_total = ?, updated_at = NOW() WHERE user_id = ?");
-      $stmt->execute(array($nowStr, $expiresAt, $durationDays, $targetUserId));
+      $stmt->execute(array($activatedAt, $expiresAt, $daysTotal, $targetUserId));
     } else {
       $stmt = $pdo->prepare("INSERT INTO user_gamepass (user_id, is_premium, tier, activated_at, days_total, expires_at, created_at, updated_at) VALUES (?, 1, 'premium', ?, ?, ?, NOW(), NOW())");
-      $stmt->execute(array($targetUserId, $nowStr, $durationDays, $expiresAt));
+      $stmt->execute(array($targetUserId, $activatedAt, $daysTotal, $expiresAt));
     }
 
     try {
@@ -466,11 +467,11 @@ switch ($action) {
       error_log("GAMEPASS_ADMIN_LOG: " . $e->getMessage());
     }
 
-    error_log("GAMEPASS_ADMIN_ASSIGN: user=$username tier=premium duration={$durationDays}d expires=$expiresAt by admin");
+    error_log("GAMEPASS_ADMIN_ASSIGN: user=$username tier=premium season expires=$expiresAt by admin");
 
     json_out(200, array(
       'success' => true,
-      'message' => 'Premium Game Pass assigned to ' . $username . ' for ' . $durationDays . ' days',
+      'message' => 'Premium Game Pass assigned to ' . $username . ' until season ends (' . substr($expiresAt, 0, 10) . ')',
       'expires_at' => $expiresAt
     ));
     break;
