@@ -48,9 +48,6 @@ const Shop = () => {
         if (settingsRes) {
           const pp = parseInt(settingsRes.gamepass_premium_price || "0");
           if (!isNaN(pp) && pp > 0) setPremiumPriceCents(pp);
-          setExtensionsEnabled(settingsRes.extensions_enabled !== '0');
-          const epd = parseInt(settingsRes.premium_extend_per_day_cents || "0");
-          setPremiumExtendPerDay(epd > 0 ? epd : Math.ceil((pp > 0 ? pp : 999) / 30));
         }
       } catch {
         // silent
