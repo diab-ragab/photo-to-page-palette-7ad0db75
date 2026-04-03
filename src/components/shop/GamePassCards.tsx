@@ -13,9 +13,9 @@ interface GamePassCardsProps {
 }
 
 const premiumPerks = [
+  "30M Zen in 30 Days",
+  "Exclusive Fashion & Back",
   "Premium daily rewards (30 days)",
-  "Exclusive premium items & gear",
-  "Bonus Coins, Zen & EXP daily",
   "Premium crown badge in-game",
   "Priority support",
   "Legendary reward items",
