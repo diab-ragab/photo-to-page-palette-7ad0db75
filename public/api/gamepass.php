@@ -433,80 +433,84 @@ try {
       }
       $reward = $rewards[0];
 
-      // Insert claim with global cycle_start
-      $zenCostColExists = hasZenCostColumn();
-      if ($zenCostColExists && $zenCost > 0) {
-        $stmt = $pdo->prepare("INSERT INTO user_gamepass_claims (user_id, day, tier, cycle_start, reward_id, zen_cost, claimed_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->execute(array($userId, $day, $tier, $cycleStart, $reward['id'], $zenCost));
+      // Check if reward is a spin bonus (item_id = -4 means spins)
+      if ((int)$reward['item_id'] === -4) {
+        // Grant bonus spins instead of mail delivery
+        $spinCount = (int)$reward['quantity'];
+        if ($spinCount <= 0) $spinCount = 1;
+        
+        $pdo->exec("CREATE TABLE IF NOT EXISTS user_bonus_spins (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          spins_available INT NOT NULL DEFAULT 0,
+          source VARCHAR(50) NOT NULL DEFAULT 'zen',
+          granted_at DATETIME NOT NULL,
+          INDEX idx_user_bonus (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+        
+        $stmt = $pdo->prepare("INSERT INTO user_bonus_spins (user_id, spins_available, source, granted_at) VALUES (?, ?, 'gamepass', NOW())");
+        $stmt->execute(array($userId, $spinCount));
+        
+        $result = array('success' => true, 'type' => 'spins', 'spins_granted' => $spinCount);
       } else {
-        $stmt = $pdo->prepare("INSERT INTO user_gamepass_claims (user_id, day, tier, cycle_start, reward_id, claimed_at) VALUES (?, ?, ?, ?, ?, NOW())");
-        $stmt->execute(array($userId, $day, $tier, $cycleStart, $reward['id']));
-      }
-
-      // Deliver reward
-      if ($reward['item_id'] === -4) {
-        $spinsToAdd = max(1, $reward['quantity']);
-        try {
-          $pdo->exec("CREATE TABLE IF NOT EXISTS user_bonus_spins (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NOT NULL,
-            spins INT DEFAULT 0,
-            reason VARCHAR(100) DEFAULT 'gamepass',
-            created_at DATETIME NOT NULL,
-            KEY idx_user (user_id)
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
-          
-          $stmt = $pdo->prepare("INSERT INTO user_bonus_spins (user_id, spins, reason, created_at) VALUES (?, ?, 'gamepass_reward', NOW())");
-          $stmt->execute(array($userId, $spinsToAdd));
-        } catch (Exception $e) {
-          error_log("GAMEPASS_SPINS_ERR: " . $e->getMessage());
-        }
-      } elseif ($reward['item_id'] === -1) {
-        $zenAmount = $reward['zen'] > 0 ? $reward['zen'] : $reward['quantity'];
-        if ($zenAmount > 0) {
-          try {
-            $stmt = $pdo->prepare("UPDATE user_currency SET zen = zen + ? WHERE user_id = ?");
-            $stmt->execute(array($zenAmount, $userId));
-            if ($stmt->rowCount() === 0) {
-              $stmt = $pdo->prepare("INSERT INTO user_currency (user_id, zen) VALUES (?, ?)");
-              $stmt->execute(array($userId, $zenAmount));
-            }
-          } catch (Exception $e) {
-            error_log("GAMEPASS_ZEN_ERR: " . $e->getMessage());
-          }
-        }
-      } elseif ($reward['item_id'] === -2) {
-        $coinsAmount = $reward['coins'] > 0 ? $reward['coins'] : $reward['quantity'];
-        if ($coinsAmount > 0) {
-          try {
-            $stmt = $pdo->prepare("UPDATE user_currency SET coins = coins + ? WHERE user_id = ?");
-            $stmt->execute(array($coinsAmount, $userId));
-            if ($stmt->rowCount() === 0) {
-              $stmt = $pdo->prepare("INSERT INTO user_currency (user_id, coins) VALUES (?, ?)");
-              $stmt->execute(array($userId, $coinsAmount));
-            }
-          } catch (Exception $e) {
-            error_log("GAMEPASS_COINS_ERR: " . $e->getMessage());
-          }
-        }
-      } elseif ($reward['item_id'] > 0) {
+        // Deliver via mail (coins, zen, exp, items - all go through GameMailer)
         $mailer = new GameMailer($pdo);
-        $qty = max(1, $reward['quantity']);
-        $mailer->sendRewardMail($roleId, $reward['item_id'], $qty, "Game Pass Day {$day} ({$tier})");
+        $result = $mailer->sendGamePassReward(
+          $roleId,
+          $day,
+          $tier,
+          (int)$reward['item_id'],
+          (int)$reward['quantity'],
+          (int)$reward['coins'],
+          (int)$reward['zen'],
+          (int)$reward['exp']
+        );
       }
 
-      $responseData = array(
+      if (!is_array($result) || empty($result['success'])) {
+        error_log("GAMEPASS_CLAIM_FAILED user={$userId} day={$day} tier={$tier}");
+
+        // Refund zen if charged
+        if ($zenCost > 0) {
+          refundUserZen($userId, $zenCost);
+        }
+
+        json_fail(500, 'Failed to deliver reward. Please try again.');
+      }
+
+      // Record claim AFTER successful delivery
+      if (hasZenCostColumn()) {
+        $stmt = $pdo->prepare("
+          INSERT INTO user_gamepass_claims (user_id, day, tier, claimed_at, cycle_start, zen_cost)
+          VALUES (?, ?, ?, NOW(), ?, ?)
+        ");
+        $stmt->execute(array($userId, $day, $tier, $cycleStart, $zenCost));
+      } else {
+        $stmt = $pdo->prepare("
+          INSERT INTO user_gamepass_claims (user_id, day, tier, claimed_at, cycle_start)
+          VALUES (?, ?, ?, NOW(), ?)
+        ");
+        $stmt->execute(array($userId, $day, $tier, $cycleStart));
+      }
+
+      error_log("GAMEPASS_CLAIMED user={$userId} role={$roleId} day={$day} tier={$tier}");
+
+      $resp = array(
         'success' => true,
-        'day' => $day,
-        'tier' => $tier,
-        'reward' => $reward['item_name'],
-        'user_zen' => getUserZenBalance($userId)
+        'message' => 'Reward claimed! Check your in-game mailbox.',
+        'reward' => array(
+          'name' => $reward['item_name'],
+          'quantity' => (int)$reward['quantity'],
+          'coins' => (int)$reward['coins'],
+          'zen' => (int)$reward['zen'],
+          'exp' => (int)$reward['exp']
+        )
       );
       if ($zenCost > 0) {
-        $responseData['zen_spent'] = $zenCost;
+        $resp['zen_spent'] = $zenCost;
+        $resp['user_zen'] = getUserZenBalance($userId);
       }
-      
-      json_out(200, $responseData);
+      json_out(200, $resp);
       break;
 
     default:
