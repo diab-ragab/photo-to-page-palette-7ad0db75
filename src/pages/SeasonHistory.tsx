@@ -74,8 +74,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     theme: "Cherry Blossom Festival",
     themeColor: "from-pink-400 to-rose-600",
     plannedRewards: [
-      { name: "Sakura Dragon", icon: "🐲", rarity: "legendary", type: "elite" },
-      { name: "Petal Wings", icon: "🌺", rarity: "legendary", type: "elite" },
+      { name: "Sakura Dragon", icon: "🐲", rarity: "legendary", type: "premium" },
+      { name: "Petal Wings", icon: "🌺", rarity: "legendary", type: "premium" },
       { name: "Koi Fish Pet", icon: "🐟", rarity: "epic", type: "free" },
       { name: "Blossom Robe", icon: "👘", rarity: "rare", type: "free" },
     ],
