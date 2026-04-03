@@ -367,16 +367,10 @@ const Dashboard = () => {
                 <h1 className="text-lg md:text-2xl font-display text-foreground truncate">
                   {user?.username}
                 </h1>
-                {userTier === "gold" && (
-                  <Badge className="bg-gradient-to-r from-amber-500 to-yellow-400 text-white border-0 text-[10px] md:text-xs px-2 py-0.5 font-display shadow-md shadow-amber-500/20 animate-pulse">
+                {userTier === "premium" && (
+                  <Badge className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-black border-0 text-[10px] md:text-xs px-2 py-0.5 font-display shadow-md shadow-amber-500/20 animate-pulse">
                     <Crown className="h-3 w-3 mr-1" />
-                    GOLD
-                  </Badge>
-                )}
-                {userTier === "elite" && (
-                  <Badge className="bg-gradient-to-r from-purple-600 to-indigo-500 text-white border-0 text-[10px] md:text-xs px-2 py-0.5 font-display shadow-md shadow-purple-500/20">
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    ELITE
+                    PREMIUM
                   </Badge>
                 )}
               </div>

@@ -82,11 +82,7 @@ $defaultSettings = array(
   'download_gdrive' => 'https://drive.google.com/file/d/1wYtPOZ5pWw4yVO4_R_wVlKxMvvkgJfJ3/view?usp=sharing',
   'download_filefm' => 'https://files.fm/u/czrengvywk',
   'flash_sale_end' => '',
-  'gamepass_elite_price' => '999',
-  'gamepass_gold_price' => '1999',
-  'elite_extend_per_day_cents' => '0',
-  'gold_extend_per_day_cents' => '0',
-  'extensions_enabled' => '1',
+  'gamepass_premium_price' => '999',
   'game_trailer_url' => '',
   'gamepass_season_start' => '',
 );
@@ -154,6 +150,22 @@ try {
         $stmt->execute(array($key, $value, $user['account_id']));
       }
       
+      // Sync gamepass_season_start to gamepass_settings.season_start
+      if ($key === 'gamepass_season_start' && $value !== '') {
+        try {
+          $seasonVal = $value . ' 00:00:00';
+          $stmt2 = $pdo->prepare("SELECT 1 FROM gamepass_settings WHERE setting_key = 'season_start' LIMIT 1");
+          $stmt2->execute();
+          if ($stmt2->fetch()) {
+            $pdo->prepare("UPDATE gamepass_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = 'season_start'")->execute(array($seasonVal));
+          } else {
+            $pdo->prepare("INSERT INTO gamepass_settings (setting_key, setting_value, updated_at) VALUES ('season_start', ?, NOW())")->execute(array($seasonVal));
+          }
+        } catch (Exception $e) {
+          error_log('[SiteSettings] Failed to sync season_start: ' . $e->getMessage());
+        }
+      }
+
       $updated[] = $key;
     }
 

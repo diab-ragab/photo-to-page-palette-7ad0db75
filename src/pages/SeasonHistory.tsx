@@ -264,7 +264,7 @@ const SeasonHistory = () => {
                         >
                           <div className="flex items-center gap-1 mb-2">
                             <span className="text-3xl">{reward.icon}</span>
-                            {reward.type === "elite" && (
+                            {reward.type === "premium" && (
                               <Crown className="h-3 w-3 text-amber-500" />
                             )}
                           </div>
