@@ -7,6 +7,7 @@
 require_once __DIR__ . '/bootstrap.php';
 handleCors(array('GET', 'POST', 'OPTIONS'));
 require_once __DIR__ . '/session_helper.php';
+require_once __DIR__ . '/gamepass_helpers.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
