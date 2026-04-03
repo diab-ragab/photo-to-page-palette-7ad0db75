@@ -566,15 +566,14 @@ export function GamePassRewardsManager({ username }: GamePassRewardsManagerProps
   };
 
   const handleAssignPass = async (targetUsername: string) => {
-    const days = parseInt(assignDuration) || 30;
-    if (!confirm(`Assign PREMIUM Game Pass to "${targetUsername}" for ${days} days?`)) return;
+    if (!confirm(`Assign PREMIUM Game Pass to "${targetUsername}" for the rest of this season?`)) return;
     setIsAssigning(true);
     try {
       const response = await fetch(adminUrl("gamepass_admin.php?action=assign_pass"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         credentials: "include",
-        body: withToken({ username: targetUsername, tier: "premium", duration_days: days }),
+        body: withToken({ username: targetUsername, tier: "premium" }),
       });
       const data = await response.json();
       if (data.success) {
