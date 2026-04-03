@@ -358,11 +358,18 @@ switch ($action) {
     $q = isset($_GET['q']) ? trim($_GET['q']) : '';
     if (strlen($q) < 2) json_fail(400, 'Search query too short');
 
+    // Detect username column
+    $uCol = 'name';
+    try {
+      $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+      if (in_array('login', $cols) && !in_array('name', $cols)) $uCol = 'login';
+    } catch (Exception $e) {}
+
     $stmt = $pdo->prepare("
-      SELECT memb___id AS username
-      FROM MEMB_INFO
-      WHERE memb___id LIKE ?
-      ORDER BY memb___id ASC
+      SELECT ID as id, `{$uCol}` AS username
+      FROM users
+      WHERE `{$uCol}` LIKE ?
+      ORDER BY `{$uCol}` ASC
       LIMIT 20
     ");
     $stmt->execute(array('%' . $q . '%'));
@@ -373,11 +380,10 @@ switch ($action) {
       $gpStmt = $pdo->prepare("
         SELECT ug.is_premium, ug.expires_at, ug.tier
         FROM user_gamepass ug
-        JOIN users ON users.id = ug.user_id
-        WHERE users.username = ?
+        WHERE ug.user_id = ?
         LIMIT 1
       ");
-      $gpStmt->execute(array($u['username']));
+      $gpStmt->execute(array((int)$u['id']));
       $gp = $gpStmt->fetch(PDO::FETCH_ASSOC);
 
       $tier = 'free';
