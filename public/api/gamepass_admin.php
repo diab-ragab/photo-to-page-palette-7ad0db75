@@ -482,7 +482,14 @@ switch ($action) {
     $username = isset($input['username']) ? trim($input['username']) : '';
     if ($username === '') json_fail(400, 'Username is required');
 
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+    // Detect username column
+    $uCol = 'name';
+    try {
+      $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+      if (in_array('login', $cols) && !in_array('name', $cols)) $uCol = 'login';
+    } catch (Exception $e) {}
+
+    $stmt = $pdo->prepare("SELECT ID as id FROM users WHERE `{$uCol}` = ?");
     $stmt->execute(array($username));
     $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$userRow) json_fail(404, 'User not found: ' . $username);
