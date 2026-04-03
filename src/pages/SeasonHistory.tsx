@@ -88,8 +88,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     theme: "Solar Eclipse",
     themeColor: "from-orange-400 to-red-600",
     plannedRewards: [
-      { name: "Solar Phoenix", icon: "🔥", rarity: "legendary", type: "elite" },
-      { name: "Sun God Helm", icon: "☀️", rarity: "legendary", type: "elite" },
+      { name: "Solar Phoenix", icon: "🔥", rarity: "legendary", type: "premium" },
+      { name: "Sun God Helm", icon: "☀️", rarity: "legendary", type: "premium" },
       { name: "Flame Spirit Pet", icon: "🌟", rarity: "epic", type: "free" },
       { name: "Ember Cloak", icon: "🧥", rarity: "rare", type: "free" },
     ],
