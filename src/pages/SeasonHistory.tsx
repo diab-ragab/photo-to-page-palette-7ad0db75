@@ -116,8 +116,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     theme: "Lightning Gods",
     themeColor: "from-indigo-500 to-purple-700",
     plannedRewards: [
-      { name: "Storm Dragon", icon: "⚡", rarity: "legendary", type: "elite" },
-      { name: "Thunder God Armor", icon: "🌩️", rarity: "legendary", type: "elite" },
+      { name: "Storm Dragon", icon: "⚡", rarity: "legendary", type: "premium" },
+      { name: "Thunder God Armor", icon: "🌩️", rarity: "legendary", type: "premium" },
       { name: "Electric Sprite Pet", icon: "💫", rarity: "epic", type: "free" },
       { name: "Lightning Staff", icon: "🪄", rarity: "rare", type: "free" },
     ],
