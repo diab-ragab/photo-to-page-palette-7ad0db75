@@ -60,8 +60,8 @@ const upcomingSeasons: UpcomingSeason[] = [
     theme: "Nature's Rebirth",
     themeColor: "from-green-400 to-emerald-600",
     plannedRewards: [
-      { name: "Forest Guardian Mount", icon: "🦌", rarity: "legendary", type: "elite" },
-      { name: "Bloom Crown", icon: "🌸", rarity: "legendary", type: "elite" },
+      { name: "Forest Guardian Mount", icon: "🦌", rarity: "legendary", type: "premium" },
+      { name: "Bloom Crown", icon: "🌸", rarity: "legendary", type: "premium" },
       { name: "Butterfly Swarm Pet", icon: "🦋", rarity: "epic", type: "free" },
       { name: "Vine Armor", icon: "🌿", rarity: "rare", type: "free" },
     ],
