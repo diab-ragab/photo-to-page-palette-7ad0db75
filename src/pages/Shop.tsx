@@ -13,7 +13,7 @@ import { GamePassComparisonTable } from "@/components/shop/GamePassComparisonTab
 import { FlashSaleCountdown } from "@/components/shop/FlashSaleCountdown";
 import { GamePassParticles } from "@/components/shop/GamePassParticles";
 import { LiveActivityFeed } from "@/components/shop/LiveActivityFeed";
-import { GamePassExtendCards } from "@/components/shop/GamePassExtendCards";
+
 import { ShoppingCart, ArrowRight, Zap, Crown, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
