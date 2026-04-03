@@ -29,12 +29,8 @@ const Shop = () => {
   const [premiumPriceCents, setPremiumPriceCents] = useState(999);
   const [premiumEnabled, setPremiumEnabled] = useState(true);
 
-  const [extensionsEnabled, setExtensionsEnabled] = useState(true);
-  const [premiumExtendPerDay, setPremiumExtendPerDay] = useState(0);
 
   const [userTier, setUserTier] = useState<"free" | "premium">("free");
-  const [passExpiresAt, setPassExpiresAt] = useState<string | null>(null);
-  const [passRemainingDays, setPassRemainingDays] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     const loadData = async () => {
