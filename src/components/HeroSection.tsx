@@ -39,12 +39,19 @@ export const HeroSection = () => {
         style={{ y: videoY }}
       >
         <motion.div
-          className="absolute w-full h-full bg-cover bg-center bg-no-repeat"
-          style={{ 
-            scale: videoScale,
-            backgroundImage: `url(${heroBg})`,
-          }}
-        />
+          className="absolute w-full h-full"
+          style={{ scale: videoScale }}
+        >
+          <img
+            src={heroBg}
+            alt="WOI Endgame hero background"
+            width={1920}
+            height={1080}
+            fetchPriority="high"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover object-center"
+          />
+        </motion.div>
       </motion.div>
       
       {/* Gradient Overlay with Glow Effects */}
