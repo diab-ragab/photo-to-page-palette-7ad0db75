@@ -23,7 +23,7 @@ const defaultMeta = {
   title: "WOI Endgame | #1 World of Illusions Private Server",
   description: "Join WOI Endgame, the best World of Illusions private server. 9 unique classes, custom dungeons, active community, x10 EXP rates. Free to play!",
   keywords: "WOI Endgame, World of Illusions private server, WOI private server, MMORPG, free MMO, Paladin, Necromancer, Warlock, Berserker, Assassin, Ranger, Magus, Monk, Heretic, custom dungeons, PvP",
-  ogImage: "/og-image.jpg",
+  ogImage: "https://woiendgame.lovable.app/og-image.jpg",
   twitterCard: "summary_large_image" as const,
   locale: "en_US",
 };
@@ -40,6 +40,8 @@ export const SEO = ({
   structuredData,
   breadcrumbs,
 }: SEOProps) => {
+  const SITE_ORIGIN = "https://woiendgame.lovable.app";
+  const absoluteOgImage = ogImage.startsWith("http") ? ogImage : `${SITE_ORIGIN}${ogImage.startsWith("/") ? "" : "/"}${ogImage}`;
   const fullTitle = title 
     ? `${title} | ${defaultMeta.siteName}` 
     : defaultMeta.title;
@@ -88,7 +90,7 @@ export const SEO = ({
       <meta property="og:url" content={canonical} />
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={description} />
-      <meta property="og:image" content={ogImage} />
+      <meta property="og:image" content={absoluteOgImage} />
       <meta property="og:site_name" content={defaultMeta.siteName} />
       <meta property="og:locale" content={defaultMeta.locale} />
       
@@ -97,7 +99,7 @@ export const SEO = ({
       <meta name="twitter:url" content={canonical} />
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />
-      <meta name="twitter:image" content={ogImage} />
+      <meta name="twitter:image" content={absoluteOgImage} />
       
       {/* Structured Data */}
       <script type="application/ld+json">

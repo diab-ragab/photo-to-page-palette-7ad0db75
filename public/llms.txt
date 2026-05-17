@@ -1,0 +1,28 @@
+# WOI Endgame
+
+> The #1 World of Illusions private server — 9 unique classes, custom dungeons, x10 EXP rates, and an active community. Free to play.
+
+## Pages
+
+- [Home](/): Server overview, features, and live status.
+- [Download](/download): Get the launcher and start playing.
+- [Shop](/shop): Flash sales and the Premium Game Pass.
+- [Blog](/blog): Patch notes, events, and game updates.
+- [Support](/support): Help center and contact options.
+- [Seasons](/seasons): Season history and leaderboards.
+- [Refund Policy](/refund): Refund rules for purchases.
+- [Refund FAQ](/refund-faq): Common refund and delivery questions.
+- [Terms](/terms): Terms of service.
+- [Privacy](/privacy): Privacy policy.
+
+## Classes
+
+- [Berzerker](/class/berzerker)
+- [Magus](/class/magus)
+- [Champion](/class/champion)
+- [Heretic](/class/heretic)
+- [Slayer](/class/slayer)
+- [Duelist](/class/duelist)
+- [Ranger](/class/ranger)
+- [Enchantress](/class/enchantress)
+- [Harbinger](/class/harbinger)

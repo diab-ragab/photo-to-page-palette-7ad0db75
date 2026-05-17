@@ -83,7 +83,51 @@ const Shop = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <SEO title="Shop" description="Flash sales and premium Game Pass for WOI Endgame." keywords="WOI shop, game pass, flash sale, premium" />
+      <SEO
+        title="Shop"
+        description="Flash sales and premium Game Pass for WOI Endgame."
+        keywords="WOI shop, game pass, flash sale, premium"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "WOI Endgame Shop",
+          description: "Flash sales and the Premium Game Pass for WOI Endgame.",
+          url: "https://woiendgame.lovable.app/shop",
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: [
+              {
+                "@type": "Product",
+                name: "Premium Game Pass",
+                description: "30 days of premium daily rewards including 30M Zen and exclusive fashion & back items.",
+                brand: { "@type": "Brand", name: "WOI Endgame" },
+                offers: {
+                  "@type": "Offer",
+                  price: (premiumPriceCents / 100).toFixed(2),
+                  priceCurrency: "USD",
+                  availability: premiumEnabled
+                    ? "https://schema.org/InStock"
+                    : "https://schema.org/OutOfStock",
+                  url: "https://woiendgame.lovable.app/shop",
+                },
+              },
+              ...products.slice(0, 20).map((p) => ({
+                "@type": "Product",
+                name: p.name,
+                description: p.description || undefined,
+                image: p.image_url || undefined,
+                offers: {
+                  "@type": "Offer",
+                  price: (p.price_cents / 100).toFixed(2),
+                  priceCurrency: "USD",
+                  availability: "https://schema.org/InStock",
+                  url: "https://woiendgame.lovable.app/shop",
+                },
+              })),
+            ],
+          },
+        }}
+      />
       <Navbar />
 
       <section className="pt-24 pb-16 relative overflow-hidden">
