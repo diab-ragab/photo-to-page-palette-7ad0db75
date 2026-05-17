@@ -62,6 +62,16 @@ const RefundFAQ = () => {
     },
   ];
 
+  const faqStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.question,
+      acceptedAnswer: { "@type": "Answer", text: f.answer },
+    })),
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SEO
@@ -69,6 +79,7 @@ const RefundFAQ = () => {
         description="Frequently asked questions about WOI Endgame refunds, delivery issues, chargebacks, and how to request support."
         keywords="WOI refund FAQ, refund help, chargeback policy, WOI Endgame support"
         breadcrumbs={breadcrumbs}
+        structuredData={faqStructuredData}
       />
       <Navbar />
       <main className="container py-20 px-4">
