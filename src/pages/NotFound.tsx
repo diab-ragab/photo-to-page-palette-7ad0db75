@@ -18,8 +18,8 @@ const NotFound = () => {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <SEO
-        title="الصفحة غير موجودة | WOI Endgame"
-        description="عذراً، الصفحة التي تبحث عنها غير موجودة أو تم نقلها. عُد إلى الصفحة الرئيسية لـ WOI Endgame واستكشف عالم War of the Immortals."
+        title="Page Not Found | WOI Endgame"
+        description="The page you're looking for doesn't exist or has been moved. Return to WOI Endgame and explore the War of the Immortals private server."
         noIndex={true}
       />
       <Navbar />
