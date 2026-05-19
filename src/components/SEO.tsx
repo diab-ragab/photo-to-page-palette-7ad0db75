@@ -22,7 +22,7 @@ const defaultMeta = {
   siteName: "WOI Endgame",
   title: "WOI Endgame | #1 War of the Immortals Private Server",
   description: "Join WOI Endgame, the best War of the Immortals private server. 9 unique classes, custom dungeons, active community, x10 EXP rates. Free to play!",
-  keywords: "WOI Endgame, War of the Immortals private server, WOI private server, MMORPG, free MMO, Paladin, Necromancer, Warlock, Berserker, Assassin, Ranger, Magus, Monk, Heretic, custom dungeons, PvP",
+  keywords: "WOI Endgame, War of the Immortals private server, WOTI private server, WOTI Endgame, WOI private server, MMORPG, free MMO, Paladin, Necromancer, Warlock, Berserker, Assassin, Ranger, Magus, Monk, Heretic, custom dungeons, PvP",
   ogImage: "https://woiendgame.lovable.app/og-image.jpg",
   twitterCard: "summary_large_image" as const,
   locale: "en_US",
