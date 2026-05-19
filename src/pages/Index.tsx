@@ -18,7 +18,7 @@ const Index = () => {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "WOI Endgame",
-    description: "Experience the ultimate World of Illusions private server with exclusive classes, custom content, and an active community.",
+    description: "Experience the ultimate War of the Immortals private server with exclusive classes, custom content, and an active community.",
     url: typeof window !== "undefined" ? window.location.origin : "",
     potentialAction: {
       "@type": "SearchAction",
@@ -33,8 +33,8 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SEO 
-        description="Join WOI Endgame, the top World of Illusions private server. 9 classes, custom dungeons, x10 EXP, active community. Free to play!"
-        keywords="WOI Endgame, World of Illusions private server, best WOI server, MMORPG 2026, Paladin class, Necromancer, Warlock, Berserker, Assassin, Ranger, Magus, Monk, Heretic, custom dungeons, free MMO"
+        description="Join WOI Endgame, the top War of the Immortals private server. 9 classes, custom dungeons, x10 EXP, active community. Free to play!"
+        keywords="WOI Endgame, War of the Immortals private server, best WOI server, MMORPG 2026, Paladin class, Necromancer, Warlock, Berserker, Assassin, Ranger, Magus, Monk, Heretic, custom dungeons, free MMO"
         structuredData={structuredData}
       />
       <Navbar />
