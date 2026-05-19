@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => ({
       manifest: {
         name: "WOI Endgame",
         short_name: "WOI",
-        description: "The #1 World of Illusions Private Server",
+        description: "The #1 War of the Immortals Private Server",
         theme_color: "#0a0a0a",
         background_color: "#0a0a0a",
         display: "standalone",

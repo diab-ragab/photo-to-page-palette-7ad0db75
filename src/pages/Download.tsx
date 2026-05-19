@@ -86,8 +86,8 @@ const DownloadPage = () => {
     <>
       <SEO
         title="Download"
-        description="Download WOI Endgame game client free for Windows. Check system requirements, installation guide, and start playing the best World of Illusions private server."
-        keywords="WOI Endgame download, game client, World of Illusions download, private server client, free MMORPG download, Windows game"
+        description="Download WOI Endgame game client free for Windows. Check system requirements, installation guide, and start playing the best War of the Immortals private server."
+        keywords="WOI Endgame download, game client, War of the Immortals download, private server client, free MMORPG download, Windows game"
         structuredData={{
           "@context": "https://schema.org",
           "@type": "SoftwareApplication",
