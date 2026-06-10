@@ -213,7 +213,7 @@ const AchievementItem = ({
         </div>
 
         {/* Claim Button */}
-        {canClaim && hasReward && (
+        {canClaim && (
           <Button
             size="sm"
             onClick={() => onClaim(achievement.id)}
@@ -221,7 +221,7 @@ const AchievementItem = ({
             className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-bold shrink-0"
           >
             <Gift className="h-4 w-4 mr-1" />
-            Claim
+            {hasReward ? "Claim" : "Complete"}
           </Button>
         )}
       </div>
