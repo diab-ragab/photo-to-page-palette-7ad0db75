@@ -64,6 +64,17 @@ export default defineConfig(({ mode }) => ({
             sizes: "512x512",
             type: "image/png",
           },
+          {
+            src: "/android-adaptive-foreground.png",
+            sizes: "432x432",
+            type: "image/png",
+            purpose: "maskable",
+          },
+          {
+            src: "/apple-touch-icon-180x180.png",
+            sizes: "180x180",
+            type: "image/png",
+          },
         ],
       },
       workbox: {
